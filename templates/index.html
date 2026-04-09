@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-inner">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div class="logo">
+                        <span class="logo-icon">🧰</span>
+                        <span class="logo-text">程钰的百宝箱</span>
+                    </div>
+                    <a href="/settings" title="设置" style="color:var(--text-muted);font-size:20px;text-decoration:none;padding:4px 8px;border-radius:8px;transition:color 0.2s,background 0.2s;"
+                       onmouseover="this.style.color='var(--text-primary)';this.style.background='var(--bg-card)'"
+                       onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent'">⚙️</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="section-label">功能入口</div>
+            <div class="card-grid">
+                {% for feature in features %}
+                <a href="{{ feature.url }}"
+                   class="card {% if feature.status == 'coming_soon' %}card--disabled{% endif %}">
+                    <div class="card-icon-wrap">
+                        <span class="card-icon">{{ feature.icon }}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="card-title">{{ feature.title }}</div>
+                        <div class="card-desc">{{ feature.description }}</div>
+                    </div>
+                    {% if feature.status == 'coming_soon' %}
+                    <div class="card-badge">即将上线</div>
+                    {% else %}
+                    <svg class="card-arrow" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    {% endif %}
+                </a>
+                {% endfor %}
+
+            </div>
+        </main>
+
+        <footer class="footer">
+            <span>程钰的百宝箱 · 本地版</span>
+        </footer>
+    </div>
+</body>
+</html>

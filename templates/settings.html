@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">⚙️</span>
+                    <span class="logo-text">设置</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="section-label">语音识别服务</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label class="form-label">Qwen API Key</label>
+                        <input type="password" id="qwen_api_key" name="qwen_api_key"
+                               value="{{ qwen_key }}"
+                               placeholder="sk-..." autocomplete="off">
+                        <div class="form-hint">用于录音转会议纪要，前往 dashscope.aliyuncs.com 获取</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">音频模型</label>
+                        <select id="qwen_audio_model" name="qwen_audio_model">
+                            <option value="qwen-audio-turbo" {% if qwen_model == 'qwen-audio-turbo' %}selected{% endif %}>qwen-audio-turbo（快速）</option>
+                            <option value="qwen-audio-chat"  {% if qwen_model == 'qwen-audio-chat'  %}selected{% endif %}>qwen-audio-chat（精准）</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width:100%;margin-top:4px;">保存设置</button>
+                </form>
+                <div id="save-msg" style="display:none;text-align:center;margin-top:10px;color:var(--accent);font-size:13px;">✅ 已保存</div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer"><span>程钰的百宝箱 · 本地版</span></footer>
+</div>
+<script>
+document.getElementById('settings-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    await fetch('/settings', { method: 'POST', body: fd });
+    const msg = document.getElementById('save-msg');
+    msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 2000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待办管理 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-inner">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div class="logo">
+                        <a href="/" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;">
+                            <span class="logo-icon">🧰</span>
+                            <span class="logo-text">程钰的百宝箱</span>
+                        </a>
+                    </div>
+                    <a href="/settings" title="设置" style="color:var(--text-muted);font-size:20px;text-decoration:none;padding:4px 8px;border-radius:8px;transition:color 0.2s,background 0.2s;"
+                       onmouseover="this.style.color='var(--text-primary)';this.style.background='var(--bg-card)';"
+                       onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent';">⚙️</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="section-label">新建待办</div>
+            <div class="card">
+                <div class="card-body" style="display:block;">
+                    <form id="task-form" class="task-form">
+                        <input type="text" id="task-title" placeholder="任务标题" required>
+                        <textarea id="task-note" placeholder="备注（可选）" rows="2"></textarea>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="date" id="task-date" required style="flex:1;">
+                            <button type="submit" class="btn-primary">添加</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="section-label">今日待办</div>
+            <div id="today-tasks" class="task-list"></div>
+
+            <div class="section-label">本周完成情况</div>
+            <div id="weekly-report" class="report"></div>
+        </main>
+
+        <footer class="footer">
+            <span>程钰的百宝箱 · 本地版</span>
+        </footer>
+    </div>
+
+    <script>
+        const todayTasksEl   = document.getElementById('today-tasks');
+        const weeklyReportEl = document.getElementById('weekly-report');
+
+        function fmt(date) { return date.toISOString().split('T')[0]; }
+
+        function makeTaskEl(task, date) {
+            const el       = document.createElement('div');
+            el.className   = `task-item ${task.status === 'done' ? 'task-item--done' : ''}`;
+
+            const checkEl  = document.createElement('div');
+            checkEl.className = 'task-check';
+            checkEl.textContent = task.status === 'done' ? '✅' : '⬜';
+            checkEl.addEventListener('click', () => toggleTask(task.id, task.status, date));
+
+            const contentEl = document.createElement('div');
+            contentEl.className = 'task-content';
+
+            const titleEl  = document.createElement('div');
+            titleEl.className = 'task-title';
+            titleEl.textContent = task.title;
+            contentEl.appendChild(titleEl);
+
+            if (task.note) {
+                const noteEl = document.createElement('div');
+                noteEl.className = 'task-note';
+                noteEl.textContent = task.note;
+                contentEl.appendChild(noteEl);
+            }
+
+            const delBtn   = document.createElement('button');
+            delBtn.className = 'task-delete';
+            delBtn.title   = '删除';
+            delBtn.textContent = '✕';
+            delBtn.addEventListener('click', () => deleteTask(task.id, date));
+
+            el.appendChild(checkEl);
+            el.appendChild(contentEl);
+            el.appendChild(delBtn);
+            return el;
+        }
+
+        async function fetchTasks(date) {
+            const res   = await fetch(`/api/tasks?date=${encodeURIComponent(date)}`);
+            const tasks = await res.json();
+            todayTasksEl.replaceChildren();
+            if (!tasks.length) {
+                const empty = document.createElement('div');
+                empty.className = 'task-empty';
+                empty.textContent = '暂无待办';
+                todayTasksEl.appendChild(empty);
+                return;
+            }
+            tasks.forEach(task => todayTasksEl.appendChild(makeTaskEl(task, date)));
+        }
+
+        async function toggleTask(id, currentStatus, date) {
+            const newStatus = currentStatus === 'done' ? 'todo' : 'done';
+            await fetch(`/api/tasks/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            fetchTasks(date);
+        }
+
+        async function deleteTask(id, date) {
+            await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            fetchTasks(date);
+            fetchWeeklyReport();
+        }
+
+        async function fetchWeeklyReport() {
+            const res   = await fetch('/api/tasks/dates');
+            const dates = await res.json();
+            weeklyReportEl.replaceChildren();
+            if (!dates.length) {
+                const empty = document.createElement('div');
+                empty.className = 'task-empty';
+                empty.textContent = '暂无记录';
+                weeklyReportEl.appendChild(empty);
+                return;
+            }
+            const byWeek = {};
+            dates.forEach(({ task_date }) => {
+                const d = new Date(task_date);
+                d.setDate(d.getDate() - d.getDay() + 1);
+                const key = fmt(d);
+                if (!byWeek[key]) byWeek[key] = [];
+                byWeek[key].push(task_date);
+            });
+            Object.keys(byWeek).sort().reverse().forEach(weekKey => {
+                const weekEl   = document.createElement('div');
+                weekEl.className = 'week-item';
+                const labelEl  = document.createElement('div');
+                labelEl.className = 'week-label';
+                labelEl.textContent = `第 ${new Date(weekKey).toLocaleDateString('zh-CN', {month:'long', day:'numeric'})} 周`;
+                const datesEl  = document.createElement('div');
+                datesEl.className = 'week-dates';
+                datesEl.textContent = byWeek[weekKey].join('  ');
+                weekEl.appendChild(labelEl);
+                weekEl.appendChild(datesEl);
+                weeklyReportEl.appendChild(weekEl);
+            });
+        }
+
+        document.getElementById('task-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title    = document.getElementById('task-title').value.trim();
+            const note     = document.getElementById('task-note').value.trim();
+            const taskDate = document.getElementById('task-date').value;
+            await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, note, is_recurring: 0, task_date: taskDate })
+            });
+            fetchTasks(taskDate);
+            e.target.reset();
+            document.getElementById('task-date').value = fmt(new Date());
+        });
+
+        const today = fmt(new Date());
+        document.getElementById('task-date').value = today;
+        fetchTasks(today);
+        fetchWeeklyReport();
+    </script>
+</body>
+</html>

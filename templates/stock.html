@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票分析 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="page page--wide">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <a href="/" class="back-btn">←</a>
+                    <div class="logo">
+                        <span class="logo-icon">📈</span>
+                        <span class="logo-text">股票分析</span>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <select id="date-select" class="date-select">
+                        {% for d in dates %}
+                        <option value="{{ d }}">{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                    <button id="refresh-btn" class="btn-secondary" title="刷新">↻</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main" id="stock-main">
+        <div id="loading" style="text-align:center;padding:60px 0;color:var(--text-muted);">加载中…</div>
+        <div id="stock-content" style="display:none;">
+            <!-- 排行榜 -->
+            <div class="section-label">明日上涨概率排行</div>
+            <div id="rank-list"></div>
+
+            <!-- 详细卡片 -->
+            <div class="section-label" style="margin-top:24px;">个股详情</div>
+            <div id="detail-list"></div>
+        </div>
+    </main>
+    <footer class="footer"><span>程钰的百宝箱 · 本地版</span></footer>
+</div>
+
+<script>
+const dateSelect = document.getElementById('date-select');
+
+function probColor(p) {
+    if (p >= 60) return '#34c759';
+    if (p >= 45) return '#ff9500';
+    return '#ff3b30';
+}
+
+function scoreBar(score) {
+    const filled = Math.round(score / 20);
+    return '★'.repeat(filled) + '☆'.repeat(5 - filled);
+}
+
+function renderRank(stocks) {
+    const el = document.getElementById('rank-list');
+    el.replaceChildren();
+    stocks.forEach((s, i) => {
+        const card = document.createElement('div');
+        card.className = 'rank-card';
+        card.style.setProperty('--prob-color', probColor(s.probability));
+
+        const pct = s.probability;
+        const changeSign = s.change_pct >= 0 ? '+' : '';
+        const chipSigs = s.chip['筹码信号'] || '—';
+
+        const num    = document.createElement('div'); num.className = 'rank-num'; num.textContent = i + 1;
+        const info   = document.createElement('div'); info.className = 'rank-info';
+        const row1   = document.createElement('div'); row1.className = 'rank-row1';
+
+        const nameEl = document.createElement('span'); nameEl.className = 'rank-name'; nameEl.textContent = s.name;
+        const codeEl = document.createElement('span'); codeEl.className = 'rank-code'; codeEl.textContent = s.code;
+        const chgEl  = document.createElement('span');
+        chgEl.className = 'rank-change ' + (s.change_pct >= 0 ? 'up' : 'down');
+        chgEl.textContent = changeSign + s.change_pct.toFixed(2) + '%';
+
+        row1.appendChild(nameEl); row1.appendChild(codeEl); row1.appendChild(chgEl);
+
+        const barWrap = document.createElement('div'); barWrap.className = 'prob-bar-wrap';
+        const bar = document.createElement('div'); bar.className = 'prob-bar';
+        bar.style.width = pct + '%';
+        const barLabel = document.createElement('span'); barLabel.className = 'prob-label';
+        barLabel.textContent = pct + '%';
+        barWrap.appendChild(bar); barWrap.appendChild(barLabel);
+
+        const sigEl = document.createElement('div'); sigEl.className = 'rank-signals';
+        const allSigs = [...(s.signals || [])];
+        if (s.chip['筹码信号'] && s.chip['筹码信号'] !== '无') allSigs.push(s.chip['筹码信号']);
+        allSigs.forEach(sig => {
+            const t = document.createElement('span'); t.className = 'sig-tag'; t.textContent = sig;
+            sigEl.appendChild(t);
+        });
+
+        info.appendChild(row1); info.appendChild(barWrap); info.appendChild(sigEl);
+        card.appendChild(num); card.appendChild(info);
+        el.appendChild(card);
+    });
+}
+
+function renderDetail(stocks) {
+    const el = document.getElementById('detail-list');
+    el.replaceChildren();
+    stocks.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'detail-card';
+
+        // 标题行
+        const header = document.createElement('div'); header.className = 'detail-header';
+        const title  = document.createElement('div'); title.className = 'detail-title';
+        const emoji  = document.createElement('span'); emoji.textContent = s.emoji + ' ';
+        const nameEl = document.createElement('span'); nameEl.textContent = s.name;
+        const codeEl = document.createElement('span'); codeEl.className = 'detail-code'; codeEl.textContent = ' (' + s.code + ')';
+        title.appendChild(emoji); title.appendChild(nameEl); title.appendChild(codeEl);
+
+        const probEl = document.createElement('div'); probEl.className = 'detail-prob';
+        probEl.style.color = probColor(s.probability);
+        probEl.textContent = s.probability + '%';
+
+        header.appendChild(title); header.appendChild(probEl);
+
+        // 价格行
+        const priceRow = document.createElement('div'); priceRow.className = 'detail-price-row';
+        const priceEl = document.createElement('span'); priceEl.textContent = s.price.toFixed(2) + ' 元';
+        const chgEl   = document.createElement('span');
+        chgEl.className = s.change_pct >= 0 ? 'up' : 'down';
+        chgEl.textContent = (s.change_pct >= 0 ? '+' : '') + s.change_pct.toFixed(2) + '%';
+        priceRow.appendChild(priceEl); priceRow.appendChild(chgEl);
+
+        // 评分条
+        const scoresEl = document.createElement('div'); scoresEl.className = 'score-grid';
+        const scoreNames = {'技术面':'🔧','基本面':'📊','资金面':'💰','情绪面':'🔥','筹码面':'📐'};
+        Object.entries(scoreNames).forEach(([dim, icon]) => {
+            const val = s.scores[dim] || 0;
+            const item = document.createElement('div'); item.className = 'score-item';
+            const lbl  = document.createElement('span'); lbl.className = 'score-dim'; lbl.textContent = icon + ' ' + dim;
+            const stars= document.createElement('span'); stars.className = 'score-stars'; stars.textContent = scoreBar(val);
+            const num  = document.createElement('span'); num.className = 'score-num'; num.textContent = val;
+            item.appendChild(lbl); item.appendChild(stars); item.appendChild(num);
+            scoresEl.appendChild(item);
+        });
+
+        // 筹码区块
+        const chipEl = document.createElement('div'); chipEl.className = 'chip-block';
+        const chipTitle = document.createElement('div'); chipTitle.className = 'chip-title'; chipTitle.textContent = '📐 筹码集中度';
+        chipEl.appendChild(chipTitle);
+
+        const chipInfo = {
+            '70%筹码区间': s.chip['70%筹码区间'] || '—',
+            '筹码宽度':     s.chip['筹码宽度']     || '—',
+            '获利比例':     s.chip['获利比例']     || '—',
+            '收敛趋势':     s.chip['15日收敛趋势'] || '—',
+        };
+        const chipGrid = document.createElement('div'); chipGrid.className = 'chip-grid';
+        Object.entries(chipInfo).forEach(([k, v]) => {
+            const item = document.createElement('div'); item.className = 'chip-item';
+            const kEl  = document.createElement('span'); kEl.className = 'chip-key'; kEl.textContent = k;
+            const vEl  = document.createElement('span'); vEl.className = 'chip-val'; vEl.textContent = v;
+            item.appendChild(kEl); item.appendChild(vEl);
+            chipGrid.appendChild(item);
+        });
+        chipEl.appendChild(chipGrid);
+
+        if (s.chip['trend_bar']) {
+            const bar = document.createElement('div'); bar.className = 'chip-trend-bar';
+            bar.textContent = '趋势：' + s.chip['trend_bar'];
+            chipEl.appendChild(bar);
+        }
+        if (s.chip['筹码信号'] && s.chip['筹码信号'] !== '无') {
+            const sig = document.createElement('div'); sig.className = 'chip-signal-tag';
+            sig.textContent = s.chip['筹码信号'];
+            chipEl.appendChild(sig);
+        }
+
+        // 指标表
+        const indEl = document.createElement('div'); indEl.className = 'ind-grid';
+        const indKeys = ['主力资金','MACD','KDJ','布林带','换手率','量比'];
+        indKeys.forEach(k => {
+            if (!s.indicators[k]) return;
+            const item = document.createElement('div'); item.className = 'ind-item';
+            const kEl  = document.createElement('span'); kEl.className = 'ind-key'; kEl.textContent = k;
+            const vEl  = document.createElement('span'); vEl.className = 'ind-val'; vEl.textContent = s.indicators[k].value;
+            const sEl  = document.createElement('span'); sEl.className = 'ind-sig'; sEl.textContent = s.indicators[k].signal;
+            item.appendChild(kEl); item.appendChild(vEl); item.appendChild(sEl);
+            indEl.appendChild(item);
+        });
+
+        card.appendChild(header);
+        card.appendChild(priceRow);
+        card.appendChild(scoresEl);
+        card.appendChild(chipEl);
+        card.appendChild(indEl);
+        el.appendChild(card);
+    });
+}
+
+async function loadReport(date) {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('stock-content').style.display = 'none';
+    const res  = await fetch('/api/stock/report?date=' + encodeURIComponent(date));
+    const data = await res.json();
+    document.getElementById('loading').style.display = 'none';
+    if (data.error) { document.getElementById('loading').textContent = data.error; document.getElementById('loading').style.display='block'; return; }
+    renderRank(data.stocks);
+    renderDetail(data.stocks);
+    document.getElementById('stock-content').style.display = 'block';
+}
+
+dateSelect.addEventListener('change', () => loadReport(dateSelect.value));
+
+const refreshBtn = document.getElementById('refresh-btn');
+refreshBtn.addEventListener('click', async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = '…';
+    document.getElementById('loading').textContent = '正在重新生成报告，请稍候…';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('stock-content').style.display = 'none';
+    try {
+        const res  = await fetch('/api/stock/refresh', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) {
+            document.getElementById('loading').textContent = '生成失败：' + data.error;
+        } else {
+            // 更新日期下拉列表
+            dateSelect.replaceChildren();
+            (data.dates || []).forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.textContent = d;
+                dateSelect.appendChild(opt);
+            });
+            if (data.latest) {
+                dateSelect.value = data.latest;
+                await loadReport(data.latest);
+            }
+        }
+    } catch(e) {
+        document.getElementById('loading').textContent = '请求失败：' + e.message;
+        document.getElementById('loading').style.display = 'block';
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '↻';
+    }
+});
+
+if (dateSelect.value) loadReport(dateSelect.value);
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>录音转会议纪要 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">🎙️</span>
+                    <span class="logo-text">录音转会议纪要</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- 上传区 -->
+        <div class="section-label">上传录音文件</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <div id="drop-zone" class="drop-zone">
+                    <div class="drop-icon">🎵</div>
+                    <div class="drop-text">拖拽音频文件到此处，或点击选择</div>
+                    <div class="drop-hint">支持 MP3、M4A、WAV、AAC、OGG</div>
+                    <input type="file" id="audio-file" accept="audio/*" style="display:none;">
+                </div>
+                <div id="file-info" class="file-info" style="display:none;"></div>
+                <button id="transcribe-btn" class="btn-primary" style="width:100%;margin-top:12px;display:none;">
+                    开始转写
+                </button>
+            </div>
+        </div>
+
+        <!-- 进度 -->
+        <div id="progress-area" style="display:none;">
+            <div class="section-label">处理中</div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;text-align:center;padding:24px 0;">
+                    <div class="spinner"></div>
+                    <div style="margin-top:12px;color:var(--text-muted);font-size:14px;">正在调用 Qwen 语音识别…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果 -->
+        <div id="result-area" style="display:none;">
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>会议纪要</span>
+                <button id="copy-btn" class="btn-secondary">复制</button>
+            </div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <pre id="minutes-output" class="minutes-pre"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- 错误 -->
+        <div id="error-area" style="display:none;">
+            <div class="section-label">错误</div>
+            <div class="card card--error" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div id="error-msg" style="color:#ff3b30;font-size:14px;"></div>
+                    <a href="/settings" style="font-size:13px;color:var(--accent);margin-top:8px;display:inline-block;">去设置页配置 API Key →</a>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer class="footer"><span>程钰的百宝箱 · 本地版</span></footer>
+</div>
+
+<script>
+const dropZone   = document.getElementById('drop-zone');
+const fileInput  = document.getElementById('audio-file');
+const fileInfo   = document.getElementById('file-info');
+const btn        = document.getElementById('transcribe-btn');
+const progressEl = document.getElementById('progress-area');
+const resultEl   = document.getElementById('result-area');
+const errorEl    = document.getElementById('error-area');
+const outputEl   = document.getElementById('minutes-output');
+const copyBtn    = document.getElementById('copy-btn');
+
+let selectedFile = null;
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drop-zone--over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drop-zone--over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drop-zone--over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+    selectedFile = f;
+    fileInfo.style.display = 'block';
+    fileInfo.textContent = f.name + '  (' + (f.size / 1024 / 1024).toFixed(2) + ' MB)';
+    btn.style.display = 'block';
+    resultEl.style.display = 'none';
+    errorEl.style.display  = 'none';
+}
+
+btn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    btn.disabled = true;
+    progressEl.style.display = 'block';
+    resultEl.style.display   = 'none';
+    errorEl.style.display    = 'none';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+        const res  = await fetch('/api/audio/transcribe', { method: 'POST', body: fd });
+        const data = await res.json();
+        progressEl.style.display = 'none';
+        if (data.error) {
+            errorEl.style.display = 'block';
+            document.getElementById('error-msg').textContent = data.error;
+        } else {
+            outputEl.textContent     = data.minutes;
+            resultEl.style.display  = 'block';
+        }
+    } catch (e) {
+        progressEl.style.display = 'none';
+        errorEl.style.display    = 'block';
+        document.getElementById('error-msg').textContent = '请求失败：' + e.message;
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(outputEl.textContent).then(() => {
+        copyBtn.textContent = '已复制 ✓';
+        setTimeout(() => copyBtn.textContent = '复制', 2000);
+    });
+});
+</script>
+</body>
+</html>
