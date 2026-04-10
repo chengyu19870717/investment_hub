@@ -474,6 +474,7 @@
         ifaceInputFields = [];
         ifaceOutputFields = [];
         $('#ifaceModalTitle').textContent = '新增接口';
+        renderPool('ifacePoolList', null, 'ifacePoolSearch');
         renderDragList('ifaceInputList', ifaceInputFields, 'ifaceInput');
         renderDragList('ifaceOutputList', ifaceOutputFields, 'ifaceOutput');
         openModal('ifaceModal');
@@ -513,6 +514,7 @@
         $('#ifaceModalTitle').textContent = '编辑接口';
         ifaceInputFields = parseJSON(ifc.input_json, []);
         ifaceOutputFields = parseJSON(ifc.output_json, []);
+        renderPool('ifacePoolList', null, 'ifacePoolSearch');
         renderDragList('ifaceInputList', ifaceInputFields, 'ifaceInput');
         renderDragList('ifaceOutputList', ifaceOutputFields, 'ifaceOutput');
         openModal('ifaceModal');
@@ -575,6 +577,7 @@
         ruleInputFields = [];
         ruleOutputFields = [];
         $('#ruleModalTitle').textContent = '新增规则';
+        renderPool('rulePoolList', null, 'rulePoolSearch');
         renderDragList('ruleInputList', ruleInputFields, 'ruleInput');
         renderDragList('ruleOutputList', ruleOutputFields, 'ruleOutput');
         openModal('ruleModal');
@@ -614,6 +617,7 @@
         $('#ruleModalTitle').textContent = '编辑规则';
         ruleInputFields = parseJSON(ru.input_json, []);
         ruleOutputFields = parseJSON(ru.output_json, []);
+        renderPool('rulePoolList', null, 'rulePoolSearch');
         renderDragList('ruleInputList', ruleInputFields, 'ruleInput');
         renderDragList('ruleOutputList', ruleOutputFields, 'ruleOutput');
         openModal('ruleModal');
@@ -628,20 +632,65 @@
     };
 
     // ═══════════════════════════════════════════════════════
-    //  通用: 拖拽列表
+    //  通用: 拖拽列表 + 字段池
     // ═══════════════════════════════════════════════════════
+
+    // 渲染字段池
+    function renderPool(poolListId, targetLists, searchId) {
+        const container = document.getElementById(poolListId);
+        if (!container) return;
+        const q = (document.getElementById(searchId)?.value || '').toLowerCase();
+        const filtered = fields.filter(f =>
+            (f.name_en || '').toLowerCase().includes(q) || (f.name_cn || '').includes(q) || f.id.toLowerCase().includes(q)
+        );
+        if (!filtered.length) {
+            container.innerHTML = '<div class="ds-empty-hint">无可用字段</div>';
+            return;
+        }
+        container.innerHTML = filtered.map(f => `
+            <div class="ds-pool-item" draggable="true" data-field-id="${f.id}" data-field-name="${esc(f.name_en)}">
+                <span class="ds-pool-item-text">${esc(f.name_en)}${f.name_cn ? ' (' + esc(f.name_cn) + ')' : ''}</span>
+                <span class="ds-pool-item-add">+</span>
+            </div>
+        `).join('');
+
+        // Drag start from pool
+        container.querySelectorAll('.ds-pool-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    source: 'pool',
+                    field_id: item.dataset.fieldId,
+                    field_name: item.dataset.fieldName
+                }));
+                e.dataTransfer.effectAllowed = 'copy';
+                item.style.opacity = '0.4';
+            });
+            item.addEventListener('dragend', (e) => {
+                item.style.opacity = '';
+            });
+        });
+    }
+
+    // 渲染拖拽列表
     function renderDragList(containerId, items, prefix) {
         const container = document.getElementById(containerId);
         if (!container) return;
+
+        // Update count badge
+        const countId = containerId.replace('List', 'Count');
+        const countEl = document.getElementById(countId);
+        if (countEl) countEl.textContent = items.length;
+
         if (!items.length) {
-            container.innerHTML = '<div class="ds-empty-hint">拖入或点击按钮添加字段</div>';
+            container.innerHTML = '<div class="ds-drop-hint">从左侧字段池拖入字段</div>';
+            setupDropZone(container, containerId, prefix);
             return;
         }
         container.innerHTML = items.map((item, i) => `
             <div class="ds-drag-item" draggable="true" data-index="${i}" data-prefix="${prefix}">
                 <span class="ds-drag-handle">☰</span>
                 <span class="ds-drag-item-text">${esc(item.field_name || item.field_id)}${item.rule_ids?.length ? ' ⚙️×' + item.rule_ids.length : ''}</span>
-                <button class="ds-drag-item-rule-btn" data-idx="${i}" data-prefix="${prefix}">关联规则</button>
+                <button class="ds-drag-item-rule-btn" data-idx="${i}" data-prefix="${prefix}">规则</button>
                 <button class="ds-drag-item-remove" data-idx="${i}" data-prefix="${prefix}">×</button>
             </div>
         `).join('');
@@ -650,9 +699,7 @@
         container.querySelectorAll('.ds-drag-item-remove').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.dataset.idx);
-                const list = btn.dataset.prefix === 'ifaceInput' ? ifaceInputFields :
-                             btn.dataset.prefix === 'ifaceOutput' ? ifaceOutputFields :
-                             btn.dataset.prefix === 'ruleInput' ? ruleInputFields : ruleOutputFields;
+                const list = getListByPrefix(btn.dataset.prefix);
                 list.splice(idx, 1);
                 renderDragList(containerId, list, btn.dataset.prefix);
             });
@@ -662,15 +709,81 @@
         container.querySelectorAll('.ds-drag-item-rule-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.dataset.idx);
-                const list = btn.dataset.prefix === 'ifaceInput' ? ifaceInputFields :
-                             btn.dataset.prefix === 'ifaceOutput' ? ifaceOutputFields :
-                             btn.dataset.prefix === 'ruleInput' ? ruleInputFields : ruleOutputFields;
+                const list = getListByPrefix(btn.dataset.prefix);
                 openFieldRulePicker(list[idx]);
             });
         });
 
-        // Drag and drop
+        // Reorder drag within list
         setupDrag(container, containerId, prefix);
+        // Drop zone
+        setupDropZone(container, containerId, prefix);
+    }
+
+    function getListByPrefix(prefix) {
+        return prefix === 'ifaceInput' ? ifaceInputFields :
+               prefix === 'ifaceOutput' ? ifaceOutputFields :
+               prefix === 'ruleInput' ? ruleInputFields : ruleOutputFields;
+    }
+
+    // 设置放置区域
+    function setupDropZone(container, containerId, prefix) {
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data) return;
+            try {
+                const parsed = JSON.parse(data);
+                if (parsed.source === 'pool') {
+                    container.classList.add('ds-drag-over');
+                    e.dataTransfer.dropEffect = 'copy';
+                }
+            } catch {}
+
+            // Reorder within list
+            const after = getDragAfterElement(container, e.clientY);
+            const dragging = container.querySelector('.ds-drag-item--dragging');
+            if (dragging) {
+                if (after) container.insertBefore(dragging, after);
+                else container.appendChild(dragging);
+            }
+        });
+
+        container.addEventListener('dragleave', (e) => {
+            if (!container.contains(e.relatedTarget)) {
+                container.classList.remove('ds-drag-over');
+            }
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.classList.remove('ds-drag-over');
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data) return;
+
+            try {
+                const parsed = JSON.parse(data);
+                if (parsed.source === 'pool') {
+                    const list = getListByPrefix(prefix);
+                    // Check if already exists
+                    if (!list.some(x => x.field_id === parsed.field_id)) {
+                        list.push({ field_id: parsed.field_id, field_name: parsed.field_name, rule_ids: [] });
+                        renderDragList(containerId, list, prefix);
+                    }
+                    return;
+                }
+            } catch {}
+
+            // Reorder within list
+            const items = container.querySelectorAll('.ds-drag-item');
+            const list = getListByPrefix(prefix);
+            const newOrder = Array.from(items).map(el => list[parseInt(el.dataset.index)]);
+            if (prefix === 'ifaceInput') ifaceInputFields = newOrder;
+            else if (prefix === 'ifaceOutput') ifaceOutputFields = newOrder;
+            else if (prefix === 'ruleInput') ruleInputFields = newOrder;
+            else ruleOutputFields = newOrder;
+            renderDragList(containerId, list, prefix);
+        });
     }
 
     function setupDrag(container, containerId, prefix) {
@@ -681,42 +794,17 @@
             if (!item) return;
             dragIdx = parseInt(item.dataset.index);
             item.classList.add('ds-drag-item--dragging');
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+                source: 'list',
+                index: dragIdx,
+                prefix: prefix
+            }));
             e.dataTransfer.effectAllowed = 'move';
         });
 
         container.addEventListener('dragend', (e) => {
             const item = e.target.closest('.ds-drag-item');
             if (item) item.classList.remove('ds-drag-item--dragging');
-        });
-
-        container.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const after = getDragAfterElement(container, e.clientY);
-            const dragging = container.querySelector('.ds-drag-item--dragging');
-            if (!dragging) return;
-            if (after) {
-                container.insertBefore(dragging, after);
-            } else {
-                container.appendChild(dragging);
-            }
-        });
-
-        container.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const items = container.querySelectorAll('.ds-drag-item');
-            const list = prefix === 'ifaceInput' ? ifaceInputFields :
-                         prefix === 'ifaceOutput' ? ifaceOutputFields :
-                         prefix === 'ruleInput' ? ruleInputFields : ruleOutputFields;
-            const newOrder = Array.from(items).map(el => {
-                const idx = parseInt(el.dataset.index);
-                return list[idx];
-            });
-            // Replace the list
-            if (prefix === 'ifaceInput') ifaceInputFields = newOrder;
-            else if (prefix === 'ifaceOutput') ifaceOutputFields = newOrder;
-            else if (prefix === 'ruleInput') ruleInputFields = newOrder;
-            else ruleOutputFields = newOrder;
-            renderDragList(containerId, list, prefix);
         });
     }
 
@@ -732,136 +820,12 @@
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
-    // Field add buttons for interface/rule
-    function setupFieldAddBtn(btnId, listType, containerId, prefix) {
-        const btn = document.getElementById(btnId);
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-            dragContext = { target: listType, containerId, prefix };
-            populateFieldPicker();
-            openModal('fieldPickerModal');
-        });
-    }
-
-    setupFieldAddBtn('btnAddIfaceInput', 'ifaceInput', 'ifaceInputList', 'ifaceInput');
-    setupFieldAddBtn('btnAddIfaceOutput', 'ifaceOutput', 'ifaceOutputList', 'ifaceOutput');
-    setupFieldAddBtn('btnAddRuleInput', 'ruleInput', 'ruleInputList', 'ruleInput');
-    setupFieldAddBtn('btnAddRuleOutput', 'ruleOutput', 'ruleOutputList', 'ruleOutput');
-
-    // Field search inside interface/rule
-    ['ifaceInput', 'ifaceOutput', 'ruleInput', 'ruleOutput'].forEach(prefix => {
-        const searchId = prefix === 'ifaceInput' ? 'ifaceInputSearch' :
-                         prefix === 'ifaceOutput' ? 'ifaceOutputSearch' :
-                         prefix === 'ruleInput' ? 'ruleInputSearch' : 'ruleOutputSearch';
-        const searchEl = document.getElementById(searchId);
-        if (searchEl) {
-            searchEl.addEventListener('input', () => {
-                // Filter displayed fields in the current drag list view
-                const containerId = prefix === 'ifaceInput' ? 'ifaceInputList' :
-                                    prefix === 'ifaceOutput' ? 'ifaceOutputList' :
-                                    prefix === 'ruleInput' ? 'ruleInputList' : 'ruleOutputList';
-                // Simple: just filter the render
-                // For now, the search filters the field picker
-            });
-        }
-    });
+    // Pool search
+    $('#ifacePoolSearch')?.addEventListener('input', () => renderPool('ifacePoolList', null, 'ifacePoolSearch'));
+    $('#rulePoolSearch')?.addEventListener('input', () => renderPool('rulePoolList', null, 'rulePoolSearch'));
 
     // ═══════════════════════════════════════════════════════
-    //  字段选择器
-    // ═══════════════════════════════════════════════════════
-    function populateFieldPicker() {
-        const list = document.getElementById('fieldPickerList');
-        if (!list) return;
-        list.innerHTML = fields.map(f => `
-            <div class="ds-field-picker-item">
-                <input type="checkbox" value="${f.id}" data-name="${f.name_en}">
-                <div class="ds-field-picker-item-label">
-                    <span class="en">${esc(f.name_en)}</span>
-                    <span class="cn">${esc(f.name_cn || '')}</span>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    $('#fieldPickerSearch')?.addEventListener('input', () => {
-        const q = ($('#fieldPickerSearch').value || '').toLowerCase();
-        document.querySelectorAll('.ds-field-picker-item').forEach(item => {
-            const text = item.textContent.toLowerCase();
-            item.style.display = text.includes(q) ? '' : 'none';
-        });
-    });
-
-    $('#btnConfirmFieldPick')?.addEventListener('click', () => {
-        const checked = document.querySelectorAll('#fieldPickerList input:checked');
-        const list = dragContext.prefix === 'ifaceInput' ? ifaceInputFields :
-                     dragContext.prefix === 'ifaceOutput' ? ifaceOutputFields :
-                     dragContext.prefix === 'ruleInput' ? ruleInputFields : ruleOutputFields;
-        checked.forEach(cb => {
-            if (!list.some(x => x.field_id === cb.value)) {
-                list.push({ field_id: cb.value, field_name: cb.dataset.name, rule_ids: [] });
-            }
-        });
-        renderDragList(dragContext.containerId, list, dragContext.prefix);
-        closeModal('fieldPickerModal');
-    });
-
-    // ═══════════════════════════════════════════════════════
-    //  字段关联规则
-    // ═══════════════════════════════════════════════════════
-    let currentFieldRuleItem = null;
-
-    function openFieldRulePicker(item) {
-        currentFieldRuleItem = item;
-        const list = document.getElementById('fieldRuleList');
-        const select = document.getElementById('fieldRuleSelect');
-        if (!list || !select) return;
-
-        // Show current rules
-        const currentRuleIds = item.rule_ids || [];
-        const currentRules = currentRuleIds.map(id => rules.find(r => r.id === id)).filter(Boolean);
-        list.innerHTML = currentRules.length ? currentRules.map(r => `
-            <div class="ds-field-rule-item">
-                <span>⚙️ ${esc(r.name)}</span>
-                <button class="ds-field-rule-remove" data-id="${r.id}">移除</button>
-            </div>
-        `).join('') : '<div class="ds-empty-hint">暂无关联规则</div>';
-
-        list.querySelectorAll('.ds-field-rule-remove').forEach(btn => {
-            btn.addEventListener('click', () => {
-                item.rule_ids = item.rule_ids.filter(id => id !== btn.dataset.id);
-                openFieldRulePicker(item); // refresh
-            });
-        });
-
-        // Populate select
-        select.innerHTML = '<option value="">-- 选择规则关联 --</option>' +
-            rules.filter(r => !currentRuleIds.includes(r.id)).map(r =>
-                `<option value="${r.id}">${esc(r.id)} - ${esc(r.name)}</option>`
-            ).join('');
-
-        openModal('fieldRuleModal');
-    }
-
-    $('#btnSaveFieldRule')?.addEventListener('click', () => {
-        const select = document.getElementById('fieldRuleSelect');
-        const val = select?.value;
-        if (val && currentFieldRuleItem) {
-            if (!currentFieldRuleItem.rule_ids) currentFieldRuleItem.rule_ids = [];
-            if (!currentFieldRuleItem.rule_ids.includes(val)) {
-                currentFieldRuleItem.rule_ids.push(val);
-            }
-        }
-        closeModal('fieldRuleModal');
-        // Re-render the active drag lists
-        renderDragList('ifaceInputList', ifaceInputFields, 'ifaceInput');
-        renderDragList('ifaceOutputList', ifaceOutputFields, 'ifaceOutput');
-        renderDragList('ruleInputList', ruleInputFields, 'ruleInput');
-        renderDragList('ruleOutputList', ruleOutputFields, 'ruleOutput');
-    });
-
-    // ═══════════════════════════════════════════════════════
-    //  关联图谱展示 & 导出
-    // ═══════════════════════════════════════════════════════
+    //  工具
     let graphData = null;
 
     function showGraph(name, type, usedFields, usedByIfaces, usedByRules) {

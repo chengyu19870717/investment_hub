@@ -280,26 +280,37 @@
                         <input type="text" id="ifaceDesc">
                     </div>
                 </div>
-                <div class="ds-iface-sections">
-                    <div class="ds-iface-section">
-                        <div class="ds-iface-section-header">
-                            <span>📥 接口输入字段</span>
-                            <div>
-                                <input type="text" class="ds-mini-search" id="ifaceInputSearch" placeholder="搜索字段...">
-                                <button class="btn-sm" id="btnAddIfaceInput">+ 添加字段</button>
-                            </div>
+
+                <!-- 拖拽布局：字段池 + 输入输出 -->
+                <div class="ds-drag-layout">
+                    <!-- 左侧：可用字段池 -->
+                    <div class="ds-field-pool">
+                        <div class="ds-pool-header">
+                            <span>📋 可用字段</span>
+                            <input type="text" class="ds-mini-search" id="ifacePoolSearch" placeholder="搜索...">
                         </div>
-                        <div class="ds-drag-list" id="ifaceInputList"></div>
+                        <div class="ds-pool-list" id="ifacePoolList"></div>
                     </div>
-                    <div class="ds-iface-section">
-                        <div class="ds-iface-section-header">
-                            <span>📤 接口输出字段</span>
-                            <div>
-                                <input type="text" class="ds-mini-search" id="ifaceOutputSearch" placeholder="搜索字段...">
-                                <button class="btn-sm" id="btnAddIfaceOutput">+ 添加字段</button>
+                    <!-- 右侧：输入输出 -->
+                    <div class="ds-iface-sections">
+                        <div class="ds-iface-section">
+                            <div class="ds-iface-section-header">
+                                <span>📥 接口输入字段（拖入字段或从左侧拖入）</span>
+                                <span class="ds-count-badge" id="ifaceInputCount">0</span>
+                            </div>
+                            <div class="ds-drag-list ds-drop-zone" id="ifaceInputList">
+                                <div class="ds-drop-hint">从左侧拖入或点击添加字段</div>
                             </div>
                         </div>
-                        <div class="ds-drag-list" id="ifaceOutputList"></div>
+                        <div class="ds-iface-section">
+                            <div class="ds-iface-section-header">
+                                <span>📤 接口输出字段（拖入字段或从左侧拖入）</span>
+                                <span class="ds-count-badge" id="ifaceOutputCount">0</span>
+                            </div>
+                            <div class="ds-drag-list ds-drop-zone" id="ifaceOutputList">
+                                <div class="ds-drop-hint">从左侧拖入或点击添加字段</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -334,26 +345,37 @@
                         <input type="text" id="ruleDesc">
                     </div>
                 </div>
-                <div class="ds-iface-sections">
-                    <div class="ds-iface-section">
-                        <div class="ds-iface-section-header">
-                            <span>📥 规则输入字段</span>
-                            <div>
-                                <input type="text" class="ds-mini-search" id="ruleInputSearch" placeholder="搜索字段...">
-                                <button class="btn-sm" id="btnAddRuleInput">+ 添加字段</button>
-                            </div>
+
+                <!-- 拖拽布局：字段池 + 输入输出 -->
+                <div class="ds-drag-layout">
+                    <!-- 左侧：可用字段池 -->
+                    <div class="ds-field-pool">
+                        <div class="ds-pool-header">
+                            <span>📋 可用字段</span>
+                            <input type="text" class="ds-mini-search" id="rulePoolSearch" placeholder="搜索...">
                         </div>
-                        <div class="ds-drag-list" id="ruleInputList"></div>
+                        <div class="ds-pool-list" id="rulePoolList"></div>
                     </div>
-                    <div class="ds-iface-section">
-                        <div class="ds-iface-section-header">
-                            <span>📤 规则输出字段</span>
-                            <div>
-                                <input type="text" class="ds-mini-search" id="ruleOutputSearch" placeholder="搜索字段...">
-                                <button class="btn-sm" id="btnAddRuleOutput">+ 添加字段</button>
+                    <!-- 右侧：输入输出 -->
+                    <div class="ds-iface-sections">
+                        <div class="ds-iface-section">
+                            <div class="ds-iface-section-header">
+                                <span>📥 规则输入字段（拖入字段或从左侧拖入）</span>
+                                <span class="ds-count-badge" id="ruleInputCount">0</span>
+                            </div>
+                            <div class="ds-drag-list ds-drop-zone" id="ruleInputList">
+                                <div class="ds-drop-hint">从左侧拖入或点击添加字段</div>
                             </div>
                         </div>
-                        <div class="ds-drag-list" id="ruleOutputList"></div>
+                        <div class="ds-iface-section">
+                            <div class="ds-iface-section-header">
+                                <span>📤 规则输出字段（拖入字段或从左侧拖入）</span>
+                                <span class="ds-count-badge" id="ruleOutputCount">0</span>
+                            </div>
+                            <div class="ds-drag-list ds-drop-zone" id="ruleOutputList">
+                                <div class="ds-drop-hint">从左侧拖入或点击添加字段</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -364,26 +386,7 @@
         </div>
     </div>
 
-    <!-- Modal: 字段选择器 (for interface/rule) -->
-    <div class="ds-modal" id="fieldPickerModal">
-        <div class="ds-modal-backdrop"></div>
-        <div class="ds-modal-content ds-modal--md">
-            <div class="ds-modal-header">
-                <h3>选择字段</h3>
-                <button class="ds-modal-close" data-close="fieldPickerModal">×</button>
-            </div>
-            <div class="ds-modal-body">
-                <input type="text" class="ds-search" id="fieldPickerSearch" placeholder="搜索字段...">
-                <div class="ds-field-picker-list" id="fieldPickerList"></div>
-            </div>
-            <div class="ds-modal-footer">
-                <button class="btn-secondary" data-close="fieldPickerModal">取消</button>
-                <button class="btn-primary" id="btnConfirmFieldPick">确认添加</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: 关联图谱 -->
+    <!-- Modal: 字段规则关联 (for interface/rule field items) -->
     <div class="ds-modal" id="graphModal">
         <div class="ds-modal-backdrop"></div>
         <div class="ds-modal-content ds-modal--lg">

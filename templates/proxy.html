@@ -23,13 +23,17 @@
     <main class="main">
         <div class="section-label">系统代理状态</div>
         <div class="card" style="display:block;">
-            <div class="card-body" style="display:block;text-align:center;padding:32px 0 24px;">
-                <!-- 大开关 -->
-                <div id="toggle-wrap" class="proxy-toggle-wrap" onclick="toggle()">
-                    <div id="toggle-knob" class="proxy-toggle-knob"></div>
-                </div>
+            <div class="card-body" style="display:block;text-align:center;padding:32px 0 28px;">
+                <!-- 状态指示灯 -->
+                <div id="status-dot" class="proxy-dot"></div>
                 <div id="status-text" class="proxy-status-text">检测中…</div>
-                <div id="proxy-info" class="proxy-info-text" style="display:none;"></div>
+                <div id="proxy-info" class="proxy-info-text" style="display:none;margin-bottom:24px;"></div>
+
+                <!-- 开关按钮 -->
+                <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+                    <button id="btn-on"  class="proxy-btn proxy-btn--on"  onclick="setProxy(true)">开启代理</button>
+                    <button id="btn-off" class="proxy-btn proxy-btn--off" onclick="setProxy(false)">关闭代理</button>
+                </div>
             </div>
         </div>
 
@@ -47,20 +51,24 @@
 </div>
 
 <script>
-const wrap      = document.getElementById('toggle-wrap');
-const knob      = document.getElementById('toggle-knob');
+const dot       = document.getElementById('status-dot');
 const statusTxt = document.getElementById('status-text');
 const infoTxt   = document.getElementById('proxy-info');
 const errorArea = document.getElementById('error-area');
 const errorMsg  = document.getElementById('error-msg');
+const btnOn     = document.getElementById('btn-on');
+const btnOff    = document.getElementById('btn-off');
 
 let busy = false;
 
 function setUI(enabled) {
-    wrap.classList.toggle('proxy-toggle-wrap--on', enabled);
-    knob.classList.toggle('proxy-toggle-knob--on', enabled);
-    statusTxt.textContent  = enabled ? '代理已开启' : '代理已关闭';
-    statusTxt.style.color  = enabled ? '#34c759' : 'var(--text-muted)';
+    dot.className = 'proxy-dot ' + (enabled ? 'proxy-dot--on' : 'proxy-dot--off');
+    statusTxt.textContent = enabled ? '代理已开启' : '代理已关闭';
+    statusTxt.style.color = enabled ? '#34c759'    : 'var(--text-muted)';
+    btnOn.disabled  = enabled;
+    btnOff.disabled = !enabled;
+    btnOn.style.opacity  = enabled  ? '0.4' : '1';
+    btnOff.style.opacity = !enabled ? '0.4' : '1';
     errorArea.style.display = 'none';
 }
 
@@ -75,17 +83,19 @@ async function loadStatus() {
         const data = await res.json();
         if (data.error) { showError(data.error); return; }
         setUI(data.enabled);
-        infoTxt.textContent = data.host + ':' + data.port + '  ·  ' + data.iface;
+        infoTxt.textContent   = '代理地址：' + data.host + ':' + data.port + '  ·  ' + data.iface;
         infoTxt.style.display = 'block';
     } catch(e) {
         showError('无法获取代理状态：' + e.message);
     }
 }
 
-async function toggle() {
+async function setProxy(enable) {
     if (busy) return;
+    const current = btnOn.disabled; // btnOn.disabled=true 说明当前已开启
+    if (enable === current) return;
     busy = true;
-    wrap.style.opacity = '0.6';
+    btnOn.disabled = btnOff.disabled = true;
     statusTxt.textContent = '切换中…';
     statusTxt.style.color = 'var(--text-muted)';
     try {
@@ -98,7 +108,6 @@ async function toggle() {
         await loadStatus();
     } finally {
         busy = false;
-        wrap.style.opacity = '1';
     }
 }
 
