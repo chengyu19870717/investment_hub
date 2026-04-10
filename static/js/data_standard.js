@@ -14,6 +14,10 @@
     // Current drag list context
     let dragContext = { target: '', fieldId: null, ruleId: null };
 
+    // 选中记录
+    let selectedRootId = null;
+    let selectedFieldId = null;
+
     // ── Helpers ────────────────────────────────────────────
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
@@ -157,16 +161,15 @@
             return;
         }
         tbody.innerHTML = list.map(r => `
-            <tr>
+            <tr class="ds-table-row${selectedRootId === r.id ? ' ds-row--selected' : ''}" onclick="selectRoot('${r.id}')">
                 <td>${esc(r.id)}</td>
                 <td><strong>${esc(r.name)}</strong></td>
                 <td>${esc(r.meaning || '—')}</td>
                 <td>${esc(r.root_type)}</td>
                 <td>${r.length ?? '—'}</td>
                 <td class="ds-table-actions">
-                    <button class="ds-btn-sm" onclick="editRoot('${r.id}')">编辑</button>
-                    <button class="ds-btn-sm" onclick="showRootGraph('${r.id}')">图谱</button>
-                    <button class="ds-btn-sm ds-btn-sm--danger" onclick="deleteRoot('${r.id}')">删除</button>
+                    <button class="ds-btn-sm" onclick="event.stopPropagation();editRoot('${r.id}')">编辑</button>
+                    <button class="ds-btn-sm ds-btn-sm--danger" onclick="event.stopPropagation();deleteRoot('${r.id}')">删除</button>
                 </td>
             </tr>
         `).join('');
@@ -304,21 +307,58 @@
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
-    // 字根行级图谱
+    // ── 行选中 ────────────────────────────────────────────────
+    window.selectRoot = function (id) {
+        selectedRootId = id;
+        renderRootTable();
+    };
+    window.selectField = function (id) {
+        selectedFieldId = id;
+        renderFieldTable();
+    };
+
+    // ── 关联图谱（全局辅助）──────────────────────────────────
     function openGraphModal(title, html) {
-        try {
-            $('#graphModalTitle').textContent = title;
-            const content = document.getElementById('graphContent');
-            const exportBtn = document.getElementById('btnExportGraph');
-            if (exportBtn) exportBtn.style.display = 'none';
-            graphData = null;
-            content.innerHTML = html;
-            openModal('graphModal');
-        } catch (e) {
-            alert('打开图谱失败: ' + e.message);
-        }
+        document.getElementById('graphModalTitle').textContent = title;
+        const content = document.getElementById('graphContent');
+        const exportBtn = document.getElementById('btnExportGraph');
+        if (exportBtn) exportBtn.style.display = 'none';
+        content.innerHTML = html;
+        openModal('graphModal');
     }
 
+    function buildGraphHtml(usedFields, usedByIfaces, usedByRules) {
+        const hasAny = usedFields.length || usedByIfaces.length || usedByRules.length;
+        if (!hasAny) return '<div class="ds-empty-hint" style="padding:32px 0;text-align:center;font-size:15px;">暂无关联</div>';
+        let html = '';
+        if (usedFields.length) {
+            html += '<div class="ds-graph-section"><h4>📋 引用字段（' + usedFields.length + '）</h4>' +
+                '<table class="ds-graph-table"><thead><tr><th>字段ID</th><th>字段英文名</th><th>字段中文名</th></tr></thead><tbody>' +
+                usedFields.map(f => '<tr><td>' + esc(f.id) + '</td><td>' + esc(f.name_en) + '</td><td>' + esc(f.name_cn || '—') + '</td></tr>').join('') +
+                '</tbody></table></div>';
+        }
+        html += '<div class="ds-graph-section"><h4>🔗 被接口引用（' + usedByIfaces.length + '）</h4>';
+        if (usedByIfaces.length) {
+            html += '<table class="ds-graph-table"><thead><tr><th>接口ID</th><th>接口名称</th><th>描述</th></tr></thead><tbody>' +
+                usedByIfaces.map(i => '<tr><td>' + esc(i.id) + '</td><td>' + esc(i.name) + '</td><td>' + esc(i.description || '—') + '</td></tr>').join('') +
+                '</tbody></table>';
+        } else {
+            html += '<div class="ds-empty-hint">无接口引用</div>';
+        }
+        html += '</div>';
+        html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用（' + usedByRules.length + '）</h4>';
+        if (usedByRules.length) {
+            html += '<table class="ds-graph-table"><thead><tr><th>规则ID</th><th>规则名称</th><th>描述</th></tr></thead><tbody>' +
+                usedByRules.map(ru => '<tr><td>' + esc(ru.id) + '</td><td>' + esc(ru.name) + '</td><td>' + esc(ru.description || '—') + '</td></tr>').join('') +
+                '</tbody></table>';
+        } else {
+            html += '<div class="ds-empty-hint">无规则引用</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    // 字根图谱（面板按钮调用）
     window.showRootGraph = function (id) {
         const r = roots.find(x => x.id === id);
         if (!r) return;
@@ -333,66 +373,8 @@
             return arr.some(x => fieldIds.includes(x.field_id));
         });
 
-        const hasAny = usedFields.length || usedByIfaces.length || usedByRules.length;
-        let html = '';
-        if (!hasAny) {
-            html = '<div class="ds-empty-hint" style="padding:32px 0;text-align:center;">暂无关联</div>';
-        } else {
-            if (usedFields.length) {
-                html += '<div class="ds-graph-section"><h4>📋 引用字段（' + usedFields.length + '）</h4>' +
-                    '<table class="ds-graph-table"><thead><tr><th>字段ID</th><th>字段英文名</th><th>字段中文名</th></tr></thead><tbody>' +
-                    usedFields.map(f => '<tr><td>' + esc(f.id) + '</td><td>' + esc(f.name_en) + '</td><td>' + esc(f.name_cn || '—') + '</td></tr>').join('') +
-                    '</tbody></table></div>';
-            }
-            if (usedByIfaces.length) {
-                html += '<div class="ds-graph-section"><h4>🔗 被接口引用（' + usedByIfaces.length + '）</h4>' +
-                    '<table class="ds-graph-table"><thead><tr><th>接口ID</th><th>接口名称</th><th>描述</th></tr></thead><tbody>' +
-                    usedByIfaces.map(i => '<tr><td>' + esc(i.id) + '</td><td>' + esc(i.name) + '</td><td>' + esc(i.description || '—') + '</td></tr>').join('') +
-                    '</tbody></table></div>';
-            } else {
-                html += '<div class="ds-graph-section"><h4>🔗 被接口引用</h4><div class="ds-empty-hint">无接口引用</div></div>';
-            }
-            if (usedByRules.length) {
-                html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用（' + usedByRules.length + '）</h4>' +
-                    '<table class="ds-graph-table"><thead><tr><th>规则ID</th><th>规则名称</th><th>描述</th></tr></thead><tbody>' +
-                    usedByRules.map(ru => '<tr><td>' + esc(ru.id) + '</td><td>' + esc(ru.name) + '</td><td>' + esc(ru.description || '—') + '</td></tr>').join('') +
-                    '</tbody></table></div>';
-            } else {
-                html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用</h4><div class="ds-empty-hint">无规则引用</div></div>';
-            }
-        }
-        openGraphModal('字根「' + r.name + '」关联图谱', html);
+        openGraphModal('字根「' + r.name + '」关联图谱', buildGraphHtml(usedFields, usedByIfaces, usedByRules));
     };
-
-    // 字根全局关联图谱（面板按钮）
-    $('#btnRootGraph')?.addEventListener('click', () => {
-        if (!roots.length) {
-            openGraphModal('字根全局关联图谱', '<div class="ds-empty-hint" style="padding:32px 0;text-align:center;">暂无字根数据</div>');
-            return;
-        }
-        const rows = roots.map(r => {
-            const usedFields = fields.filter(f => f.root_id === r.id);
-            const fieldIds = usedFields.map(f => f.id);
-            const ifaceCount = ifaces.filter(ifc => {
-                const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
-                return arr.some(x => fieldIds.includes(x.field_id));
-            }).length;
-            const ruleCount = rules.filter(ru => {
-                const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
-                return arr.some(x => fieldIds.includes(x.field_id));
-            }).length;
-            return { r, fieldCount: usedFields.length, ifaceCount, ruleCount };
-        });
-        let html = '<table class="ds-graph-table"><thead><tr>' +
-            '<th>字根ID</th><th>字根名</th><th>类型</th><th>引用字段数</th><th>被接口引用</th><th>被规则引用</th>' +
-            '</tr></thead><tbody>' +
-            rows.map(({ r, fieldCount, ifaceCount, ruleCount }) =>
-                '<tr><td>' + esc(r.id) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.root_type || '—') + '</td>' +
-                '<td>' + fieldCount + '</td><td>' + ifaceCount + '</td><td>' + ruleCount + '</td></tr>'
-            ).join('') +
-            '</tbody></table>';
-        openGraphModal('字根全局关联图谱', html);
-    });
 
     // ═══════════════════════════════════════════════════════
     //  2. 标准数据字段维护
@@ -413,7 +395,7 @@
             return;
         }
         tbody.innerHTML = list.map(f => `
-            <tr>
+            <tr class="ds-table-row${selectedFieldId === f.id ? ' ds-row--selected' : ''}" onclick="selectField('${f.id}')">
                 <td>${esc(f.id)}</td>
                 <td><strong>${esc(f.name_en)}</strong></td>
                 <td>${esc(f.name_cn || '—')}</td>
@@ -421,9 +403,8 @@
                 <td>${f.length ?? '—'}</td>
                 <td>${esc(f.root_name || f.root_id || '—')}</td>
                 <td class="ds-table-actions">
-                    <button class="ds-btn-sm" onclick="editField('${f.id}')">编辑</button>
-                    <button class="ds-btn-sm" onclick="showFieldGraph('${f.id}')">图谱</button>
-                    <button class="ds-btn-sm ds-btn-sm--danger" onclick="deleteField('${f.id}')">删除</button>
+                    <button class="ds-btn-sm" onclick="event.stopPropagation();editField('${f.id}')">编辑</button>
+                    <button class="ds-btn-sm ds-btn-sm--danger" onclick="event.stopPropagation();deleteField('${f.id}')">删除</button>
                 </td>
             </tr>
         `).join('');
