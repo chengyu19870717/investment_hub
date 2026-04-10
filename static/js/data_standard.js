@@ -481,58 +481,125 @@
         return result.length ? JSON.stringify(result) : null;
     }
 
-    // ── 字根选择器（带搜索）────────────────────────────────────
-    function populateFieldRootSelect(filterText) {
-        const sel = document.getElementById('fieldRootId');
-        if (!sel) return;
-        const q = (filterText || '').toLowerCase();
+    // ── 字根 Combobox 选择器 ──────────────────────────────────
+    let _currentRootVals = [];  // 当前选中字根的全量码值，用于还原
+
+    function rpShowDropdown(q) {
+        const list = document.getElementById('rootPickerList');
+        const drop = document.getElementById('rootPickerDropdown');
+        if (!list || !drop) return;
+        const keyword = (q || '').toLowerCase();
         const filtered = roots.filter(r =>
-            !q || r.id.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+            !keyword || r.id.toLowerCase().includes(keyword) || r.name.toLowerCase().includes(keyword)
         );
-        sel.textContent = '';
-        const blank = document.createElement('option');
-        blank.value = '';
-        blank.textContent = '-- 不引用 --';
-        sel.appendChild(blank);
-        filtered.forEach(r => {
-            const opt = document.createElement('option');
-            opt.value = r.id;
-            opt.textContent = r.id + ' - ' + r.name;
-            sel.appendChild(opt);
+        list.textContent = '';
+        // "不引用" option
+        const clearItem = document.createElement('div');
+        clearItem.className = 'rp-item rp-item--clear';
+        clearItem.textContent = '— 不引用 —';
+        clearItem.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            rpSelectRoot(null);
         });
+        list.appendChild(clearItem);
+
+        filtered.forEach(function (r) {
+            const item = document.createElement('div');
+            item.className = 'rp-item';
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = r.name;
+            const idSpan = document.createElement('span');
+            idSpan.className = 'rp-item-id';
+            idSpan.textContent = r.id;
+            item.appendChild(nameSpan);
+            item.appendChild(idSpan);
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                rpSelectRoot(r);
+            });
+            list.appendChild(item);
+        });
+
+        if (!filtered.length) {
+            const empty = document.createElement('div');
+            empty.className = 'rp-empty';
+            empty.textContent = '无匹配字根';
+            list.appendChild(empty);
+        }
+        drop.style.display = 'block';
     }
 
-    document.getElementById('fieldRootSearch')?.addEventListener('input', function () {
-        const current = document.getElementById('fieldRootId')?.value;
-        populateFieldRootSelect(this.value);
-        // restore selection if still visible
-        const sel = document.getElementById('fieldRootId');
-        if (sel && current) sel.value = current;
-    });
-
-    // 选中字根后回显类型/长度/码值
-    window.onFieldRootChange = function () {
-        const sel = document.getElementById('fieldRootId');
-        if (!sel) return;
-        const root = roots.find(r => r.id === sel.value);
-        const codeGroup = document.getElementById('fieldCodeGroup');
-        if (root) {
-            document.getElementById('fieldType').value   = root.root_type || '';
-            document.getElementById('fieldLength').value = root.length   || '';
-            if (root.root_type === '字符型' && root.code_values) {
-                let rootVals = [];
-                try { rootVals = JSON.parse(root.code_values); } catch (_) {}
-                renderFieldCodeRows(rootVals, null);  // 新选字根时显示全量供删减
-                codeGroup.style.display = '';
-            } else {
-                codeGroup.style.display = 'none';
-            }
-        } else {
-            document.getElementById('fieldType').value   = '';
+    function rpSelectRoot(root) {
+        const hiddenId = document.getElementById('fieldRootId');
+        const searchInput = document.getElementById('fieldRootSearch');
+        const selectedDiv = document.getElementById('rootPickerSelected');
+        const drop = document.getElementById('rootPickerDropdown');
+        if (drop) drop.style.display = 'none';
+        if (!root) {
+            if (hiddenId) hiddenId.value = '';
+            if (searchInput) searchInput.value = '';
+            if (selectedDiv) { selectedDiv.textContent = ''; selectedDiv.style.display = 'none'; }
+            document.getElementById('fieldType').value = '';
             document.getElementById('fieldLength').value = '';
+            document.getElementById('fieldCodeGroup').style.display = 'none';
+            _currentRootVals = [];
+            return;
+        }
+        if (hiddenId) hiddenId.value = root.id;
+        if (searchInput) searchInput.value = '';
+        if (selectedDiv) {
+            selectedDiv.textContent = root.id + ' — ' + root.name + (root.root_type ? ' (' + root.root_type + ')' : '');
+            selectedDiv.style.display = 'block';
+        }
+        // 回显类型/长度
+        document.getElementById('fieldType').value   = root.root_type || '';
+        document.getElementById('fieldLength').value = root.length   || '';
+        // 回显码值
+        const codeGroup = document.getElementById('fieldCodeGroup');
+        if (root.root_type === '字符型' && root.code_values) {
+            try { _currentRootVals = JSON.parse(root.code_values); } catch (_) { _currentRootVals = []; }
+            renderFieldCodeRows(_currentRootVals, null);
+            codeGroup.style.display = '';
+        } else {
+            _currentRootVals = [];
             codeGroup.style.display = 'none';
         }
-    };
+    }
+
+    function rpSetValue(rootId) {
+        // set root picker to a specific root without triggering full combobox flow
+        const root = rootId ? roots.find(r => r.id === rootId) : null;
+        const hiddenId = document.getElementById('fieldRootId');
+        const searchInput = document.getElementById('fieldRootSearch');
+        const selectedDiv = document.getElementById('rootPickerSelected');
+        if (hiddenId) hiddenId.value = rootId || '';
+        if (searchInput) searchInput.value = '';
+        if (selectedDiv) {
+            if (root) {
+                selectedDiv.textContent = root.id + ' — ' + root.name + (root.root_type ? ' (' + root.root_type + ')' : '');
+                selectedDiv.style.display = 'block';
+            } else {
+                selectedDiv.textContent = '';
+                selectedDiv.style.display = 'none';
+            }
+        }
+    }
+
+    (function () {
+        const searchInput = document.getElementById('fieldRootSearch');
+        const drop = document.getElementById('rootPickerDropdown');
+        if (!searchInput) return;
+        searchInput.addEventListener('focus', function () { rpShowDropdown(this.value); });
+        searchInput.addEventListener('input', function () { rpShowDropdown(this.value); });
+        searchInput.addEventListener('blur', function () {
+            setTimeout(function () { if (drop) drop.style.display = 'none'; }, 150);
+        });
+    })();
+
+    // 还原码值
+    document.getElementById('btnResetFieldCode')?.addEventListener('click', function () {
+        renderFieldCodeRows(_currentRootVals, null);
+    });
 
     $('#btnAddField')?.addEventListener('click', () => {
         $('#fieldEditId').value = '';
@@ -544,9 +611,9 @@
         $('#fieldLength').value = '';
         document.getElementById('fieldCodeGroup').style.display = 'none';
         document.getElementById('fieldCodeRows').textContent = '';
-        document.getElementById('fieldRootSearch').value = '';
+        _currentRootVals = [];
+        rpSetValue('');
         $('#fieldModalTitle').textContent = '新增字段';
-        populateFieldRootSelect('');
         openModal('fieldModal');
     });
 
@@ -588,21 +655,20 @@
         $('#fieldNameEn').value = f.name_en;
         $('#fieldNameCn').value = f.name_cn || '';
         $('#fieldRemark').value = f.remark || '';
-        document.getElementById('fieldRootSearch').value = '';
-        populateFieldRootSelect('');
-        document.getElementById('fieldRootId').value = f.root_id || '';
         $('#fieldType').value = f.field_type || '';
         $('#fieldLength').value = f.length || '';
+        rpSetValue(f.root_id || '');
         // 码值：回显字根全量 + 仅保留已有子集
         const codeGroup = document.getElementById('fieldCodeGroup');
         const root = roots.find(r => r.id === f.root_id);
         if (root && root.root_type === '字符型' && root.code_values) {
-            let rootVals = [], fieldVals = [];
-            try { rootVals  = JSON.parse(root.code_values); } catch (_) {}
+            try { _currentRootVals = JSON.parse(root.code_values); } catch (_) { _currentRootVals = []; }
+            let fieldVals = [];
             try { fieldVals = JSON.parse(f.code_values || '[]'); } catch (_) {}
-            renderFieldCodeRows(rootVals, fieldVals.length ? fieldVals : null);
+            renderFieldCodeRows(_currentRootVals, fieldVals.length ? fieldVals : null);
             codeGroup.style.display = '';
         } else {
+            _currentRootVals = [];
             codeGroup.style.display = 'none';
             document.getElementById('fieldCodeRows').textContent = '';
         }

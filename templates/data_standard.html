@@ -231,12 +231,14 @@
                     </div>
                     <div class="ds-form-group" style="grid-column:1/-1;">
                         <label>引用字根</label>
-                        <div class="root-picker">
-                            <input type="text" id="fieldRootSearch" placeholder="搜索字根名称或ID…" autocomplete="off">
-                            <select id="fieldRootId" size="4" onchange="onFieldRootChange()">
-                                <option value="">-- 不引用 --</option>
-                            </select>
+                        <input type="hidden" id="fieldRootId">
+                        <div class="rp-wrap" id="rootPickerWrap">
+                            <input type="text" id="fieldRootSearch" placeholder="输入关键词搜索字根…" autocomplete="off">
+                            <div class="rp-dropdown" id="rootPickerDropdown">
+                                <div id="rootPickerList"></div>
+                            </div>
                         </div>
+                        <div id="rootPickerSelected" class="rp-selected" style="display:none;"></div>
                     </div>
                     <div class="ds-form-group">
                         <label>字段类型</label>
@@ -247,7 +249,10 @@
                         <input type="text" id="fieldLength" readonly placeholder="引用字根后自动填充" style="background:#f2f2f7;">
                     </div>
                     <div class="ds-form-group" id="fieldCodeGroup" style="grid-column:1/-1;display:none;">
-                        <label>字段码值（从字根码值中删减，保留字段使用的子集）</label>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                            <label style="margin:0;">字段码值（从字根码值中删减，保留子集）</label>
+                            <button type="button" class="btn-secondary" id="btnResetFieldCode" style="padding:3px 10px;font-size:12px;">还原</button>
+                        </div>
                         <div class="cv-editor">
                             <div class="cv-header">
                                 <span>码值编码</span>
@@ -256,7 +261,7 @@
                             </div>
                             <div id="fieldCodeRows"></div>
                         </div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">点击 × 删除不需要的码值</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">点击 × 删除不需要的码值；点击「还原」恢复字根全量码值</div>
                     </div>
                     <div class="ds-form-group" style="grid-column:1/-1;">
                         <label>字段备注</label>

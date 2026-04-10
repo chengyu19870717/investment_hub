@@ -458,23 +458,40 @@
     margin-bottom: 6px;
     font-size: 13px;
 }
-/* 字根搜索选择器 */
-.root-picker { display: flex; flex-direction: column; gap: 4px; }
-.root-picker input[type="text"] {
+/* 字根 Combobox 选择器 */
+.rp-wrap { position: relative; }
+.rp-wrap input[type="text"] {
     width: 100%; box-sizing: border-box;
-    padding: 7px 10px; font-size: 13px;
-    border: 1px solid var(--border); border-radius: 8px 8px 0 0;
+    padding: 8px 12px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 8px;
     background: var(--bg-page); color: var(--text-primary); outline: none;
+    transition: border-color 0.15s;
 }
-.root-picker input[type="text"]:focus { border-color: var(--accent); }
-.root-picker select {
-    width: 100%; box-sizing: border-box;
-    border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px;
-    background: var(--bg-page); color: var(--text-primary);
-    font-size: 13px; outline: none; padding: 2px 0;
+.rp-wrap input[type="text"]:focus { border-color: var(--accent); }
+.rp-dropdown {
+    display: none;
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+    background: var(--bg-card);
+    border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    max-height: 200px; overflow-y: auto;
 }
-.root-picker select:focus { border-color: var(--accent); }
-.root-picker select option { padding: 4px 10px; }
+.rp-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; font-size: 13px; cursor: pointer;
+    transition: background 0.1s;
+}
+.rp-item:hover { background: var(--accent-light, #f0f7ff); }
+.rp-item--clear { color: var(--text-muted); font-style: italic; }
+.rp-item-id { font-size: 11px; color: var(--text-muted); margin-left: 8px; flex-shrink: 0; }
+.rp-empty { padding: 10px 12px; font-size: 13px; color: var(--text-muted); text-align: center; }
+.rp-selected {
+    margin-top: 6px; padding: 6px 12px; font-size: 12px;
+    background: var(--accent-light, #e8f2ff); color: var(--accent);
+    border-radius: 6px; border: 1px solid var(--accent);
+    word-break: break-all;
+}
 
 /* 行选中高亮 */
 .ds-table-row { cursor: pointer; }
