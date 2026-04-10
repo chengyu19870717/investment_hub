@@ -146,6 +146,9 @@ def init_db():
 
 init_db()
 
+# ── 后台任务状态追踪 ──────────────────────────────────────
+refresh_task_status = {"running": False, "progress": "", "done": False, "error": None, "dates": [], "latest": None}
+
 def get_setting(key: str, default: str = "") -> str:
     conn = get_db()
     row  = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
@@ -209,26 +212,57 @@ def chart_page(request: Request):
 QUANT_DIR  = Path.home() / "Desktop" / "quant_trading"
 QUANT_VENV = Path("/Users/chengyu/PycharmProjects/PythonProject/.venv/bin/python")
 
-@app.post("/api/stock/refresh")
-async def refresh_stock_report():
+def _do_refresh():
+    """后台执行股神计划，更新全局状态"""
+    global refresh_task_status
+    refresh_task_status = {"running": True, "progress": "启动分析引擎…", "done": False, "error": None, "dates": [], "latest": None}
     try:
         result = subprocess.run(
             [str(QUANT_VENV), "main.py"],
             cwd=str(QUANT_DIR),
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=180,
         )
         if result.returncode != 0:
-            return JSONResponse({"error": result.stderr[-500:] or "运行失败"}, status_code=500)
-        # 返回最新生成的日期列表
+            refresh_task_status = {
+                "running": False, "progress": "", "done": True,
+                "error": result.stderr[-500:] or "运行失败", "dates": [], "latest": None
+            }
+            return
         reports = sorted(REPORT_DIR.glob("*_report.md"), reverse=True) if REPORT_DIR.exists() else []
         dates   = [r.stem.replace("_report", "") for r in reports]
-        return JSONResponse({"ok": True, "dates": dates, "latest": dates[0] if dates else None})
+        refresh_task_status = {
+            "running": False, "progress": "", "done": True,
+            "error": None, "dates": dates, "latest": dates[0] if dates else None
+        }
     except subprocess.TimeoutExpired:
-        return JSONResponse({"error": "分析超时（>120s）"}, status_code=500)
+        refresh_task_status = {
+            "running": False, "progress": "", "done": True,
+            "error": "分析超时（>180s）", "dates": [], "latest": None
+        }
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        refresh_task_status = {
+            "running": False, "progress": "", "done": True,
+            "error": str(e), "dates": [], "latest": None
+        }
+
+@app.post("/api/stock/refresh")
+async def start_refresh():
+    """启动后台刷新（非阻塞）"""
+    global refresh_task_status
+    if refresh_task_status["running"]:
+        return JSONResponse({"error": "已有刷新任务在运行，请稍后"}, status_code=409)
+    import threading
+    t = threading.Thread(target=_do_refresh, daemon=True)
+    t.start()
+    return {"ok": True, "message": "后台刷新已启动"}
+
+@app.get("/api/stock/refresh/status")
+def get_refresh_status():
+    """查询刷新进度"""
+    return refresh_task_status
+
 
 @app.get("/api/stock/report")
 def get_stock_report(date: str):

@@ -465,3 +465,73 @@
     cursor: pointer;
     font-size: 13px;
 }
+
+/* ── 码值序列编辑器（WPS 风格）──────────────────────────── */
+.cv-editor {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-page);
+}
+.cv-header {
+    display: grid;
+    grid-template-columns: 120px 1fr 36px;
+    gap: 0;
+    padding: 6px 12px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.cv-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 36px;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    align-items: stretch;
+}
+.cv-row:last-child { border-bottom: none; }
+.cv-row input {
+    border: none;
+    border-right: 1px solid var(--border);
+    padding: 6px 10px;
+    font-size: 13px;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+    height: 34px;
+}
+.cv-row input:last-of-type { border-right: none; }
+.cv-row input:focus { background: var(--accent-light, #f0f7ff); }
+.cv-del-btn {
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+.cv-del-btn:hover { color: #ff3b30; }
+.cv-add-btn {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    border: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+.cv-add-btn:hover { background: var(--accent-light, #f0f7ff); }

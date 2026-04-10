@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
 </head>
 <body>
     <div class="page page--home">
@@ -24,17 +24,23 @@
 
         <main class="main">
             <div class="section-label">功能入口</div>
-            <div class="feature-grid">
+            <div class="card-grid-4">
                 {% for feature in features %}
                 <a href="{{ feature.url }}"
-                   class="feature-card {% if feature.status == 'coming_soon' %}feature-card--disabled{% endif %}">
-                    <div class="feature-icon-wrap">
-                        <span class="feature-icon">{{ feature.icon }}</span>
+                   class="card {% if feature.status == 'coming_soon' %}card--disabled{% endif %}">
+                    <div class="card-icon-wrap">
+                        <span class="card-icon">{{ feature.icon }}</span>
                     </div>
-                    <div class="feature-title">{{ feature.title }}</div>
-                    <div class="feature-desc">{{ feature.description }}</div>
+                    <div class="card-body">
+                        <div class="card-title">{{ feature.title }}</div>
+                        <div class="card-desc">{{ feature.description }}</div>
+                    </div>
                     {% if feature.status == 'coming_soon' %}
-                    <div class="feature-badge">即将上线</div>
+                    <div class="card-badge">即将上线</div>
+                    {% else %}
+                    <svg class="card-arrow" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                     {% endif %}
                 </a>
                 {% endfor %}

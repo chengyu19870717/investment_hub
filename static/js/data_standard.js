@@ -180,9 +180,9 @@
         $('#rootMeaning').value = '';
         $('#rootType').value = '字符型';
         $('#rootLength').value = '';
-        $('#rootCodeValues').value = '';
         $('#rootRemark').value = '';
         $('#rootModalTitle').textContent = '新增字根';
+        renderCodeRows([]);
         toggleRootCodeGroup();
         openModal('rootModal');
     });
@@ -192,6 +192,63 @@
         const g = $('#rootCodeGroup');
         if (g) g.style.display = $('#rootType')?.value === '字符型' ? '' : 'none';
     }
+
+    // ── 码值序列编辑器（WPS 风格）──────────────────────────
+    function addCodeRow(code, label) {
+        const container = $('#rootCodeRows');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'cv-row';
+
+        const codeInput = document.createElement('input');
+        codeInput.type = 'text';
+        codeInput.className = 'cv-code';
+        codeInput.placeholder = '码值';
+        codeInput.value = code || '';
+
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.className = 'cv-label';
+        labelInput.placeholder = '含义';
+        labelInput.value = label || '';
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'cv-del-btn';
+        delBtn.title = '删除';
+        delBtn.textContent = '\u00d7';
+        delBtn.addEventListener('click', () => row.remove());
+
+        row.appendChild(codeInput);
+        row.appendChild(labelInput);
+        row.appendChild(delBtn);
+        container.appendChild(row);
+    }
+
+    function renderCodeRows(values) {
+        const container = $('#rootCodeRows');
+        if (!container) return;
+        container.textContent = '';
+        (values || []).forEach(function(v) {
+            const sep = v.indexOf('=');
+            const code  = sep >= 0 ? v.slice(0, sep) : v;
+            const label = sep >= 0 ? v.slice(sep + 1) : '';
+            addCodeRow(code, label);
+        });
+    }
+
+    function getCodeValues() {
+        const rows = document.querySelectorAll('#rootCodeRows .cv-row');
+        const result = [];
+        rows.forEach(function(row) {
+            const code  = (row.querySelector('.cv-code')?.value  || '').trim();
+            const label = (row.querySelector('.cv-label')?.value || '').trim();
+            if (code) result.push(label ? code + '=' + label : code);
+        });
+        return result.length ? JSON.stringify(result) : null;
+    }
+
+    $('#btnAddCodeRow')?.addEventListener('click', () => addCodeRow('', ''));
 
     $('#btnSaveRoot')?.addEventListener('click', async () => {
         const id = ($('#rootId').value || '').trim();
@@ -203,7 +260,7 @@
             meaning: ($('#rootMeaning').value || '').trim(),
             root_type: type,
             length: parseInt($('#rootLength')?.value) || null,
-            code_values: type === '字符型' ? ($('#rootCodeValues').value || '').trim() : null,
+            code_values: type === '字符型' ? getCodeValues() : null,
             remark: ($('#rootRemark').value || '').trim(),
         };
         try {
@@ -229,9 +286,11 @@
         $('#rootMeaning').value = r.meaning || '';
         $('#rootType').value = r.root_type || '字符型';
         $('#rootLength').value = r.length || '';
-        $('#rootCodeValues').value = r.code_values || '';
         $('#rootRemark').value = r.remark || '';
         $('#rootModalTitle').textContent = '编辑字根';
+        var vals = [];
+        try { vals = JSON.parse(r.code_values || '[]'); } catch (_) { vals = []; }
+        renderCodeRows(vals);
         toggleRootCodeGroup();
         openModal('rootModal');
     };

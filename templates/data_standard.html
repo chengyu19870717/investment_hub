@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数据标准 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
     <link rel="stylesheet" href="/static/css/data_standard.css">
 </head>
 <body>
@@ -179,9 +179,17 @@
                         <label>字根长度</label>
                         <input type="number" id="rootLength" min="1">
                     </div>
-                    <div class="ds-form-group" id="rootCodeGroup">
-                        <label>字根码值（JSON数组，仅字符型）</label>
-                        <textarea id="rootCodeValues" rows="3" placeholder='["A","B","C"]'></textarea>
+                    <div class="ds-form-group" id="rootCodeGroup" style="grid-column:1/-1;">
+                        <label>字根码值（仅字符型）</label>
+                        <div class="cv-editor">
+                            <div class="cv-header">
+                                <span>码值编码</span>
+                                <span>码值含义</span>
+                                <span></span>
+                            </div>
+                            <div id="rootCodeRows"></div>
+                            <button type="button" class="cv-add-btn" id="btnAddCodeRow">+ 添加码值</button>
+                        </div>
                     </div>
                     <div class="ds-form-group" style="grid-column:1/-1;">
                         <label>字根备注</label>

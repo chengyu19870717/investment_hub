@@ -4,7 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>股票分析 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
+<style>
+/* 后台刷新进度条 */
+.refresh-progress-bar {
+    position: relative;
+    height: 3px;
+    background: var(--bg-page);
+    overflow: hidden;
+}
+.refresh-progress-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 30%;
+    background: var(--accent);
+    animation: refresh-slide 1.2s ease-in-out infinite;
+}
+@keyframes refresh-slide {
+    0%   { left: -30%; width: 30%; }
+    50%  { width: 50%; }
+    100% { left: 100%; width: 30%; }
+}
+.refresh-progress-text {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* 刷新完成 Toast */
+.refresh-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    animation: toast-slide-up 0.3s ease;
+}
+@keyframes toast-slide-up {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.refresh-toast-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 18px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    font-size: 14px;
+}
+.refresh-toast-icon { font-size: 18px; }
+.refresh-toast-text { color: var(--text-primary); font-weight: 500; }
+.refresh-toast-btn {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    transition: opacity 0.15s;
+}
+.refresh-toast-btn:hover { opacity: 0.85; }
+.refresh-toast-btn--dim {
+    background: var(--badge-bg);
+    color: var(--text-muted);
+}
+</style>
 </head>
 <body>
 <div class="page page--wide">
@@ -24,11 +97,29 @@
                         <option value="{{ d }}">{{ d }}</option>
                         {% endfor %}
                     </select>
-                    <button id="refresh-btn" class="btn-secondary" title="刷新">↻</button>
+                    <button id="refresh-btn" class="btn-secondary" title="后台刷新">↻</button>
                 </div>
             </div>
         </div>
     </header>
+
+    <!-- 后台刷新进度条 -->
+    <div id="refresh-progress" style="display:none;">
+        <div class="refresh-progress-bar">
+            <div class="refresh-progress-fill" id="refresh-progress-fill"></div>
+            <span class="refresh-progress-text" id="refresh-progress-text">正在分析…</span>
+        </div>
+    </div>
+
+    <!-- 刷新完成提示 -->
+    <div id="refresh-toast" class="refresh-toast" style="display:none;">
+        <div class="refresh-toast-content">
+            <span class="refresh-toast-icon">✅</span>
+            <span class="refresh-toast-text">报告已生成，是否加载最新结果？</span>
+            <button class="refresh-toast-btn" id="toast-reload-btn">立即加载</button>
+            <button class="refresh-toast-btn refresh-toast-btn--dim" id="toast-dismiss-btn">稍后</button>
+        </div>
+    </div>
 
     <main class="main" id="stock-main">
         <div id="loading" style="text-align:center;padding:60px 0;color:var(--text-muted);">加载中…</div>
@@ -214,38 +305,120 @@ async function loadReport(date) {
 
 dateSelect.addEventListener('change', () => loadReport(dateSelect.value));
 
+// ── 后台异步刷新 ──────────────────────────────────────
 const refreshBtn = document.getElementById('refresh-btn');
+const progressBar = document.getElementById('refresh-progress');
+const progressFill = document.getElementById('refresh-progress-fill');
+const progressText = document.getElementById('refresh-progress-text');
+const toast = document.getElementById('refresh-toast');
+let pollTimer = null;
+let pendingDates = [];
+let pendingLatest = null;
+
 refreshBtn.addEventListener('click', async () => {
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = '…';
-    document.getElementById('loading').textContent = '正在重新生成报告，请稍候…';
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('stock-content').style.display = 'none';
+    if (refreshBtn.classList.contains('refreshing')) return;
+    refreshBtn.classList.add('refreshing');
+    refreshBtn.textContent = '⟳';
+
+    // 显示进度条
+    progressBar.style.display = 'block';
+    progressText.textContent = '启动分析引擎…';
+
+    // 启动后台任务
     try {
-        const res  = await fetch('/api/stock/refresh', { method: 'POST' });
+        const res = await fetch('/api/stock/refresh', { method: 'POST' });
         const data = await res.json();
         if (data.error) {
-            document.getElementById('loading').textContent = '生成失败：' + data.error;
-        } else {
-            // 更新日期下拉列表
-            dateSelect.replaceChildren();
-            (data.dates || []).forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d; opt.textContent = d;
-                dateSelect.appendChild(opt);
-            });
-            if (data.latest) {
-                dateSelect.value = data.latest;
-                await loadReport(data.latest);
-            }
+            progressText.textContent = '启动失败：' + data.error;
+            setTimeout(() => { progressBar.style.display = 'none'; }, 2000);
+            refreshBtn.classList.remove('refreshing');
+            refreshBtn.textContent = '↻';
+            return;
         }
     } catch(e) {
-        document.getElementById('loading').textContent = '请求失败：' + e.message;
-        document.getElementById('loading').style.display = 'block';
-    } finally {
-        refreshBtn.disabled = false;
+        progressText.textContent = '请求失败：' + e.message;
+        setTimeout(() => { progressBar.style.display = 'none'; }, 2000);
+        refreshBtn.classList.remove('refreshing');
         refreshBtn.textContent = '↻';
+        return;
     }
+
+    // 轮询状态
+    pollTimer = setInterval(checkRefreshStatus, 2000);
+});
+
+async function checkRefreshStatus() {
+    try {
+        const res = await fetch('/api/stock/refresh/status');
+        const status = await res.json();
+
+        if (status.running) {
+            // 更新进度文本
+            progressText.textContent = status.progress || '正在分析…';
+            return;
+        }
+
+        if (!status.done) return; // 还没完成，继续轮询
+
+        // 任务完成，停止轮询
+        clearInterval(pollTimer);
+        pollTimer = null;
+        progressBar.style.display = 'none';
+        refreshBtn.classList.remove('refreshing');
+        refreshBtn.textContent = '↻';
+
+        if (status.error) {
+            alert('报告生成失败：' + status.error);
+            return;
+        }
+
+        // 成功，显示 Toast
+        pendingDates = status.dates || [];
+        pendingLatest = status.latest || null;
+        if (pendingLatest) {
+            toast.style.display = 'block';
+        }
+    } catch(e) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        progressBar.style.display = 'none';
+        refreshBtn.classList.remove('refreshing');
+        refreshBtn.textContent = '↻';
+        alert('状态查询失败：' + e.message);
+    }
+}
+
+// Toast 按钮事件
+document.getElementById('toast-reload-btn').addEventListener('click', async () => {
+    toast.style.display = 'none';
+    // 更新日期下拉列表
+    dateSelect.replaceChildren();
+    pendingDates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        dateSelect.appendChild(opt);
+    });
+    if (pendingLatest) {
+        dateSelect.value = pendingLatest;
+        await loadReport(pendingLatest);
+    }
+    pendingDates = [];
+    pendingLatest = null;
+});
+
+document.getElementById('toast-dismiss-btn').addEventListener('click', () => {
+    toast.style.display = 'none';
+    // 仍然更新日期列表（不加载报告）
+    if (pendingDates.length) {
+        dateSelect.replaceChildren();
+        pendingDates.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d; opt.textContent = d;
+            dateSelect.appendChild(opt);
+        });
+    }
+    pendingDates = [];
+    pendingLatest = null;
 });
 
 if (dateSelect.value) loadReport(dateSelect.value);
