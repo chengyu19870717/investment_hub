@@ -303,25 +303,45 @@
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
-    // 字根关联图谱
-    $('#btnRootGraph')?.addEventListener('click', async () => {
-        const id = $('#rootEditId').value;
-        if (!id) { alert('请先选择或新增一个字根'); return; }
-        const r = roots.find(x => x.id === id);
-        if (!r) return;
-        const usedFields = fields.filter(f => f.root_id === id);
-        const fieldIds = usedFields.map(f => f.id);
-        const usedByIfaces = ifaces.filter(ifc => {
-            const inF = parseJSON(ifc.input_json, []);
-            const outF = parseJSON(ifc.output_json, []);
-            return [...inF, ...outF].some(x => fieldIds.includes(x.field_id));
+    // 字根全局关联图谱
+    $('#btnRootGraph')?.addEventListener('click', () => {
+        $('#graphModalTitle').textContent = '字根全局关联图谱';
+        const content = document.getElementById('graphContent');
+        graphData = null;
+        $('#btnExportGraph').style.display = 'none';
+
+        if (!roots.length) {
+            content.textContent = '暂无字根数据';
+            openModal('graphModal');
+            return;
+        }
+
+        const rows = roots.map(r => {
+            const usedFields = fields.filter(f => f.root_id === r.id);
+            const fieldIds = usedFields.map(f => f.id);
+            const ifaceCount = ifaces.filter(ifc => {
+                const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
+                return arr.some(x => fieldIds.includes(x.field_id));
+            }).length;
+            const ruleCount = rules.filter(ru => {
+                const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
+                return arr.some(x => fieldIds.includes(x.field_id));
+            }).length;
+            return { r, fieldCount: usedFields.length, ifaceCount, ruleCount };
         });
-        const usedByRules = rules.filter(ru => {
-            const inF = parseJSON(ru.input_json, []);
-            const outF = parseJSON(ru.output_json, []);
-            return [...inF, ...outF].some(x => fieldIds.includes(x.field_id));
+
+        let html = '<table class="ds-graph-table"><thead><tr>' +
+            '<th>字根ID</th><th>字根名</th><th>类型</th><th>引用字段数</th><th>被接口引用</th><th>被规则引用</th>' +
+            '</tr></thead><tbody>';
+        rows.forEach(({ r, fieldCount, ifaceCount, ruleCount }) => {
+            html += '<tr>' +
+                '<td>' + esc(r.id) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.root_type || '—') + '</td>' +
+                '<td>' + fieldCount + '</td><td>' + ifaceCount + '</td><td>' + ruleCount + '</td>' +
+                '</tr>';
         });
-        showGraph(r.name, '字根', usedFields, usedByIfaces, usedByRules);
+        html += '</tbody></table>';
+        content.innerHTML = html;
+        openModal('graphModal');
     });
 
     // ═══════════════════════════════════════════════════════
@@ -465,23 +485,44 @@
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
-    // 字段关联图谱
-    $('#btnFieldGraph')?.addEventListener('click', async () => {
-        const id = $('#fieldEditId').value;
-        if (!id) { alert('请先选择或新增一个字段'); return; }
-        const f = fields.find(x => x.id === id);
-        if (!f) return;
-        const usedByIfaces = ifaces.filter(ifc => {
-            const inF = parseJSON(ifc.input_json, []);
-            const outF = parseJSON(ifc.output_json, []);
-            return [...inF, ...outF].some(x => x.field_id === id);
+    // 字段全局关联图谱
+    $('#btnFieldGraph')?.addEventListener('click', () => {
+        $('#graphModalTitle').textContent = '字段全局关联图谱';
+        const content = document.getElementById('graphContent');
+        graphData = null;
+        $('#btnExportGraph').style.display = 'none';
+
+        if (!fields.length) {
+            content.textContent = '暂无字段数据';
+            openModal('graphModal');
+            return;
+        }
+
+        const rows = fields.map(f => {
+            const ifaceCount = ifaces.filter(ifc => {
+                const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
+                return arr.some(x => x.field_id === f.id);
+            }).length;
+            const ruleCount = rules.filter(ru => {
+                const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
+                return arr.some(x => x.field_id === f.id);
+            }).length;
+            return { f, ifaceCount, ruleCount };
         });
-        const usedByRules = rules.filter(ru => {
-            const inF = parseJSON(ru.input_json, []);
-            const outF = parseJSON(ru.output_json, []);
-            return [...inF, ...outF].some(x => x.field_id === id);
+
+        let html = '<table class="ds-graph-table"><thead><tr>' +
+            '<th>字段ID</th><th>字段英文名</th><th>字段中文名</th><th>引用字根</th><th>被接口引用</th><th>被规则引用</th>' +
+            '</tr></thead><tbody>';
+        rows.forEach(({ f, ifaceCount, ruleCount }) => {
+            html += '<tr>' +
+                '<td>' + esc(f.id) + '</td><td>' + esc(f.name_en) + '</td><td>' + esc(f.name_cn || '—') + '</td>' +
+                '<td>' + esc(f.root_name || f.root_id || '—') + '</td>' +
+                '<td>' + ifaceCount + '</td><td>' + ruleCount + '</td>' +
+                '</tr>';
         });
-        showGraph(f.name_en, '字段', [], usedByIfaces, usedByRules);
+        html += '</tbody></table>';
+        content.innerHTML = html;
+        openModal('graphModal');
     });
 
     // ═══════════════════════════════════════════════════════
@@ -886,42 +927,6 @@
     // ═══════════════════════════════════════════════════════
     //  工具
     let graphData = null;
-
-    function showGraph(name, type, usedFields, usedByIfaces, usedByRules) {
-        $('#graphModalTitle').textContent = type + '「' + name + '」关联图谱';
-        const content = document.getElementById('graphContent');
-        graphData = { name, type, usedFields, usedByIfaces, usedByRules };
-
-        let html = '';
-
-        if (usedFields.length) {
-            html += '<div class="ds-graph-section"><h4>📋 关联字段（' + usedFields.length + '）</h4>';
-            html += '<table class="ds-graph-table"><thead><tr><th>字段ID</th><th>字段名</th><th>类型</th></tr></thead><tbody>';
-            html += usedFields.map(f => `<tr><td>${esc(f.id)}</td><td>${esc(f.name_en)}</td><td>${esc(f.field_type || '—')}</td></tr>`).join('');
-            html += '</tbody></table></div>';
-        }
-
-        html += '<div class="ds-graph-section"><h4>🔗 被接口引用（' + usedByIfaces.length + '）</h4>';
-        if (usedByIfaces.length) {
-            html += '<table class="ds-graph-table"><thead><tr><th>接口ID</th><th>接口名称</th><th>描述</th></tr></thead><tbody>';
-            html += usedByIfaces.map(i => `<tr><td>${esc(i.id)}</td><td>${esc(i.name)}</td><td>${esc(i.description || '—')}</td></tr>`).join('');
-            html += '</tbody></table></div>';
-        } else {
-            html += '<div class="ds-empty-hint">无接口引用</div></div>';
-        }
-
-        html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用（' + usedByRules.length + '）</h4>';
-        if (usedByRules.length) {
-            html += '<table class="ds-graph-table"><thead><tr><th>规则ID</th><th>规则名称</th><th>描述</th></tr></thead><tbody>';
-            html += usedByRules.map(r => `<tr><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.description || '—')}</td></tr>`).join('');
-            html += '</tbody></table></div>';
-        } else {
-            html += '<div class="ds-empty-hint">无规则引用</div></div>';
-        }
-
-        content.innerHTML = html;
-        openModal('graphModal');
-    }
 
     $('#btnExportGraph')?.addEventListener('click', () => {
         if (!graphData) return;
