@@ -24,6 +24,10 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 def data_standard_page(request: Request):
     return templates.TemplateResponse("data_standard.html", {"request": request})
 
+@app.get("/data-graph", response_class=HTMLResponse)
+def data_graph_page(request: Request):
+    return templates.TemplateResponse("data_graph.html", {"request": request})
+
 FEATURES = [
     {"title": "股票分析",       "url": "/stock",         "icon": "📈", "description": "每日复盘报告可视化",   "status": "active"},
     {"title": "录音转会议纪要", "url": "/audio",         "icon": "🎙️", "description": "上传录音自动生成纪要", "status": "active"},

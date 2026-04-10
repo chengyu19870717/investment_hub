@@ -320,11 +320,11 @@
     // ── 面板图谱按钮入口（HTML onclick 直接调用）─────────────
     window.openSelectedRootGraph = function () {
         if (!selectedRootId) { alert('请先选中一条字根记录，再查看关联图谱'); return; }
-        window.showRootGraph(selectedRootId);
+        window.open('/data-graph?type=root&id=' + encodeURIComponent(selectedRootId), '_blank');
     };
     window.openSelectedFieldGraph = function () {
         if (!selectedFieldId) { alert('请先选中一条字段记录，再查看关联图谱'); return; }
-        window.showFieldGraph(selectedFieldId);
+        window.open('/data-graph?type=field&id=' + encodeURIComponent(selectedFieldId), '_blank');
     };
 
     // ── 关联图谱（全局辅助）──────────────────────────────────

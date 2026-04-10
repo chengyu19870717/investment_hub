@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>关联图谱 - 数据标准</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <style>
+        body { background: var(--bg-page); }
+        .graph-page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .graph-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .graph-title { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+        .graph-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+        .graph-canvas-wrap {
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 32px;
+            min-height: 480px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        svg#graph { width: 100%; height: 560px; }
+        /* Node styles */
+        .node-root rect   { fill: #3a7bd5; rx: 8; }
+        .node-field rect  { fill: #34c759; }
+        .node-iface rect  { fill: #ff9500; }
+        .node-rule rect   { fill: #af52de; }
+        .node-label { fill: #fff; font-size: 12px; font-family: -apple-system,sans-serif; font-weight: 500; }
+        .node-type  { fill: rgba(255,255,255,0.7); font-size: 10px; font-family: -apple-system,sans-serif; }
+        .edge { fill: none; stroke: #c0c0c0; stroke-width: 1.5; marker-end: url(#arrowhead); }
+        .edge-label { fill: var(--text-muted); font-size: 10px; font-family: -apple-system,sans-serif; }
+        .empty-hint { text-anchor: middle; fill: var(--text-muted); font-size: 15px; font-family: -apple-system,sans-serif; }
+        .legend { display: flex; gap: 24px; margin-top: 20px; font-size: 12px; color: var(--text-muted); }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+<div class="graph-page">
+    <div class="graph-header">
+        <a href="/data-standard" class="back-btn" title="返回数据标准">←</a>
+        <div>
+            <div class="graph-title" id="pageTitle">关联图谱</div>
+            <div class="graph-subtitle" id="pageSubtitle">加载中…</div>
+        </div>
+    </div>
+
+    <div class="graph-canvas-wrap">
+        <svg id="graph" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                    <polygon points="0 0,8 3,0 6" fill="#c0c0c0"/>
+                </marker>
+            </defs>
+            <g id="graphContent">
+                <text class="empty-hint" x="50%" y="50%">加载中…</text>
+            </g>
+        </svg>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3a7bd5"></div> 字根 / 字段</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#34c759"></div> 关联字段</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff9500"></div> 接口</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#af52de"></div> 规则</div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const params  = new URLSearchParams(location.search);
+    const type    = params.get('type');   // 'root' | 'field'
+    const id      = params.get('id');
+
+    if (!type || !id) {
+        document.getElementById('pageSubtitle').textContent = '参数缺失，请从数据标准页面进入';
+        return;
+    }
+
+    // ── SVG helpers ────────────────────────────────────────
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs) {
+        const e = document.createElementNS(SVG_NS, tag);
+        Object.entries(attrs || {}).forEach(([k, v]) => e.setAttribute(k, v));
+        return e;
+    }
+
+    const NODE_W  = 160;
+    const NODE_H  = 48;
+    const COL_GAP = 200;
+    const ROW_GAP = 64;
+
+    function makeNode(g, x, y, label, sublabel, colorClass) {
+        const grp = el('g', { class: 'node-' + colorClass, transform: 'translate(' + x + ',' + y + ')' });
+        const colors = { root: '#3a7bd5', field: '#34c759', iface: '#ff9500', rule: '#af52de' };
+        const bg = el('rect', { x: 0, y: 0, width: NODE_W, height: NODE_H, rx: 8, fill: colors[colorClass] || '#888' });
+        grp.appendChild(bg);
+        const txt = el('text', { x: NODE_W / 2, y: 20, 'text-anchor': 'middle', class: 'node-label' });
+        txt.textContent = truncate(label, 16);
+        grp.appendChild(txt);
+        if (sublabel) {
+            const sub = el('text', { x: NODE_W / 2, y: 35, 'text-anchor': 'middle', class: 'node-type' });
+            sub.textContent = truncate(sublabel, 20);
+            grp.appendChild(sub);
+        }
+        g.appendChild(grp);
+        // return center-right port and center-left port
+        return {
+            rx: x + NODE_W, ry: y + NODE_H / 2,  // right port
+            lx: x,          ly: y + NODE_H / 2,   // left port
+            cx: x + NODE_W / 2, cy: y + NODE_H / 2
+        };
+    }
+
+    function makeEdge(g, x1, y1, x2, y2, label) {
+        const midX = (x1 + x2) / 2;
+        const path = el('path', {
+            d: 'M' + x1 + ',' + y1 + ' C' + midX + ',' + y1 + ' ' + midX + ',' + y2 + ' ' + x2 + ',' + y2,
+            class: 'edge'
+        });
+        g.insertBefore(path, g.firstChild);
+        if (label) {
+            const lbl = el('text', { x: midX, y: (y1 + y2) / 2 - 4, 'text-anchor': 'middle', class: 'edge-label' });
+            lbl.textContent = label;
+            g.appendChild(lbl);
+        }
+    }
+
+    function truncate(s, n) {
+        if (!s) return '';
+        return s.length > n ? s.slice(0, n - 1) + '…' : s;
+    }
+
+    // ── Layout & render ────────────────────────────────────
+    function render(centerLabel, centerSub, fields, ifaces, rules) {
+        const gc = document.getElementById('graphContent');
+        gc.textContent = '';  // clear
+
+        const svg  = document.getElementById('graph');
+        const totalRows = Math.max(fields.length, ifaces.length + rules.length, 1);
+        const svgH = Math.max(560, totalRows * ROW_GAP + 120);
+        svg.setAttribute('height', svgH);
+
+        const CX = 40;   // col 0 x (center node)
+        const FX = CX + NODE_W + COL_GAP;   // col 1 x (fields)
+        const RX = FX + NODE_W + COL_GAP;   // col 2 x (ifaces/rules)
+
+        // Center node (root or field)
+        const centerY = svgH / 2 - NODE_H / 2;
+        const srcPort = makeNode(gc, CX, centerY, centerLabel, centerSub, 'root');
+
+        if (fields.length === 0 && ifaces.length === 0 && rules.length === 0) {
+            const hint = el('text', { x: FX + 60, y: svgH / 2, 'text-anchor': 'middle', class: 'empty-hint' });
+            hint.textContent = '暂无关联';
+            gc.appendChild(hint);
+            return;
+        }
+
+        // Field nodes (col 1) — only for root type
+        const fieldPorts = [];
+        const fieldTotal = fields.length;
+        const fieldStartY = svgH / 2 - (fieldTotal * (NODE_H + ROW_GAP - NODE_H)) / 2 - NODE_H / 2;
+        fields.forEach((f, i) => {
+            const fy = fieldStartY + i * ROW_GAP;
+            const p  = makeNode(gc, FX, fy, f.name_en || f.id, f.id, 'field');
+            makeEdge(gc, srcPort.rx, srcPort.ry, p.lx, p.ly, '引用字段');
+            fieldPorts.push(p);
+        });
+
+        // Right nodes (ifaces + rules) — col 2 for root, col 1 for field type
+        const rightX = (type === 'field') ? FX : RX;
+        const rightItems = [
+            ...ifaces.map(x => ({ ...x, kind: 'iface', edgeLabel: '被引用' })),
+            ...rules.map(x => ({ ...x, kind: 'rule',  edgeLabel: '被引用' })),
+        ];
+        const rightTotal = rightItems.length;
+        const rightStartY = svgH / 2 - (rightTotal * ROW_GAP) / 2 - NODE_H / 2;
+
+        rightItems.forEach((item, i) => {
+            const ry = rightStartY + i * ROW_GAP;
+            const p  = makeNode(gc, rightX, ry, item.name || item.id, item.id, item.kind);
+            if (type === 'field') {
+                makeEdge(gc, srcPort.rx, srcPort.ry, p.lx, p.ly, item.edgeLabel);
+            } else {
+                // Connect from relevant field node if any, else from src
+                const anyField = fieldPorts.find(fp => true);  // simplified: connect from last field or src
+                const origin = anyField || srcPort;
+                makeEdge(gc, origin.rx, origin.ry, p.lx, p.ly, item.edgeLabel);
+            }
+        });
+    }
+
+    // ── Data fetch ─────────────────────────────────────────
+    async function loadAndRender() {
+        try {
+            const [roots, fields, ifaces, rules] = await Promise.all([
+                fetch('/api/data-roots').then(r => r.json()),
+                fetch('/api/data-fields').then(r => r.json()),
+                fetch('/api/interfaces').then(r => r.json()),
+                fetch('/api/rules').then(r => r.json()),
+            ]);
+
+            function parseJSON(s) { try { return JSON.parse(s); } catch { return []; } }
+
+            if (type === 'root') {
+                const root = roots.find(r => r.id === id);
+                if (!root) { document.getElementById('pageSubtitle').textContent = '找不到字根：' + id; return; }
+                document.getElementById('pageTitle').textContent = '字根「' + root.name + '」关联图谱';
+                document.getElementById('pageSubtitle').textContent = root.meaning || root.root_type || '';
+
+                const usedFields = fields.filter(f => f.root_id === id);
+                const fieldIds = usedFields.map(f => f.id);
+                const usedIfaces = ifaces.filter(ifc => {
+                    const arr = [...parseJSON(ifc.input_json), ...parseJSON(ifc.output_json)];
+                    return arr.some(x => fieldIds.includes(x.field_id));
+                });
+                const usedRules = rules.filter(ru => {
+                    const arr = [...parseJSON(ru.input_json), ...parseJSON(ru.output_json)];
+                    return arr.some(x => fieldIds.includes(x.field_id));
+                });
+                render(root.name, root.id, usedFields, usedIfaces, usedRules);
+
+            } else if (type === 'field') {
+                const field = fields.find(f => f.id === id);
+                if (!field) { document.getElementById('pageSubtitle').textContent = '找不到字段：' + id; return; }
+                document.getElementById('pageTitle').textContent = '字段「' + (field.name_cn || field.name_en) + '」关联图谱';
+                document.getElementById('pageSubtitle').textContent = field.name_en + ' · ' + (field.field_type || '');
+
+                const usedIfaces = ifaces.filter(ifc => {
+                    const arr = [...parseJSON(ifc.input_json), ...parseJSON(ifc.output_json)];
+                    return arr.some(x => x.field_id === id);
+                });
+                const usedRules = rules.filter(ru => {
+                    const arr = [...parseJSON(ru.input_json), ...parseJSON(ru.output_json)];
+                    return arr.some(x => x.field_id === id);
+                });
+                render(field.name_cn || field.name_en, field.name_en, [], usedIfaces, usedRules);
+            }
+        } catch (e) {
+            document.getElementById('pageSubtitle').textContent = '加载失败：' + e.message;
+        }
+    }
+
+    loadAndRender();
+})();
+</script>
+</body>
+</html>
