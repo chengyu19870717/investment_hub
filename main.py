@@ -30,7 +30,13 @@ FEATURES = [
     {"title": "一图一表",       "url": "/chart",         "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active"},
     {"title": "待办管理",       "url": "/tasks",         "icon": "📝", "description": "快速登记和管理待办",   "status": "active"},
     {"title": "数据标准",       "url": "/data-standard",  "icon": "📐", "description": "数据标准化配置与管理",   "status": "active"},
+    {"title": "代理网关",       "url": "/proxy",          "icon": "🌐", "description": "一键开关系统代理服务",   "status": "active"},
 ]
+
+# ── 代理配置 ──────────────────────────────────────────────
+PROXY_IFACE  = "Wi-Fi"          # 网络接口名称
+PROXY_HOST   = "127.0.0.1"
+PROXY_PORT   = 9981
 
 
 # ── 数据库 ────────────────────────────────────────────────
@@ -349,6 +355,44 @@ async def transcribe_audio(file: UploadFile = File(...)):
         save_path.unlink(missing_ok=True)
 
 
+# ── 代理网关 ─────────────────────────────────────────────
+
+@app.get("/proxy", response_class=HTMLResponse)
+def proxy_page(request: Request):
+    return templates.TemplateResponse("proxy.html", {"request": request})
+
+def _get_proxy_status() -> dict:
+    """读取当前系统代理状态，返回 {enabled, host, port}"""
+    try:
+        out = subprocess.check_output(
+            ["networksetup", "-getwebproxy", PROXY_IFACE],
+            text=True, timeout=5
+        )
+        enabled = "Enabled: Yes" in out
+        return {"enabled": enabled, "host": PROXY_HOST, "port": PROXY_PORT, "iface": PROXY_IFACE}
+    except Exception as e:
+        return {"enabled": False, "host": PROXY_HOST, "port": PROXY_PORT, "iface": PROXY_IFACE, "error": str(e)}
+
+@app.get("/api/proxy/status")
+def proxy_status():
+    return JSONResponse(_get_proxy_status())
+
+@app.post("/api/proxy/toggle")
+def proxy_toggle():
+    status = _get_proxy_status()
+    target = "off" if status["enabled"] else "on"
+    try:
+        for cmd in [
+            ["networksetup", "-setwebproxystate",          PROXY_IFACE, target],
+            ["networksetup", "-setsecurewebproxystate",    PROXY_IFACE, target],
+            ["networksetup", "-setsocksfirewallproxystate",PROXY_IFACE, target],
+        ]:
+            subprocess.run(cmd, check=True, timeout=5)
+        return JSONResponse({"enabled": target == "on", "host": PROXY_HOST, "port": PROXY_PORT})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ── 一图一表 API ──────────────────────────────────────────
 
 class ChartData(BaseModel):
@@ -463,6 +507,142 @@ def delete_task(task_id: int):
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+# ── 数据标准 导入/导出 API ─────────────────────────────
+
+def _csv_response(content, filename):
+    from fastapi.responses import Response
+    # Use ASCII filename to avoid latin-1 encoding error in headers
+    safe_name = filename.encode("ascii", "ignore").decode("ascii")
+    return Response(
+        content=content.encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
+    )
+
+# --- 字根 导出模板 / 导出 / 导入 ---
+@app.get("/api/data-roots/template")
+def download_root_template():
+    header = "字根ID,字根名,字根含义,字根类型,字根长度,字根码值,字根备注\n"
+    example = 'ROOT_EXAMPLE,示例字根,这是一个示例,字符型,10,"[""A"",""B"",""C""]",示例备注\n'
+    return _csv_response(header + example, "字根导入模板.csv")
+
+@app.get("/api/data-roots/export")
+def export_roots():
+    conn = get_db()
+    rows = conn.execute("SELECT id,name,meaning,root_type,length,code_values,remark FROM data_roots ORDER BY id").fetchall()
+    conn.close()
+    header = "字根ID,字根名,字根含义,字根类型,字根长度,字根码值,字根备注\n"
+    lines = ""
+    for r in rows:
+        cv = (r[5] or "").replace('"', '""')
+        lines += f'{r[0]},{r[1]},{r[2] or ""},{r[3] or ""},{r[4] or ""},"{cv}",{r[6] or ""}\n'
+    return _csv_response(header + lines, f"字根导出_{datetime.now().strftime('%Y%m%d')}.csv")
+
+@app.post("/api/data-roots/import")
+async def import_roots(file: UploadFile = File(...)):
+    content = await file.read()
+    text = content.decode("utf-8-sig")
+    import csv, io
+    reader = csv.reader(io.StringIO(text))
+    header = next(reader, None)
+    if not header or len(header) < 4:
+        return JSONResponse({"error": "文件格式不正确，请下载使用模板文件"}, status_code=400)
+    success, errors = 0, 0
+    conn = get_db()
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for i, row in enumerate(reader, 2):
+        try:
+            rid = (row[0] or "").strip()
+            rname = (row[1] or "").strip()
+            if not rid or not rname:
+                errors += 1; continue
+            rmean = (row[2] or "").strip()
+            rtype = (row[3] or "字符型").strip()
+            rlen = int(row[4]) if len(row) > 4 and (row[4] or "").strip() else None
+            rcode = (row[5] or "").strip() if len(row) > 5 else None
+            rremark = (row[6] or "").strip() if len(row) > 6 else None
+            existing = conn.execute("SELECT id FROM data_roots WHERE id=?", (rid,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE data_roots SET name=?,meaning=?,root_type=?,length=?,code_values=?,remark=?,updated_at=? WHERE id=?",
+                    (rname, rmean, rtype, rlen, rcode, rremark, now_ts, rid)
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO data_roots(id,name,meaning,root_type,length,code_values,remark,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (rid, rname, rmean, rtype, rlen, rcode, rremark, now_ts, now_ts)
+                )
+            success += 1
+        except Exception:
+            errors += 1
+    conn.commit()
+    conn.close()
+    return {"ok": True, "success": success, "errors": errors}
+
+# --- 字段 导出模板 / 导出 / 导入 ---
+@app.get("/api/data-fields/template")
+def download_field_template():
+    header = "字段ID,字段英文名,字段中文名,字段含义,引用字根ID,引用字根名,字段类型,字段长度,字段码值,字段备注\n"
+    example = 'FIELD_EXAMPLE,exampleField,示例字段,用于示例,ROOT_EXAMPLE,示例字根,字符型,10,"[""A"",""B""]",示例备注\n'
+    return _csv_response(header + example, "字段导入模板.csv")
+
+@app.get("/api/data-fields/export")
+def export_fields():
+    conn = get_db()
+    rows = conn.execute("SELECT id,name_en,name_cn,meaning,root_id,root_name,field_type,length,code_values,remark FROM data_fields ORDER BY id").fetchall()
+    conn.close()
+    header = "字段ID,字段英文名,字段中文名,字段含义,引用字根ID,引用字根名,字段类型,字段长度,字段码值,字段备注\n"
+    lines = ""
+    for r in rows:
+        cv = (r[8] or "").replace('"', '""')
+        lines += f'{r[0]},{r[1]},{r[2] or ""},{r[3] or ""},{r[4] or ""},{r[5] or ""},{r[6] or ""},{r[7] or ""},"{cv}",{r[9] or ""}\n'
+    return _csv_response(header + lines, f"字段导出_{datetime.now().strftime('%Y%m%d')}.csv")
+
+@app.post("/api/data-fields/import")
+async def import_fields(file: UploadFile = File(...)):
+    content = await file.read()
+    text = content.decode("utf-8-sig")
+    import csv, io
+    reader = csv.reader(io.StringIO(text))
+    header = next(reader, None)
+    if not header or len(header) < 2:
+        return JSONResponse({"error": "文件格式不正确，请下载使用模板文件"}, status_code=400)
+    success, errors = 0, 0
+    conn = get_db()
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for i, row in enumerate(reader, 2):
+        try:
+            fid = (row[0] or "").strip()
+            fname_en = (row[1] or "").strip()
+            if not fid or not fname_en:
+                errors += 1; continue
+            fname_cn = (row[2] or "").strip() if len(row) > 2 else ""
+            fmean = (row[3] or "").strip() if len(row) > 3 else ""
+            froot_id = (row[4] or "").strip() if len(row) > 4 else None
+            froot_name = (row[5] or "").strip() if len(row) > 5 else None
+            ftype = (row[6] or "").strip() if len(row) > 6 else None
+            flen = int(row[7]) if len(row) > 7 and (row[7] or "").strip() else None
+            fcode = (row[8] or "").strip() if len(row) > 8 else None
+            fremark = (row[9] or "").strip() if len(row) > 9 else ""
+            existing = conn.execute("SELECT id FROM data_fields WHERE id=?", (fid,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE data_fields SET name_en=?,name_cn=?,meaning=?,root_id=?,root_name=?,field_type=?,length=?,code_values=?,remark=?,updated_at=? WHERE id=?",
+                    (fname_en, fname_cn, fmean, froot_id, froot_name, ftype, flen, fcode, fremark, now_ts, fid)
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO data_fields(id,name_en,name_cn,meaning,root_id,root_name,field_type,length,code_values,remark,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (fid, fname_en, fname_cn, fmean, froot_id, froot_name, ftype, flen, fcode, fremark, now_ts, now_ts)
+                )
+            success += 1
+        except Exception:
+            errors += 1
+    conn.commit()
+    conn.close()
+    return {"ok": True, "success": success, "errors": errors}
 
 
 # ── 数据标准 API ──────────────────────────────────────────

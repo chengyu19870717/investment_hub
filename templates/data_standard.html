@@ -33,6 +33,9 @@
                     <div class="ds-panel-header">
                         <div class="ds-search-row">
                             <input type="text" class="ds-search" id="rootSearch" placeholder="搜索字根...">
+                            <button class="btn-secondary" id="btnDownloadRootTemplate">📥 下载模板</button>
+                            <button class="btn-secondary" id="btnImportRoots">📂 导入</button>
+                            <button class="btn-secondary" id="btnExportRoots">📤 导出</button>
                             <button class="btn-primary" id="btnAddRoot">+ 新增字根</button>
                         </div>
                     </div>
@@ -54,6 +57,9 @@
                     <div class="ds-panel-header">
                         <div class="ds-search-row">
                             <input type="text" class="ds-search" id="fieldSearch" placeholder="搜索字段...">
+                            <button class="btn-secondary" id="btnDownloadFieldTemplate">📥 下载模板</button>
+                            <button class="btn-secondary" id="btnImportFields">📂 导入</button>
+                            <button class="btn-secondary" id="btnExportFields">📤 导出</button>
                             <button class="btn-primary" id="btnAddField">+ 新增字段</button>
                         </div>
                     </div>
@@ -113,6 +119,27 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="rootFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+    <input type="file" id="fieldFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+
+    <!-- Modal: 导入结果 -->
+    <div class="ds-modal" id="importResultModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--md">
+            <div class="ds-modal-header">
+                <h3 id="importResultTitle">导入结果</h3>
+                <button class="ds-modal-close" data-close="importResultModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <div id="importResultBody"></div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-primary" data-close="importResultModal">确定</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal: 字根编辑 -->

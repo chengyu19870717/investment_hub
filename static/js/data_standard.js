@@ -67,6 +67,78 @@
     });
 
     // ═══════════════════════════════════════════════════════
+    //  导入/导出功能
+    // ═══════════════════════════════════════════════════════
+
+    // 下载模板
+    function downloadTemplate(url) {
+        window.open(url, '_blank');
+    }
+
+    // 导出 CSV
+    function exportData(url) {
+        window.open(url, '_blank');
+    }
+
+    // 导入文件
+    function importFile(uploadUrl, fileInput, typeName) {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const origText = fileInput.parentElement?.querySelector('.btn-secondary')?.textContent || '导入中...';
+        fileInput.disabled = true;
+
+        fetch(uploadUrl, { method: 'POST', body: formData })
+            .then(res => {
+                if (!res.ok) return res.json().then(e => { throw new Error(e.error || '导入失败'); });
+                return res.json();
+            })
+            .then(data => {
+                showImportResult(typeName, data.success, data.errors);
+                fileInput.value = '';
+                fileInput.disabled = false;
+                // 刷新列表
+                if (typeName === '字根') loadRoots();
+                else if (typeName === '字段') loadFields();
+            })
+            .catch(e => {
+                alert('导入失败: ' + e.message);
+                fileInput.disabled = false;
+            });
+    }
+
+    function showImportResult(typeName, success, errors) {
+        const body = $('#importResultBody');
+        $('#importResultTitle').textContent = typeName + ' 导入结果';
+        let html = '';
+        if (success > 0) {
+            html += '<div style="color:#34c759;font-size:15px;margin-bottom:8px;">✅ 成功导入 <strong>' + success + '</strong> 条</div>';
+        }
+        if (errors > 0) {
+            html += '<div style="color:#ff3b30;font-size:15px;margin-bottom:8px;">❌ <strong>' + errors + '</strong> 条解析失败（请检查格式）</div>';
+        }
+        if (success === 0 && errors === 0) {
+            html += '<div style="color:var(--text-muted);">未找到有效数据</div>';
+        }
+        body.innerHTML = html;
+        openModal('importResultModal');
+    }
+
+    // 字根 导入/导出/模板 按钮
+    $('#btnDownloadRootTemplate')?.addEventListener('click', () => downloadTemplate('/api/data-roots/template'));
+    $('#btnExportRoots')?.addEventListener('click', () => exportData('/api/data-roots/export'));
+    $('#btnImportRoots')?.addEventListener('click', () => $('#rootFileInput').click());
+    $('#rootFileInput')?.addEventListener('change', () => importFile('/api/data-roots/import', $('#rootFileInput'), '字根'));
+
+    // 字段 导入/导出/模板 按钮
+    $('#btnDownloadFieldTemplate')?.addEventListener('click', () => downloadTemplate('/api/data-fields/template'));
+    $('#btnExportFields')?.addEventListener('click', () => exportData('/api/data-fields/export'));
+    $('#btnImportFields')?.addEventListener('click', () => $('#fieldFileInput').click());
+    $('#fieldFileInput')?.addEventListener('change', () => importFile('/api/data-fields/import', $('#fieldFileInput'), '字段'));
+
+    // ═══════════════════════════════════════════════════════
     //  1. 字根维护
     // ═══════════════════════════════════════════════════════
     async function loadRoots() {

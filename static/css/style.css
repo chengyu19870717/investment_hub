@@ -614,6 +614,47 @@ body {
 .form-group input:focus,
 .form-group select:focus { border-color: var(--accent); }
 
+/* ── 代理开关 ──────────────────────────────────────────── */
+.proxy-toggle-wrap {
+    width: 80px;
+    height: 44px;
+    border-radius: 22px;
+    background: var(--border);
+    margin: 0 auto 16px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.proxy-toggle-wrap--on {
+    background: #34c759;
+}
+.proxy-toggle-knob {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    transition: left 0.3s;
+}
+.proxy-toggle-knob--on {
+    left: 40px;
+}
+.proxy-status-text {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    transition: color 0.3s;
+}
+.proxy-info-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
 /* ── 错误卡片 ──────────────────────────────────────────── */
 .card--error {
     border: 1px solid #ffcdd2;

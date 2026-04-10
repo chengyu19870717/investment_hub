@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代理网关 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">🌐</span>
+                    <span class="logo-text">代理网关</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="section-label">系统代理状态</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;text-align:center;padding:32px 0 24px;">
+                <!-- 大开关 -->
+                <div id="toggle-wrap" class="proxy-toggle-wrap" onclick="toggle()">
+                    <div id="toggle-knob" class="proxy-toggle-knob"></div>
+                </div>
+                <div id="status-text" class="proxy-status-text">检测中…</div>
+                <div id="proxy-info" class="proxy-info-text" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="error-area" style="display:none;margin-top:12px;">
+            <div class="card card--error" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div id="error-msg" style="color:#ff3b30;font-size:14px;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer"><span>程钰的百宝箱 · 本地版</span></footer>
+</div>
+
+<script>
+const wrap      = document.getElementById('toggle-wrap');
+const knob      = document.getElementById('toggle-knob');
+const statusTxt = document.getElementById('status-text');
+const infoTxt   = document.getElementById('proxy-info');
+const errorArea = document.getElementById('error-area');
+const errorMsg  = document.getElementById('error-msg');
+
+let busy = false;
+
+function setUI(enabled) {
+    wrap.classList.toggle('proxy-toggle-wrap--on', enabled);
+    knob.classList.toggle('proxy-toggle-knob--on', enabled);
+    statusTxt.textContent  = enabled ? '代理已开启' : '代理已关闭';
+    statusTxt.style.color  = enabled ? '#34c759' : 'var(--text-muted)';
+    errorArea.style.display = 'none';
+}
+
+function showError(msg) {
+    errorArea.style.display = 'block';
+    errorMsg.textContent = msg;
+}
+
+async function loadStatus() {
+    try {
+        const res  = await fetch('/api/proxy/status');
+        const data = await res.json();
+        if (data.error) { showError(data.error); return; }
+        setUI(data.enabled);
+        infoTxt.textContent = data.host + ':' + data.port + '  ·  ' + data.iface;
+        infoTxt.style.display = 'block';
+    } catch(e) {
+        showError('无法获取代理状态：' + e.message);
+    }
+}
+
+async function toggle() {
+    if (busy) return;
+    busy = true;
+    wrap.style.opacity = '0.6';
+    statusTxt.textContent = '切换中…';
+    statusTxt.style.color = 'var(--text-muted)';
+    try {
+        const res  = await fetch('/api/proxy/toggle', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) { showError(data.error); await loadStatus(); }
+        else             { setUI(data.enabled); }
+    } catch(e) {
+        showError('切换失败：' + e.message);
+        await loadStatus();
+    } finally {
+        busy = false;
+        wrap.style.opacity = '1';
+    }
+}
+
+loadStatus();
+</script>
+</body>
+</html>
