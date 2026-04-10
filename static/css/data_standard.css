@@ -458,6 +458,24 @@
     margin-bottom: 6px;
     font-size: 13px;
 }
+/* 字根搜索选择器 */
+.root-picker { display: flex; flex-direction: column; gap: 4px; }
+.root-picker input[type="text"] {
+    width: 100%; box-sizing: border-box;
+    padding: 7px 10px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 8px 8px 0 0;
+    background: var(--bg-page); color: var(--text-primary); outline: none;
+}
+.root-picker input[type="text"]:focus { border-color: var(--accent); }
+.root-picker select {
+    width: 100%; box-sizing: border-box;
+    border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px;
+    background: var(--bg-page); color: var(--text-primary);
+    font-size: 13px; outline: none; padding: 2px 0;
+}
+.root-picker select:focus { border-color: var(--accent); }
+.root-picker select option { padding: 4px 10px; }
+
 /* 行选中高亮 */
 .ds-table-row { cursor: pointer; }
 .ds-table-row:hover { background: var(--accent-light, #f0f7ff); }

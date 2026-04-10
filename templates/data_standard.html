@@ -229,11 +229,14 @@
                         <label>字段中文名</label>
                         <input type="text" id="fieldNameCn">
                     </div>
-                    <div class="ds-form-group">
-                        <label>引用字根ID</label>
-                        <select id="fieldRootId">
-                            <option value="">-- 不引用 --</option>
-                        </select>
+                    <div class="ds-form-group" style="grid-column:1/-1;">
+                        <label>引用字根</label>
+                        <div class="root-picker">
+                            <input type="text" id="fieldRootSearch" placeholder="搜索字根名称或ID…" autocomplete="off">
+                            <select id="fieldRootId" size="4" onchange="onFieldRootChange()">
+                                <option value="">-- 不引用 --</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="ds-form-group">
                         <label>字段类型</label>
@@ -243,13 +246,17 @@
                         <label>字段长度</label>
                         <input type="text" id="fieldLength" readonly placeholder="引用字根后自动填充" style="background:#f2f2f7;">
                     </div>
-                    <div class="ds-form-group" id="fieldCodeGroup" style="grid-column:1/-1;">
-                        <label>字段码值（字根码值的子集，JSON数组）</label>
-                        <textarea id="fieldCodeValues" rows="3" placeholder='["A","B"] 选择部分字根码值'></textarea>
-                    </div>
-                    <div class="ds-form-group">
-                        <label>字段含义</label>
-                        <input type="text" id="fieldMeaning">
+                    <div class="ds-form-group" id="fieldCodeGroup" style="grid-column:1/-1;display:none;">
+                        <label>字段码值（从字根码值中删减，保留字段使用的子集）</label>
+                        <div class="cv-editor">
+                            <div class="cv-header">
+                                <span>码值编码</span>
+                                <span>码值含义</span>
+                                <span></span>
+                            </div>
+                            <div id="fieldCodeRows"></div>
+                        </div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">点击 × 删除不需要的码值</div>
                     </div>
                     <div class="ds-form-group" style="grid-column:1/-1;">
                         <label>字段备注</label>

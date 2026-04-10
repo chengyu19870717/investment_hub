@@ -422,50 +422,131 @@
 
     $('#fieldSearch')?.addEventListener('input', renderFieldTable);
 
-    function populateFieldRootSelect() {
-        const sel = $('#fieldRootId');
-        if (!sel) return;
-        sel.innerHTML = '<option value="">-- 不引用 --</option>' +
-            roots.map(r => `<option value="${r.id}">${esc(r.id)} - ${esc(r.name)}</option>`).join('');
+    // ── 字段码值子集编辑器 ────────────────────────────────────
+    function addFieldCodeRow(code, label) {
+        const container = document.getElementById('fieldCodeRows');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'cv-row';
+
+        const codeInput = document.createElement('input');
+        codeInput.type = 'text';
+        codeInput.className = 'cv-code';
+        codeInput.readOnly = true;
+        codeInput.value = code || '';
+
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.className = 'cv-label';
+        labelInput.readOnly = true;
+        labelInput.value = label || '';
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'cv-del-btn';
+        delBtn.title = '删除';
+        delBtn.textContent = '\u00d7';
+        delBtn.addEventListener('click', () => row.remove());
+
+        row.appendChild(codeInput);
+        row.appendChild(labelInput);
+        row.appendChild(delBtn);
+        container.appendChild(row);
     }
 
-    function setupFieldRootChange() {
-        const sel = $('#fieldRootId');
-        if (!sel) return;
-        sel.addEventListener('change', () => {
-            const root = roots.find(r => r.id === sel.value);
-            if (root) {
-                $('#fieldType').value = root.root_type || '';
-                $('#fieldLength').value = root.length || '';
-                if (root.root_type === '字符型' && root.code_values) {
-                    $('#fieldCodeGroup').style.display = '';
-                    $('#fieldCodeValues').placeholder = '从字根码值中选择子集，字根码值: ' + root.code_values;
-                } else {
-                    $('#fieldCodeGroup').style.display = 'none';
-                }
-            } else {
-                $('#fieldType').value = '';
-                $('#fieldLength').value = '';
-                $('#fieldCodeGroup').style.display = '';
-                $('#fieldCodeValues').placeholder = '';
-            }
+    // rootVals: 字根全量码值数组 ["01=个人","02=对公"]
+    // fieldVals: 字段已有码值数组（子集），null 表示新建时显示全量
+    function renderFieldCodeRows(rootVals, fieldVals) {
+        const container = document.getElementById('fieldCodeRows');
+        if (!container) return;
+        container.textContent = '';
+        const subset = fieldVals && fieldVals.length ? new Set(fieldVals) : null;
+        (rootVals || []).forEach(function (v) {
+            if (subset && !subset.has(v)) return;  // 编辑时只显示已选子集
+            const sep = v.indexOf('=');
+            const code  = sep >= 0 ? v.slice(0, sep) : v;
+            const label = sep >= 0 ? v.slice(sep + 1) : '';
+            addFieldCodeRow(code, label);
         });
     }
+
+    function getFieldCodeValues() {
+        const rows = document.querySelectorAll('#fieldCodeRows .cv-row');
+        const result = [];
+        rows.forEach(function (row) {
+            const code  = (row.querySelector('.cv-code')?.value  || '').trim();
+            const label = (row.querySelector('.cv-label')?.value || '').trim();
+            if (code) result.push(label ? code + '=' + label : code);
+        });
+        return result.length ? JSON.stringify(result) : null;
+    }
+
+    // ── 字根选择器（带搜索）────────────────────────────────────
+    function populateFieldRootSelect(filterText) {
+        const sel = document.getElementById('fieldRootId');
+        if (!sel) return;
+        const q = (filterText || '').toLowerCase();
+        const filtered = roots.filter(r =>
+            !q || r.id.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+        );
+        sel.textContent = '';
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '-- 不引用 --';
+        sel.appendChild(blank);
+        filtered.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.id;
+            opt.textContent = r.id + ' - ' + r.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    document.getElementById('fieldRootSearch')?.addEventListener('input', function () {
+        const current = document.getElementById('fieldRootId')?.value;
+        populateFieldRootSelect(this.value);
+        // restore selection if still visible
+        const sel = document.getElementById('fieldRootId');
+        if (sel && current) sel.value = current;
+    });
+
+    // 选中字根后回显类型/长度/码值
+    window.onFieldRootChange = function () {
+        const sel = document.getElementById('fieldRootId');
+        if (!sel) return;
+        const root = roots.find(r => r.id === sel.value);
+        const codeGroup = document.getElementById('fieldCodeGroup');
+        if (root) {
+            document.getElementById('fieldType').value   = root.root_type || '';
+            document.getElementById('fieldLength').value = root.length   || '';
+            if (root.root_type === '字符型' && root.code_values) {
+                let rootVals = [];
+                try { rootVals = JSON.parse(root.code_values); } catch (_) {}
+                renderFieldCodeRows(rootVals, null);  // 新选字根时显示全量供删减
+                codeGroup.style.display = '';
+            } else {
+                codeGroup.style.display = 'none';
+            }
+        } else {
+            document.getElementById('fieldType').value   = '';
+            document.getElementById('fieldLength').value = '';
+            codeGroup.style.display = 'none';
+        }
+    };
 
     $('#btnAddField')?.addEventListener('click', () => {
         $('#fieldEditId').value = '';
         $('#fieldId').value = genId('FIELD');
         $('#fieldNameEn').value = '';
         $('#fieldNameCn').value = '';
-        $('#fieldMeaning').value = '';
         $('#fieldRemark').value = '';
-        $('#fieldRootId').value = '';
         $('#fieldType').value = '';
         $('#fieldLength').value = '';
-        $('#fieldCodeValues').value = '';
-        $('#fieldCodeGroup').style.display = '';
+        document.getElementById('fieldCodeGroup').style.display = 'none';
+        document.getElementById('fieldCodeRows').textContent = '';
+        document.getElementById('fieldRootSearch').value = '';
         $('#fieldModalTitle').textContent = '新增字段';
-        populateFieldRootSelect();
+        populateFieldRootSelect('');
         openModal('fieldModal');
     });
 
@@ -473,17 +554,16 @@
         const id = ($('#fieldId').value || '').trim();
         const nameEn = ($('#fieldNameEn').value || '').trim();
         if (!id || !nameEn) { alert('请填写字段ID和字段英文名'); return; }
-        const rootId = ($('#fieldRootId').value || '').trim();
+        const rootId = (document.getElementById('fieldRootId')?.value || '').trim();
         const root = roots.find(r => r.id === rootId);
         const data = {
             id, name_en: nameEn,
             name_cn: ($('#fieldNameCn').value || '').trim(),
-            meaning: ($('#fieldMeaning').value || '').trim(),
             root_id: rootId || null,
             root_name: root ? root.name : null,
             field_type: ($('#fieldType').value || '').trim() || null,
             length: parseInt($('#fieldLength').value) || null,
-            code_values: ($('#fieldCodeValues').value || '').trim() || null,
+            code_values: getFieldCodeValues(),
             remark: ($('#fieldRemark').value || '').trim(),
         };
         try {
@@ -507,15 +587,26 @@
         $('#fieldId').value = f.id;
         $('#fieldNameEn').value = f.name_en;
         $('#fieldNameCn').value = f.name_cn || '';
-        $('#fieldMeaning').value = f.meaning || '';
         $('#fieldRemark').value = f.remark || '';
-        populateFieldRootSelect();
-        $('#fieldRootId').value = f.root_id || '';
+        document.getElementById('fieldRootSearch').value = '';
+        populateFieldRootSelect('');
+        document.getElementById('fieldRootId').value = f.root_id || '';
         $('#fieldType').value = f.field_type || '';
         $('#fieldLength').value = f.length || '';
-        $('#fieldCodeValues').value = f.code_values || '';
+        // 码值：回显字根全量 + 仅保留已有子集
+        const codeGroup = document.getElementById('fieldCodeGroup');
+        const root = roots.find(r => r.id === f.root_id);
+        if (root && root.root_type === '字符型' && root.code_values) {
+            let rootVals = [], fieldVals = [];
+            try { rootVals  = JSON.parse(root.code_values); } catch (_) {}
+            try { fieldVals = JSON.parse(f.code_values || '[]'); } catch (_) {}
+            renderFieldCodeRows(rootVals, fieldVals.length ? fieldVals : null);
+            codeGroup.style.display = '';
+        } else {
+            codeGroup.style.display = 'none';
+            document.getElementById('fieldCodeRows').textContent = '';
+        }
         $('#fieldModalTitle').textContent = '编辑字段';
-        if (f.field_type !== '字符型') $('#fieldCodeGroup').style.display = 'none';
         openModal('fieldModal');
     };
 
