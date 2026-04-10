@@ -25,6 +25,7 @@ FEATURES = [
     {"title": "录音转会议纪要", "url": "/audio",   "icon": "🎙️", "description": "上传录音自动生成纪要", "status": "active"},
     {"title": "一图一表",       "url": "/chart",   "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active"},
     {"title": "待办管理",       "url": "/tasks",   "icon": "📝", "description": "快速登记和管理待办",   "status": "active"},
+    {"title": "数据标准",       "url": "#",        "icon": "📐", "description": "数据标准化配置与管理",   "status": "coming_soon"},
 ]
 
 
