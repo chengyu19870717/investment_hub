@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据标准 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/data_standard.css">
+</head>
+<body>
+    <div class="page page--wide">
+        <header class="header">
+            <div class="header-inner" style="display:flex;align-items:center;justify-content:space-between;">
+                <a href="/" class="back-btn">←</a>
+                <span style="font-size:17px;font-weight:600;">数据标准</span>
+                <span style="width:28px;"></span>
+            </div>
+        </header>
+
+        <main class="main" style="padding:0;">
+            <!-- Tab Bar -->
+            <div class="ds-tabs" id="dsTabs">
+                <button class="ds-tab ds-tab--active" data-tab="roots">📐 字根维护</button>
+                <button class="ds-tab" data-tab="fields">📋 标准字段维护</button>
+                <button class="ds-tab" data-tab="interfaces">🔗 接口维护</button>
+                <button class="ds-tab" data-tab="rules">⚙️ 规则维护</button>
+            </div>
+
+            <!-- Content Panels -->
+            <div class="ds-panels">
+                <!-- 字根维护 -->
+                <div class="ds-panel ds-panel--active" id="panel-roots">
+                    <div class="ds-panel-header">
+                        <div class="ds-search-row">
+                            <input type="text" class="ds-search" id="rootSearch" placeholder="搜索字根...">
+                            <button class="btn-primary" id="btnAddRoot">+ 新增字根</button>
+                        </div>
+                    </div>
+                    <div class="ds-table-wrap">
+                        <table class="ds-table" id="rootTable">
+                            <thead>
+                                <tr>
+                                    <th>字根ID</th><th>字根名</th><th>字根含义</th>
+                                    <th>字根类型</th><th>长度</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 标准字段维护 -->
+                <div class="ds-panel" id="panel-fields">
+                    <div class="ds-panel-header">
+                        <div class="ds-search-row">
+                            <input type="text" class="ds-search" id="fieldSearch" placeholder="搜索字段...">
+                            <button class="btn-primary" id="btnAddField">+ 新增字段</button>
+                        </div>
+                    </div>
+                    <div class="ds-table-wrap">
+                        <table class="ds-table" id="fieldTable">
+                            <thead>
+                                <tr>
+                                    <th>字段ID</th><th>字段英文名</th><th>字段中文名</th>
+                                    <th>字段类型</th><th>长度</th><th>引用字根</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 接口维护 -->
+                <div class="ds-panel" id="panel-interfaces">
+                    <div class="ds-panel-header">
+                        <div class="ds-search-row">
+                            <input type="text" class="ds-search" id="ifaceSearch" placeholder="搜索接口...">
+                            <button class="btn-primary" id="btnAddIface">+ 新增接口</button>
+                        </div>
+                    </div>
+                    <div class="ds-table-wrap">
+                        <table class="ds-table" id="ifaceTable">
+                            <thead>
+                                <tr>
+                                    <th>接口ID</th><th>接口名称</th><th>接口描述</th>
+                                    <th>输入字段数</th><th>输出字段数</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 规则维护 -->
+                <div class="ds-panel" id="panel-rules">
+                    <div class="ds-panel-header">
+                        <div class="ds-search-row">
+                            <input type="text" class="ds-search" id="ruleSearch" placeholder="搜索规则...">
+                            <button class="btn-primary" id="btnAddRule">+ 新增规则</button>
+                        </div>
+                    </div>
+                    <div class="ds-table-wrap">
+                        <table class="ds-table" id="ruleTable">
+                            <thead>
+                                <tr>
+                                    <th>规则ID</th><th>规则名称</th><th>规则描述</th>
+                                    <th>输入字段数</th><th>输出字段数</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: 字根编辑 -->
+    <div class="ds-modal" id="rootModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--lg">
+            <div class="ds-modal-header">
+                <h3 id="rootModalTitle">新增字根</h3>
+                <button class="ds-modal-close" data-close="rootModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <input type="hidden" id="rootEditId">
+                <div class="ds-form-grid">
+                    <div class="ds-form-group">
+                        <label>字根ID</label>
+                        <input type="text" id="rootId" placeholder="如：ROOT_001">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字根名 *</label>
+                        <input type="text" id="rootName" required>
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字根含义</label>
+                        <input type="text" id="rootMeaning">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字根类型 *</label>
+                        <select id="rootType">
+                            <option value="字符型">字符型</option>
+                            <option value="数字型">数字型</option>
+                            <option value="金额类型">金额类型</option>
+                            <option value="日期类型">日期类型</option>
+                            <option value="时间戳">时间戳</option>
+                        </select>
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字根长度</label>
+                        <input type="number" id="rootLength" min="1">
+                    </div>
+                    <div class="ds-form-group" id="rootCodeGroup">
+                        <label>字根码值（JSON数组，仅字符型）</label>
+                        <textarea id="rootCodeValues" rows="3" placeholder='["A","B","C"]'></textarea>
+                    </div>
+                    <div class="ds-form-group" style="grid-column:1/-1;">
+                        <label>字根备注</label>
+                        <textarea id="rootRemark" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="rootModal">取消</button>
+                <button class="btn-primary" id="btnSaveRoot">保存</button>
+                <button class="btn-secondary" id="btnRootGraph" style="margin-left:auto;">📊 查看关联图谱</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 字段编辑 -->
+    <div class="ds-modal" id="fieldModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--lg">
+            <div class="ds-modal-header">
+                <h3 id="fieldModalTitle">新增字段</h3>
+                <button class="ds-modal-close" data-close="fieldModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <input type="hidden" id="fieldEditId">
+                <div class="ds-form-grid">
+                    <div class="ds-form-group">
+                        <label>字段ID</label>
+                        <input type="text" id="fieldId" placeholder="如：FIELD_001">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字段英文名 *</label>
+                        <input type="text" id="fieldNameEn" required>
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字段中文名</label>
+                        <input type="text" id="fieldNameCn">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>引用字根ID</label>
+                        <select id="fieldRootId">
+                            <option value="">-- 不引用 --</option>
+                        </select>
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字段类型</label>
+                        <input type="text" id="fieldType" readonly placeholder="引用字根后自动填充" style="background:#f2f2f7;">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字段长度</label>
+                        <input type="text" id="fieldLength" readonly placeholder="引用字根后自动填充" style="background:#f2f2f7;">
+                    </div>
+                    <div class="ds-form-group" id="fieldCodeGroup" style="grid-column:1/-1;">
+                        <label>字段码值（字根码值的子集，JSON数组）</label>
+                        <textarea id="fieldCodeValues" rows="3" placeholder='["A","B"] 选择部分字根码值'></textarea>
+                    </div>
+                    <div class="ds-form-group">
+                        <label>字段含义</label>
+                        <input type="text" id="fieldMeaning">
+                    </div>
+                    <div class="ds-form-group" style="grid-column:1/-1;">
+                        <label>字段备注</label>
+                        <textarea id="fieldRemark" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="fieldModal">取消</button>
+                <button class="btn-primary" id="btnSaveField">保存</button>
+                <button class="btn-secondary" id="btnFieldGraph" style="margin-left:auto;">📊 查看关联图谱</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 接口编辑 -->
+    <div class="ds-modal" id="ifaceModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--xl">
+            <div class="ds-modal-header">
+                <h3 id="ifaceModalTitle">新增接口</h3>
+                <button class="ds-modal-close" data-close="ifaceModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <input type="hidden" id="ifaceEditId">
+                <div class="ds-form-grid">
+                    <div class="ds-form-group">
+                        <label>接口ID</label>
+                        <input type="text" id="ifaceId" placeholder="如：IFACE_001">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>接口名称 *</label>
+                        <input type="text" id="ifaceName" required>
+                    </div>
+                    <div class="ds-form-group" style="grid-column:1/-1;">
+                        <label>接口描述</label>
+                        <input type="text" id="ifaceDesc">
+                    </div>
+                </div>
+                <div class="ds-iface-sections">
+                    <div class="ds-iface-section">
+                        <div class="ds-iface-section-header">
+                            <span>📥 接口输入字段</span>
+                            <div>
+                                <input type="text" class="ds-mini-search" id="ifaceInputSearch" placeholder="搜索字段...">
+                                <button class="btn-sm" id="btnAddIfaceInput">+ 添加字段</button>
+                            </div>
+                        </div>
+                        <div class="ds-drag-list" id="ifaceInputList"></div>
+                    </div>
+                    <div class="ds-iface-section">
+                        <div class="ds-iface-section-header">
+                            <span>📤 接口输出字段</span>
+                            <div>
+                                <input type="text" class="ds-mini-search" id="ifaceOutputSearch" placeholder="搜索字段...">
+                                <button class="btn-sm" id="btnAddIfaceOutput">+ 添加字段</button>
+                            </div>
+                        </div>
+                        <div class="ds-drag-list" id="ifaceOutputList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="ifaceModal">取消</button>
+                <button class="btn-primary" id="btnSaveIface">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 规则编辑 -->
+    <div class="ds-modal" id="ruleModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--xl">
+            <div class="ds-modal-header">
+                <h3 id="ruleModalTitle">新增规则</h3>
+                <button class="ds-modal-close" data-close="ruleModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <input type="hidden" id="ruleEditId">
+                <div class="ds-form-grid">
+                    <div class="ds-form-group">
+                        <label>规则ID</label>
+                        <input type="text" id="ruleId" placeholder="如：RULE_001">
+                    </div>
+                    <div class="ds-form-group">
+                        <label>规则名称 *</label>
+                        <input type="text" id="ruleName" required>
+                    </div>
+                    <div class="ds-form-group" style="grid-column:1/-1;">
+                        <label>规则描述</label>
+                        <input type="text" id="ruleDesc">
+                    </div>
+                </div>
+                <div class="ds-iface-sections">
+                    <div class="ds-iface-section">
+                        <div class="ds-iface-section-header">
+                            <span>📥 规则输入字段</span>
+                            <div>
+                                <input type="text" class="ds-mini-search" id="ruleInputSearch" placeholder="搜索字段...">
+                                <button class="btn-sm" id="btnAddRuleInput">+ 添加字段</button>
+                            </div>
+                        </div>
+                        <div class="ds-drag-list" id="ruleInputList"></div>
+                    </div>
+                    <div class="ds-iface-section">
+                        <div class="ds-iface-section-header">
+                            <span>📤 规则输出字段</span>
+                            <div>
+                                <input type="text" class="ds-mini-search" id="ruleOutputSearch" placeholder="搜索字段...">
+                                <button class="btn-sm" id="btnAddRuleOutput">+ 添加字段</button>
+                            </div>
+                        </div>
+                        <div class="ds-drag-list" id="ruleOutputList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="ruleModal">取消</button>
+                <button class="btn-primary" id="btnSaveRule">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 字段选择器 (for interface/rule) -->
+    <div class="ds-modal" id="fieldPickerModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--md">
+            <div class="ds-modal-header">
+                <h3>选择字段</h3>
+                <button class="ds-modal-close" data-close="fieldPickerModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <input type="text" class="ds-search" id="fieldPickerSearch" placeholder="搜索字段...">
+                <div class="ds-field-picker-list" id="fieldPickerList"></div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="fieldPickerModal">取消</button>
+                <button class="btn-primary" id="btnConfirmFieldPick">确认添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 关联图谱 -->
+    <div class="ds-modal" id="graphModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--lg">
+            <div class="ds-modal-header">
+                <h3 id="graphModalTitle">关联图谱</h3>
+                <button class="ds-modal-close" data-close="graphModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <div id="graphContent"></div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="graphModal">关闭</button>
+                <button class="btn-primary" id="btnExportGraph">📥 导出Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 字段规则关联 (for interface/rule field items) -->
+    <div class="ds-modal" id="fieldRuleModal">
+        <div class="ds-modal-backdrop"></div>
+        <div class="ds-modal-content ds-modal--md">
+            <div class="ds-modal-header">
+                <h3 id="fieldRuleModalTitle">字段关联规则</h3>
+                <button class="ds-modal-close" data-close="fieldRuleModal">×</button>
+            </div>
+            <div class="ds-modal-body">
+                <div id="fieldRuleList"></div>
+                <div style="margin-top:12px;">
+                    <select id="fieldRuleSelect" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;">
+                        <option value="">-- 选择规则关联 --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="ds-modal-footer">
+                <button class="btn-secondary" data-close="fieldRuleModal">取消</button>
+                <button class="btn-primary" id="btnSaveFieldRule">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/data_standard.js"></script>
+</body>
+</html>

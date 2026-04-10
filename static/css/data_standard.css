@@ -1,0 +1,382 @@
+/* ── 数据标准 模块样式 ────────────────────────────────── */
+
+/* Tab Bar */
+.ds-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    padding: 0 16px;
+}
+.ds-tab {
+    padding: 12px 20px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+.ds-tab:hover { color: var(--text-primary); }
+.ds-tab--active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* Panels */
+.ds-panel { display: none; }
+.ds-panel--active { display: block; }
+
+.ds-panel-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+}
+.ds-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ds-search {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    outline: none;
+}
+.ds-search:focus { border-color: var(--accent); }
+
+/* Table */
+.ds-table-wrap {
+    overflow-x: auto;
+    padding: 0;
+}
+.ds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.ds-table th, .ds-table td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+.ds-table th {
+    background: var(--bg-page);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 12px;
+    position: sticky;
+    top: 0;
+}
+.ds-table tbody tr:hover { background: var(--bg-card-hover); }
+.ds-table-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 32px !important;
+}
+
+/* Table Actions */
+.ds-table-actions {
+    display: flex;
+    gap: 4px;
+}
+.ds-btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.ds-btn-sm:hover { background: var(--bg-card-hover); }
+.ds-btn-sm--danger { color: #ff3b30; }
+.ds-btn-sm--danger:hover { background: #fff0ef; }
+
+/* Modal */
+.ds-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+.ds-modal--open { display: flex; align-items: center; justify-content: center; }
+.ds-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+}
+.ds-modal-content {
+    position: relative;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+}
+.ds-modal--lg { width: 700px; }
+.ds-modal--xl  { width: 900px; }
+.ds-modal--md  { width: 500px; }
+.ds-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.ds-modal-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+}
+.ds-modal-close {
+    border: none;
+    background: none;
+    font-size: 22px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.ds-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+.ds-modal-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+}
+
+/* Form Grid */
+.ds-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.ds-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ds-form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.ds-form-group input,
+.ds-form-group select,
+.ds-form-group textarea {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    outline: none;
+}
+.ds-form-group input:focus,
+.ds-form-group select:focus,
+.ds-form-group textarea:focus {
+    border-color: var(--accent);
+}
+.ds-form-group textarea { resize: vertical; }
+.ds-form-group input[readonly] {
+    background: #f2f2f7 !important;
+    color: var(--text-muted) !important;
+}
+
+/* Interface / Rule Sections */
+.ds-iface-sections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+.ds-iface-section {
+    background: var(--bg-page);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+}
+.ds-iface-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.ds-iface-section-header div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ds-mini-search {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    width: 120px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    outline: none;
+}
+.ds-mini-search:focus { border-color: var(--accent); }
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* Drag List */
+.ds-drag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 40px;
+}
+.ds-drag-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-card);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: grab;
+    border: 1px solid var(--border);
+    transition: box-shadow 0.15s;
+}
+.ds-drag-item:hover { box-shadow: var(--shadow); }
+.ds-drag-item--dragging {
+    opacity: 0.5;
+    box-shadow: var(--shadow-hover);
+}
+.ds-drag-handle {
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: grab;
+}
+.ds-drag-item-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ds-drag-item-remove {
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+    border-radius: 4px;
+}
+.ds-drag-item-remove:hover { color: #ff3b30; background: #fff0ef; }
+.ds-drag-item-rule-btn {
+    border: none;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.ds-drag-item-rule-btn:hover { background: var(--accent-light); }
+.ds-empty-hint {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 16px;
+}
+
+/* Field Picker */
+.ds-field-picker-list {
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 12px;
+}
+.ds-field-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-page);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: border-color 0.15s;
+}
+.ds-field-picker-item:hover { border-color: var(--accent); }
+.ds-field-picker-item input[type="checkbox"] { accent-color: var(--accent); }
+.ds-field-picker-item-label {
+    flex: 1;
+}
+.ds-field-picker-item-label .en { font-weight: 600; }
+.ds-field-picker-item-label .cn { color: var(--text-muted); font-size: 12px; }
+
+/* Graph Content */
+.ds-graph-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.ds-graph-table th, .ds-graph-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    text-align: left;
+}
+.ds-graph-table th {
+    background: var(--bg-page);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+.ds-graph-section { margin-bottom: 16px; }
+.ds-graph-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+/* Field Rule List */
+.ds-field-rule-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-page);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+.ds-field-rule-remove {
+    border: none;
+    background: none;
+    color: #ff3b30;
+    cursor: pointer;
+    font-size: 13px;
+}

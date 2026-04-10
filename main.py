@@ -20,12 +20,16 @@ app.mount("/static",  StaticFiles(directory=BASE_DIR / "static"),  name="static"
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR),           name="uploads")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
+@app.get("/data-standard", response_class=HTMLResponse)
+def data_standard_page(request: Request):
+    return templates.TemplateResponse("data_standard.html", {"request": request})
+
 FEATURES = [
-    {"title": "股票分析",       "url": "/stock",   "icon": "📈", "description": "每日复盘报告可视化",   "status": "active"},
-    {"title": "录音转会议纪要", "url": "/audio",   "icon": "🎙️", "description": "上传录音自动生成纪要", "status": "active"},
-    {"title": "一图一表",       "url": "/chart",   "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active"},
-    {"title": "待办管理",       "url": "/tasks",   "icon": "📝", "description": "快速登记和管理待办",   "status": "active"},
-    {"title": "数据标准",       "url": "#",        "icon": "📐", "description": "数据标准化配置与管理",   "status": "coming_soon"},
+    {"title": "股票分析",       "url": "/stock",         "icon": "📈", "description": "每日复盘报告可视化",   "status": "active"},
+    {"title": "录音转会议纪要", "url": "/audio",         "icon": "🎙️", "description": "上传录音自动生成纪要", "status": "active"},
+    {"title": "一图一表",       "url": "/chart",         "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active"},
+    {"title": "待办管理",       "url": "/tasks",         "icon": "📝", "description": "快速登记和管理待办",   "status": "active"},
+    {"title": "数据标准",       "url": "/data-standard",  "icon": "📐", "description": "数据标准化配置与管理",   "status": "active"},
 ]
 
 
@@ -61,6 +65,76 @@ def init_db():
             updated_at TEXT
         );
     """)
+
+    # 数据标准模块 — 兼容旧表迁移
+    cols_rules = [r[1] for r in conn.execute("PRAGMA table_info(rules)").fetchall()]
+    if not cols_rules:
+        conn.execute("""
+            CREATE TABLE rules (
+                id              TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                description     TEXT,
+                input_json      TEXT,
+                output_json     TEXT,
+                created_at      TEXT,
+                updated_at      TEXT
+            )
+        """)
+    elif "input_json" not in cols_rules:
+        conn.execute("ALTER TABLE rules ADD COLUMN input_json TEXT")
+        conn.execute("ALTER TABLE rules ADD COLUMN output_json TEXT")
+        conn.execute("ALTER TABLE rules ADD COLUMN created_at TEXT")
+        conn.execute("ALTER TABLE rules ADD COLUMN updated_at TEXT")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS data_roots (
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL,
+            meaning         TEXT,
+            root_type       TEXT,
+            length          INTEGER,
+            code_values     TEXT,
+            remark          TEXT,
+            created_at      TEXT,
+            updated_at      TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS data_fields (
+            id              TEXT PRIMARY KEY,
+            name_en         TEXT NOT NULL,
+            name_cn         TEXT,
+            meaning         TEXT,
+            root_id         TEXT,
+            root_name       TEXT,
+            field_type      TEXT,
+            length          INTEGER,
+            code_values     TEXT,
+            remark          TEXT,
+            created_at      TEXT,
+            updated_at      TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS interfaces (
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL,
+            description     TEXT,
+            input_json      TEXT,
+            output_json     TEXT,
+            created_at      TEXT,
+            updated_at      TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS field_rules (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            field_id        TEXT,
+            rule_id         TEXT,
+            created_at      TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -386,6 +460,182 @@ def update_task_status(task_id: int, body: dict):
 def delete_task(task_id: int):
     conn = get_db()
     conn.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── 数据标准 API ──────────────────────────────────────────
+
+# 字根 CRUD
+@app.get("/api/data-roots")
+def list_roots():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM data_roots ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/data-roots")
+def create_root(data: dict):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO data_roots(id,name,meaning,root_type,length,code_values,remark,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+        (data["id"], data["name"], data.get("meaning"), data.get("root_type"),
+         data.get("length"), data.get("code_values"), data.get("remark"),
+         data.get("created_at"), data.get("updated_at"))
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": data["id"]}
+
+@app.put("/api/data-roots/{root_id}")
+def update_root(root_id: str, data: dict):
+    conn = get_db()
+    conn.execute(
+        "UPDATE data_roots SET name=?,meaning=?,root_type=?,length=?,code_values=?,remark=?,updated_at=? WHERE id=?",
+        (data["name"], data.get("meaning"), data.get("root_type"),
+         data.get("length"), data.get("code_values"), data.get("remark"),
+         data.get("updated_at", now()), root_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/data-roots/{root_id}")
+def delete_root(root_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM data_roots WHERE id=?", (root_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# 字段 CRUD
+@app.get("/api/data-fields")
+def list_fields():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM data_fields ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/data-fields")
+def create_field(data: dict):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO data_fields(id,name_en,name_cn,meaning,root_id,root_name,field_type,length,code_values,remark,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        (data["id"], data["name_en"], data.get("name_cn"), data.get("meaning"),
+         data.get("root_id"), data.get("root_name"), data.get("field_type"),
+         data.get("length"), data.get("code_values"), data.get("remark"),
+         data.get("created_at"), data.get("updated_at"))
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": data["id"]}
+
+@app.put("/api/data-fields/{field_id}")
+def update_field(field_id: str, data: dict):
+    conn = get_db()
+    conn.execute(
+        "UPDATE data_fields SET name_en=?,name_cn=?,meaning=?,root_id=?,root_name=?,field_type=?,length=?,code_values=?,remark=?,updated_at=? WHERE id=?",
+        (data["name_en"], data.get("name_cn"), data.get("meaning"),
+         data.get("root_id"), data.get("root_name"), data.get("field_type"),
+         data.get("length"), data.get("code_values"), data.get("remark"),
+         data.get("updated_at", now()), field_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/data-fields/{field_id}")
+def delete_field(field_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM data_fields WHERE id=?", (field_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# 接口 CRUD
+@app.get("/api/interfaces")
+def list_interfaces():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM interfaces ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/interfaces")
+def create_interface(data: dict):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO interfaces(id,name,description,input_json,output_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+        (data["id"], data["name"], data.get("description"),
+         data.get("input_json", "[]"), data.get("output_json", "[]"),
+         data.get("created_at"), data.get("updated_at"))
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": data["id"]}
+
+@app.put("/api/interfaces/{iface_id}")
+def update_interface(iface_id: str, data: dict):
+    conn = get_db()
+    conn.execute(
+        "UPDATE interfaces SET name=?,description=?,input_json=?,output_json=?,updated_at=? WHERE id=?",
+        (data["name"], data.get("description"),
+         data.get("input_json", "[]"), data.get("output_json", "[]"),
+         data.get("updated_at", now()), iface_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/interfaces/{iface_id}")
+def delete_interface(iface_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM interfaces WHERE id=?", (iface_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# 规则 CRUD
+@app.get("/api/rules")
+def list_rules():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM rules ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/rules")
+def create_rule(data: dict):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO rules(id,name,description,input_json,output_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+        (data["id"], data["name"], data.get("description"),
+         data.get("input_json", "[]"), data.get("output_json", "[]"),
+         data.get("created_at"), data.get("updated_at"))
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "id": data["id"]}
+
+@app.put("/api/rules/{rule_id}")
+def update_rule(rule_id: str, data: dict):
+    conn = get_db()
+    conn.execute(
+        "UPDATE rules SET name=?,description=?,input_json=?,output_json=?,updated_at=? WHERE id=?",
+        (data["name"], data.get("description"),
+         data.get("input_json", "[]"), data.get("output_json", "[]"),
+         data.get("updated_at", now()), rule_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/rules/{rule_id}")
+def delete_rule(rule_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM rules WHERE id=?", (rule_id,))
     conn.commit()
     conn.close()
     return {"ok": True}
