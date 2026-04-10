@@ -458,6 +458,12 @@
     margin-bottom: 6px;
     font-size: 13px;
 }
+/* 行选中高亮 */
+.ds-table-row { cursor: pointer; }
+.ds-table-row:hover { background: var(--accent-light, #f0f7ff); }
+.ds-row--selected { background: var(--accent-light, #e8f2ff) !important; }
+.ds-row--selected td { color: var(--accent); font-weight: 500; }
+
 .ds-field-rule-remove {
     border: none;
     background: none;
