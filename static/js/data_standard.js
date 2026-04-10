@@ -317,6 +317,16 @@
         renderFieldTable();
     };
 
+    // ── 面板图谱按钮入口（HTML onclick 直接调用）─────────────
+    window.openSelectedRootGraph = function () {
+        if (!selectedRootId) { alert('请先选中一条字根记录，再查看关联图谱'); return; }
+        window.showRootGraph(selectedRootId);
+    };
+    window.openSelectedFieldGraph = function () {
+        if (!selectedFieldId) { alert('请先选中一条字段记录，再查看关联图谱'); return; }
+        window.showFieldGraph(selectedFieldId);
+    };
+
     // ── 关联图谱（全局辅助）──────────────────────────────────
     function openGraphModal(title, html) {
         document.getElementById('graphModalTitle').textContent = title;
@@ -517,10 +527,10 @@
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
-    // 字段行级图谱
+    // 字段图谱（面板按钮调用）
     window.showFieldGraph = function (id) {
         const f = fields.find(x => x.id === id);
-        if (!f) return;
+        if (!f) { alert('找不到字段数据'); return; }
         const usedByIfaces = ifaces.filter(ifc => {
             const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
             return arr.some(x => x.field_id === id);
@@ -529,60 +539,8 @@
             const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
             return arr.some(x => x.field_id === id);
         });
-
-        const hasAny = usedByIfaces.length || usedByRules.length;
-        let html = '';
-        if (!hasAny) {
-            html = '<div class="ds-empty-hint" style="padding:32px 0;text-align:center;">暂无关联</div>';
-        } else {
-            if (usedByIfaces.length) {
-                html += '<div class="ds-graph-section"><h4>🔗 被接口引用（' + usedByIfaces.length + '）</h4>' +
-                    '<table class="ds-graph-table"><thead><tr><th>接口ID</th><th>接口名称</th><th>描述</th></tr></thead><tbody>' +
-                    usedByIfaces.map(i => '<tr><td>' + esc(i.id) + '</td><td>' + esc(i.name) + '</td><td>' + esc(i.description || '—') + '</td></tr>').join('') +
-                    '</tbody></table></div>';
-            } else {
-                html += '<div class="ds-graph-section"><h4>🔗 被接口引用</h4><div class="ds-empty-hint">无接口引用</div></div>';
-            }
-            if (usedByRules.length) {
-                html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用（' + usedByRules.length + '）</h4>' +
-                    '<table class="ds-graph-table"><thead><tr><th>规则ID</th><th>规则名称</th><th>描述</th></tr></thead><tbody>' +
-                    usedByRules.map(ru => '<tr><td>' + esc(ru.id) + '</td><td>' + esc(ru.name) + '</td><td>' + esc(ru.description || '—') + '</td></tr>').join('') +
-                    '</tbody></table></div>';
-            } else {
-                html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用</h4><div class="ds-empty-hint">无规则引用</div></div>';
-            }
-        }
-        openGraphModal('字段「' + f.name_en + '」关联图谱', html);
+        openGraphModal('字段「' + f.name_en + '」关联图谱', buildGraphHtml([], usedByIfaces, usedByRules));
     };
-
-    // 字段全局关联图谱（面板按钮）
-    $('#btnFieldGraph')?.addEventListener('click', () => {
-        if (!fields.length) {
-            openGraphModal('字段全局关联图谱', '<div class="ds-empty-hint" style="padding:32px 0;text-align:center;">暂无字段数据</div>');
-            return;
-        }
-        const rows = fields.map(f => {
-            const ifaceCount = ifaces.filter(ifc => {
-                const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
-                return arr.some(x => x.field_id === f.id);
-            }).length;
-            const ruleCount = rules.filter(ru => {
-                const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
-                return arr.some(x => x.field_id === f.id);
-            }).length;
-            return { f, ifaceCount, ruleCount };
-        });
-        let html = '<table class="ds-graph-table"><thead><tr>' +
-            '<th>字段ID</th><th>字段英文名</th><th>字段中文名</th><th>引用字根</th><th>被接口引用</th><th>被规则引用</th>' +
-            '</tr></thead><tbody>' +
-            rows.map(({ f, ifaceCount, ruleCount }) =>
-                '<tr><td>' + esc(f.id) + '</td><td>' + esc(f.name_en) + '</td><td>' + esc(f.name_cn || '—') + '</td>' +
-                '<td>' + esc(f.root_name || f.root_id || '—') + '</td>' +
-                '<td>' + ifaceCount + '</td><td>' + ruleCount + '</td></tr>'
-            ).join('') +
-            '</tbody></table>';
-        openGraphModal('字段全局关联图谱', html);
-    });
 
     // ═══════════════════════════════════════════════════════
     //  3. 接口维护
