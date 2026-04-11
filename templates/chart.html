@@ -79,6 +79,15 @@
     .flow-step-item:active { cursor: grabbing; }
     .flow-step-item.dragging { opacity: 0.4; border-color: var(--accent); }
     .flow-step-item.drag-over { border-color: var(--accent); background: var(--accent-light); }
+    .flow-step-item[data-level="2"] { margin-left: 24px; }
+    .flow-step-item[data-level="3"] { margin-left: 48px; }
+    .flow-step-level-badge {
+        padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
+        flex-shrink: 0; margin-top: 2px;
+    }
+    .flow-step-level-badge[data-level="1"] { background: #007aff; color: #fff; }
+    .flow-step-level-badge[data-level="2"] { background: #ff9500; color: #fff; }
+    .flow-step-level-badge[data-level="3"] { background: #34c759; color: #fff; }
     .flow-step-num {
         width: 24px; height: 24px; border-radius: 50%; background: var(--accent);
         color: #fff; font-size: 12px; font-weight: 700; display: flex;
@@ -431,17 +440,20 @@ function renderSteps() {
     const container = $('#steps-container');
     container.replaceChildren();
     steps.forEach((s, i) => {
+        const level = s.level || 1;
         const item = document.createElement('div');
         item.className = 'flow-step-item';
         item.draggable = true;
         item.dataset.stepId = s.id;
+        item.dataset.level = level;
         item.innerHTML = `
-            <div class="flow-step-num">${i + 1}</div>
+            <span class="flow-step-level-badge" data-level="${level}">L${level}</span>
             <div class="flow-step-body">
                 <div class="flow-step-name">${esc(s.name)}</div>
                 ${s.desc ? '<div class="flow-step-desc">' + esc(s.desc) + '</div>' : ''}
             </div>
             <div class="flow-step-actions">
+                <button class="flow-step-btn btn-add-substep" title="添加子步骤">➕</button>
                 <button class="flow-step-btn btn-edit-step" title="编辑">✏️</button>
                 <button class="flow-step-btn flow-step-btn--danger btn-del-step" title="删除">🗑️</button>
             </div>
@@ -464,6 +476,7 @@ function renderSteps() {
                 renderSteps();
             }
         });
+        item.querySelector('.btn-add-substep').addEventListener('click', () => addSubStep(s));
         item.querySelector('.btn-edit-step').addEventListener('click', () => editStep(s));
         item.querySelector('.btn-del-step').addEventListener('click', () => {
             steps = steps.filter(x => x.id !== s.id);
@@ -474,16 +487,69 @@ function renderSteps() {
     renderFlowchart();
 }
 
+function addSubStep(parentStep) {
+    const container = $('#steps-container');
+    const existing = container.querySelector('.flow-step-form');
+    if (existing) existing.remove();
+
+    const parentLevel = parentStep.level || 1;
+    const childLevel = Math.min(parentLevel + 1, 3);
+
+    const form = document.createElement('div');
+    form.className = 'flow-step-form';
+    form.style.marginLeft = (childLevel - 1) * 24 + 'px';
+    form.innerHTML = `
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">作为「${esc(parentStep.name)}」的子步骤（L${childLevel}）</div>
+        <input type="text" class="step-name-input" placeholder="步骤名称">
+        <textarea class="step-desc-input" placeholder="步骤描述（可选）"></textarea>
+        <div class="flow-step-form-btns">
+            <button class="btn-primary btn-save-step">添加</button>
+            <button class="btn-secondary btn-cancel-step">取消</button>
+        </div>
+    `;
+
+    // 在父步骤后面插入表单
+    const parentItem = container.querySelector(`[data-step-id="${parentStep.id}"]`);
+    if (parentItem) {
+        container.insertBefore(form, parentItem.nextSibling);
+    } else {
+        container.appendChild(form);
+    }
+    form.querySelector('.step-name-input').focus();
+
+    const parentIdx = steps.findIndex(x => x.id === parentStep.id);
+    form.querySelector('.btn-save-step').addEventListener('click', () => {
+        const name = form.querySelector('.step-name-input').value.trim();
+        const desc = form.querySelector('.step-desc-input').value.trim();
+        if (!name) { alert('请填写步骤名称'); return; }
+        const newStep = { id: nextStepId++, name, desc, level: childLevel, parent_id: parentStep.id };
+        steps.splice(parentIdx + 1, 0, newStep);
+        form.remove();
+        renderSteps();
+    });
+    form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
+}
+
 function editStep(step) {
     const container = $('#steps-container');
     const existing = container.querySelector('.flow-step-form');
     if (existing) existing.remove();
 
+    const level = step.level || 1;
     const form = document.createElement('div');
     form.className = 'flow-step-form';
+    form.style.marginLeft = (level - 1) * 24 + 'px';
     form.innerHTML = `
         <input type="text" class="step-name-input" placeholder="步骤名称" value="${esc(step.name)}">
         <textarea class="step-desc-input" placeholder="步骤描述（可选）">${esc(step.desc || '')}</textarea>
+        <div>
+            <label style="font-size:12px;color:var(--text-muted);margin-right:8px;">步骤层级：</label>
+            <select class="step-level-select">
+                <option value="1" ${level===1?'selected':''}>一级步骤</option>
+                <option value="2" ${level===2?'selected':''}>二级步骤</option>
+                <option value="3" ${level===3?'selected':''}>三级步骤</option>
+            </select>
+        </div>
         <div class="flow-step-form-btns">
             <button class="btn-primary btn-save-step">保存</button>
             <button class="btn-secondary btn-cancel-step">取消</button>
@@ -494,8 +560,9 @@ function editStep(step) {
     form.querySelector('.btn-save-step').addEventListener('click', () => {
         const name = form.querySelector('.step-name-input').value.trim();
         const desc = form.querySelector('.step-desc-input').value.trim();
+        const level = parseInt(form.querySelector('.step-level-select').value);
         if (!name) { alert('请填写步骤名称'); return; }
-        step.name = name; step.desc = desc;
+        step.name = name; step.desc = desc; step.level = level;
         form.remove();
         renderSteps();
     });
@@ -512,6 +579,14 @@ $('#btn-add-step').addEventListener('click', () => {
     form.innerHTML = `
         <input type="text" class="step-name-input" placeholder="步骤名称">
         <textarea class="step-desc-input" placeholder="步骤描述（可选）"></textarea>
+        <div>
+            <label style="font-size:12px;color:var(--text-muted);margin-right:8px;">步骤层级：</label>
+            <select class="step-level-select">
+                <option value="1">一级步骤</option>
+                <option value="2">二级步骤</option>
+                <option value="3">三级步骤</option>
+            </select>
+        </div>
         <div class="flow-step-form-btns">
             <button class="btn-primary btn-save-step">添加</button>
             <button class="btn-secondary btn-cancel-step">取消</button>
@@ -520,12 +595,13 @@ $('#btn-add-step').addEventListener('click', () => {
     container.appendChild(form);
     form.querySelector('.step-name-input').focus();
 
-    const newStep = { id: nextStepId++, name: '', desc: '' };
+    const newStep = { id: nextStepId++, name: '', desc: '', level: 1 };
     form.querySelector('.btn-save-step').addEventListener('click', () => {
         const name = form.querySelector('.step-name-input').value.trim();
         const desc = form.querySelector('.step-desc-input').value.trim();
+        const level = parseInt(form.querySelector('.step-level-select').value);
         if (!name) { alert('请填写步骤名称'); return; }
-        newStep.name = name; newStep.desc = desc;
+        newStep.name = name; newStep.desc = desc; newStep.level = level;
         steps.push(newStep);
         form.remove();
         renderSteps();
@@ -533,11 +609,12 @@ $('#btn-add-step').addEventListener('click', () => {
     form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
 });
 
-// ── 自动生成流程图 ────────────────────────────────────────
+// ── 自动生成流程图（支持多层级）─────────────────────────────
 function renderFlowchart() {
     const W = 800, nodeW = 200, nodeH = 60, gapY = 72;
-    const startX = W / 2 - nodeW / 2;
     const startY = 30;
+    const levelOffsets = { 1: W/2 - nodeW/2, 2: W/2 - nodeW/2 + 60, 3: W/2 - nodeW/2 + 120 };
+    const levelColors = { 1: '#007aff', 2: '#ff9500', 3: '#34c759' };
     const H = Math.max(600, startY + steps.length * (nodeH + gapY) + 40);
 
     const svgEl = $('#flow-svg');
@@ -563,34 +640,51 @@ function renderFlowchart() {
     }
 
     steps.forEach((s, i) => {
+        const level = s.level || 1;
+        const x = levelOffsets[level] || levelOffsets[1];
         const y = startY + i * (nodeH + gapY);
+        const color = levelColors[level] || levelColors[1];
 
         // 连线
         if (i > 0) {
+            const prevLevel = steps[i-1].level || 1;
+            const prevX = levelOffsets[prevLevel] || levelOffsets[1];
             const prevY = startY + (i - 1) * (nodeH + gapY) + nodeH;
+
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', W / 2); line.setAttribute('y1', prevY);
-            line.setAttribute('x2', W / 2); line.setAttribute('y2', y);
+            line.setAttribute('x1', prevX + nodeW/2);
+            line.setAttribute('y1', prevY);
+            line.setAttribute('x2', x + nodeW/2);
+            line.setAttribute('y2', y);
             line.setAttribute('stroke', '#8e8e93');
-            line.setAttribute('stroke-width', '2');
+            line.setAttribute('stroke-width', level !== prevLevel ? '1.5' : '2');
+            if (level !== prevLevel) line.setAttribute('stroke-dasharray', '4,3');
             line.setAttribute('marker-end', 'url(#arrow2)');
             svgEl.appendChild(line);
         }
 
         // 节点
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.setAttribute('transform', `translate(${startX}, ${y})`);
+        g.setAttribute('transform', `translate(${x}, ${y})`);
 
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('width', nodeW); rect.setAttribute('height', nodeH);
-        rect.setAttribute('rx', '10'); rect.setAttribute('fill', '#f0f4ff');
-        rect.setAttribute('stroke', '#007aff'); rect.setAttribute('stroke-width', '1.5');
+        rect.setAttribute('rx', '10'); rect.setAttribute('fill', level === 1 ? '#f0f4ff' : level === 2 ? '#fff7ed' : '#f0fdf4');
+        rect.setAttribute('stroke', color); rect.setAttribute('stroke-width', level === 1 ? '1.5' : '1');
         g.appendChild(rect);
+
+        // 层级标签
+        const lvlLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lvlLabel.setAttribute('x', nodeW - 8); lvlLabel.setAttribute('y', 12);
+        lvlLabel.setAttribute('text-anchor', 'end'); lvlLabel.setAttribute('font-size', '9');
+        lvlLabel.setAttribute('fill', color); lvlLabel.setAttribute('font-weight', '600');
+        lvlLabel.textContent = `L${level}`;
+        g.appendChild(lvlLabel);
 
         // 序号
         const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         badge.setAttribute('cx', '16'); badge.setAttribute('cy', '16');
-        badge.setAttribute('r', '10'); badge.setAttribute('fill', '#007aff');
+        badge.setAttribute('r', '10'); badge.setAttribute('fill', color);
         g.appendChild(badge);
 
         const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -604,8 +698,9 @@ function renderFlowchart() {
         // 名称
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', '36'); text.setAttribute('y', '22');
-        text.setAttribute('font-size', '13'); text.setAttribute('fill', '#1d1d1f');
-        text.setAttribute('font-weight', '600');
+        text.setAttribute('font-size', level === 1 ? '13' : '12');
+        text.setAttribute('fill', '#1d1d1f');
+        text.setAttribute('font-weight', level === 1 ? '600' : '400');
         text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
         text.textContent = s.name;
         g.appendChild(text);
