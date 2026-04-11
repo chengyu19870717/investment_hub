@@ -6,148 +6,105 @@
     <title>一图一表 - 程钰的百宝箱</title>
     <link rel="stylesheet" href="/static/css/style.css?v=2">
     <style>
-    /* 流程图自动生成布局 */
+    /* 产品列表视图 */
+    .prod-layout { display: flex; flex-direction: column; gap: 12px; }
+    .prod-header { display: flex; align-items: center; justify-content: space-between; }
+    .prod-search {
+        padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+        font-size: 13px; background: var(--bg-page); color: var(--text-primary); outline: none; width: 240px;
+    }
+    .prod-search:focus { border-color: var(--accent); }
+    .prod-table-wrap { overflow-x: auto; }
+    .prod-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .prod-table th, .prod-table td {
+        padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .prod-table th { background: var(--bg-page); font-weight: 600; color: var(--text-muted); font-size: 12px; }
+    .prod-table tbody tr:hover { background: var(--bg-card-hover); }
+    .prod-empty { text-align: center; color: var(--text-muted); padding: 48px 0; }
+    .prod-actions { display: flex; gap: 4px; }
+    .prod-btn {
+        padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+        background: var(--bg-card); color: var(--text-secondary); font-size: 12px;
+        cursor: pointer; transition: background 0.15s, color 0.15s;
+    }
+    .prod-btn:hover { background: var(--bg-card-hover); }
+    .prod-btn--primary { color: var(--accent); border-color: var(--accent); }
+    .prod-btn--danger { color: #ff3b30; }
+    .prod-btn--danger:hover { background: #fff0ef; }
+
+    /* 产品编辑 Modal */
+    .prod-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .prod-form-group { display: flex; flex-direction: column; gap: 4px; }
+    .prod-form-group label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .prod-form-group input, .prod-form-group textarea {
+        padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+        font-size: 13px; font-family: inherit; background: var(--bg-page);
+        color: var(--text-primary); outline: none;
+    }
+    .prod-form-group input:focus, .prod-form-group textarea:focus { border-color: var(--accent); }
+    .prod-form-group textarea { resize: vertical; }
+    .prod-form-group.full { grid-column: 1 / -1; }
+
+    /* 流程图视图 */
     .flow-layout {
-        display: flex;
-        gap: 16px;
-        height: calc(100vh - 160px);
-        min-height: 400px;
+        display: flex; gap: 16px; height: calc(100vh - 180px); min-height: 400px;
     }
     .flow-steps-panel {
-        width: 340px;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        overflow-y: auto;
+        width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
     }
     .flow-svg-panel {
-        flex: 1;
-        background: var(--bg-card);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        overflow: auto;
-        display: flex;
-        flex-direction: column;
+        flex: 1; background: var(--bg-card); border-radius: var(--radius);
+        box-shadow: var(--shadow); overflow: auto; display: flex; flex-direction: column;
     }
     .flow-svg-toolbar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 14px;
+        display: flex; align-items: center; gap: 8px; padding: 10px 14px;
         border-bottom: 1px solid var(--border);
     }
     .flow-svg-wrap {
-        flex: 1;
-        padding: 20px;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
+        flex: 1; padding: 20px; display: flex; align-items: flex-start; justify-content: center;
     }
-    .flow-svg-wrap svg {
-        max-width: 100%;
-    }
-
-    /* 步骤列表 */
+    .flow-svg-wrap svg { max-width: 100%; }
     .flow-title-input {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
-        font-size: 14px;
-        font-family: inherit;
-        background: var(--bg-card);
-        color: var(--text-primary);
-        outline: none;
+        width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+        border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+        background: var(--bg-card); color: var(--text-primary); outline: none;
     }
     .flow-title-input:focus { border-color: var(--accent); }
-
     .flow-step-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        background: var(--bg-card);
-        border-radius: var(--radius-sm);
-        padding: 10px 12px;
-        box-shadow: var(--shadow);
-        border: 2px solid transparent;
-        transition: border-color 0.15s;
-        cursor: grab;
+        display: flex; align-items: flex-start; gap: 8px; background: var(--bg-card);
+        border-radius: var(--radius-sm); padding: 10px 12px; box-shadow: var(--shadow);
+        border: 2px solid transparent; transition: border-color 0.15s; cursor: grab;
     }
     .flow-step-item:active { cursor: grabbing; }
     .flow-step-item.dragging { opacity: 0.4; border-color: var(--accent); }
     .flow-step-item.drag-over { border-color: var(--accent); background: var(--accent-light); }
-
     .flow-step-num {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        background: var(--accent);
-        color: #fff;
-        font-size: 12px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        margin-top: 2px;
+        width: 24px; height: 24px; border-radius: 50%; background: var(--accent);
+        color: #fff; font-size: 12px; font-weight: 700; display: flex;
+        align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
     }
     .flow-step-body { flex: 1; min-width: 0; }
-    .flow-step-name {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 2px;
-    }
-    .flow-step-desc {
-        font-size: 12px;
-        color: var(--text-muted);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .flow-step-actions {
-        display: flex;
-        gap: 4px;
-        flex-shrink: 0;
-    }
+    .flow-step-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+    .flow-step-desc { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .flow-step-actions { display: flex; gap: 4px; flex-shrink: 0; }
     .flow-step-btn {
-        border: none;
-        background: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        padding: 2px 4px;
-        border-radius: 4px;
-        font-size: 14px;
+        border: none; background: none; color: var(--text-muted); cursor: pointer;
+        padding: 2px 4px; border-radius: 4px; font-size: 14px;
     }
     .flow-step-btn:hover { color: var(--accent); background: var(--accent-light); }
     .flow-step-btn--danger:hover { color: #ff3b30; background: #fff0ef; }
-
-    /* 步骤编辑表单 */
     .flow-step-form {
-        background: var(--bg-card);
-        border-radius: var(--radius-sm);
-        padding: 12px;
-        box-shadow: var(--shadow);
-        border: 1px dashed var(--accent);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        background: var(--bg-card); border-radius: var(--radius-sm); padding: 12px;
+        box-shadow: var(--shadow); border: 1px dashed var(--accent);
+        display: flex; flex-direction: column; gap: 8px;
     }
-    .flow-step-form input,
-    .flow-step-form textarea {
-        width: 100%;
-        padding: 8px 10px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        font-size: 13px;
-        font-family: inherit;
-        background: var(--bg-page);
-        color: var(--text-primary);
-        outline: none;
+    .flow-step-form input, .flow-step-form textarea {
+        width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+        border-radius: 6px; font-size: 13px; font-family: inherit;
+        background: var(--bg-page); color: var(--text-primary); outline: none;
     }
-    .flow-step-form input:focus,
-    .flow-step-form textarea:focus { border-color: var(--accent); }
+    .flow-step-form input:focus, .flow-step-form textarea:focus { border-color: var(--accent); }
     .flow-step-form textarea { resize: vertical; min-height: 40px; }
     .flow-step-form-btns { display: flex; gap: 8px; }
     </style>
@@ -161,41 +118,57 @@
                     <a href="/" class="back-btn">←</a>
                     <div class="logo">
                         <span class="logo-icon">🗂️</span>
-                        <span class="logo-text">一图一表</span>
+                        <span class="logo-text" id="page-title">一图一表</span>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px;">
-                    <button id="btn-new"    class="btn-secondary">＋ 新建</button>
-                    <button id="btn-delete" class="btn-secondary" style="color:#ff3b30;display:none;">删除</button>
-                    <button id="btn-save"    class="btn-primary">保存</button>
+                <div style="display:flex;gap:8px;" id="header-actions">
+                    <!-- 动态按钮 -->
                 </div>
             </div>
         </div>
     </header>
 
     <div class="main" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;">
-        <!-- 图表列表 -->
-        <div id="chart-list-bar" style="margin-bottom:8px;">
-            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">已保存流程图</div>
-            <div id="chart-list" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-            <div id="chart-empty" style="font-size:13px;color:var(--text-muted);">暂无图表，点击新建</div>
+        <!-- 视图 1: 产品列表 -->
+        <div id="view-product-list" class="prod-layout">
+            <div class="prod-header">
+                <input type="text" class="prod-search" id="prodSearch" placeholder="搜索产品…">
+                <button class="btn-primary" id="btn-add-product">＋ 新增产品</button>
+            </div>
+            <div class="prod-table-wrap">
+                <table class="prod-table" id="prodTable">
+                    <thead>
+                        <tr>
+                            <th>产品ID</th><th>产品名称</th><th>产品描述</th>
+                            <th>产品经理</th><th>业务对接人</th><th>主管业务部门</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="prod-empty" class="prod-empty">暂无产品，点击"新增产品"添加</div>
         </div>
 
-        <div class="flow-layout">
-            <!-- 左侧：步骤维护 -->
-            <div class="flow-steps-panel">
-                <input type="text" class="flow-title-input" id="flow-title" placeholder="流程图名称…">
-                <div id="steps-container"></div>
-                <button class="btn-secondary" id="btn-add-step" style="width:100%;">＋ 添加步骤</button>
+        <!-- 视图 2: 流程图编辑 -->
+        <div id="view-flow-editor" style="display:none;">
+            <div style="margin-bottom:8px;">
+                <button class="btn-secondary" id="btn-back-to-list">← 返回产品列表</button>
+                <span id="flow-product-name" style="margin-left:12px;font-weight:600;font-size:14px;"></span>
             </div>
-
-            <!-- 右侧：自动生成流程图 -->
-            <div class="flow-svg-panel">
-                <div class="flow-svg-toolbar">
-                    <span style="font-size:13px;font-weight:600;color:var(--text-muted);">自动生成流程图</span>
+            <div class="flow-layout">
+                <div class="flow-steps-panel">
+                    <input type="text" class="flow-title-input" id="flow-title" placeholder="流程图名称…">
+                    <div id="steps-container"></div>
+                    <button class="btn-secondary" id="btn-add-step" style="width:100%;">＋ 添加步骤</button>
                 </div>
-                <div class="flow-svg-wrap">
-                    <svg id="flow-svg" viewBox="0 0 800 600" width="800" height="600"></svg>
+                <div class="flow-svg-panel">
+                    <div class="flow-svg-toolbar">
+                        <span style="font-size:13px;font-weight:600;color:var(--text-muted);">自动生成流程图</span>
+                        <button class="btn-primary" id="btn-save-flow" style="margin-left:auto;">保存</button>
+                    </div>
+                    <div class="flow-svg-wrap">
+                        <svg id="flow-svg" viewBox="0 0 800 600" width="800" height="600"></svg>
+                    </div>
                 </div>
             </div>
         </div>
@@ -203,62 +176,237 @@
     <footer class="footer"><span>程钰的百宝箱 · 本地版</span></footer>
 </div>
 
+<!-- Modal: 产品编辑 -->
+<div class="ds-modal" id="prodModal">
+    <div class="ds-modal-backdrop"></div>
+    <div class="ds-modal-content ds-modal--lg">
+        <div class="ds-modal-header">
+            <h3 id="prodModalTitle">新增产品</h3>
+            <button class="ds-modal-close" data-close="prodModal">×</button>
+        </div>
+        <div class="ds-modal-body">
+            <input type="hidden" id="prodEditId">
+            <div class="prod-form-grid">
+                <div class="prod-form-group">
+                    <label>产品ID *</label>
+                    <input type="text" id="prodId" placeholder="如：PROD_001">
+                </div>
+                <div class="prod-form-group">
+                    <label>产品名称 *</label>
+                    <input type="text" id="prodName" placeholder="如：信贷审批系统">
+                </div>
+                <div class="prod-form-group full">
+                    <label>产品描述</label>
+                    <textarea id="prodDesc" rows="2" placeholder="产品功能描述"></textarea>
+                </div>
+                <div class="prod-form-group">
+                    <label>产品经理</label>
+                    <input type="text" id="prodManager" placeholder="如：张三">
+                </div>
+                <div class="prod-form-group">
+                    <label>业务对接人</label>
+                    <input type="text" id="prodBizContact" placeholder="如：李四">
+                </div>
+                <div class="prod-form-group full">
+                    <label>主管业务部门</label>
+                    <input type="text" id="prodBizDept" placeholder="如：信贷管理部">
+                </div>
+            </div>
+        </div>
+        <div class="ds-modal-footer">
+            <button class="btn-secondary" data-close="prodModal">取消</button>
+            <button class="btn-primary" id="btnSaveProd">保存</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ── 状态 ──────────────────────────────────────────────────
-let charts    = [];
-let currentId = null;
-let steps     = []; // [{id, name, desc}]
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let products = [];
+let currentProductId = null; // 当前编辑的产品 ID
+let steps = [];
 let nextStepId = 1;
 
-// ── DOM ───────────────────────────────────────────────────
-const $ = s => document.querySelector(s);
-const titleInput = $('#flow-title');
-const stepsCont  = $('#steps-container');
-const chartList  = $('#chart-list');
-const chartEmpty = $('#chart-empty');
-const btnNew     = $('#btn-new');
-const btnDel     = $('#btn-delete');
-const btnSave    = $('#btn-save');
-const btnAddStep = $('#btn-add-step');
-const svgEl      = $('#flow-svg');
-
-// ── 初始化 ────────────────────────────────────────────────
-async function init() {
-    const res = await fetch('/api/charts');
-    charts = await res.json();
-    renderChartList();
-    if (charts.length > 0) loadChart(charts[0].id);
+// ── 视图切换 ──────────────────────────────────────────────
+function showView(view) {
+    $('#view-product-list').style.display = view === 'list' ? '' : 'none';
+    $('#view-flow-editor').style.display = view === 'flow' ? '' : 'none';
+    if (view === 'list') {
+        $('#page-title').textContent = '一图一表';
+        $('#header-actions').innerHTML = '<button class="btn-primary" id="btn-add-product">＋ 新增产品</button>';
+        $('#btn-add-product').addEventListener('click', openProductModal);
+    }
 }
 
-function renderChartList() {
-    chartList.replaceChildren();
-    chartEmpty.style.display = charts.length === 0 ? 'block' : 'none';
-    charts.forEach(c => {
-        const tag = document.createElement('span');
-        tag.className = 'chart-list-item' + (c.id === currentId ? ' chart-list-item--active' : '');
-        tag.textContent = c.title || '未命名';
-        tag.style.cursor = 'pointer';
-        tag.addEventListener('click', () => loadChart(c.id));
-        chartList.appendChild(tag);
-    });
+// ── Modal 工具 ────────────────────────────────────────────
+function openModal(id) { const el = document.getElementById(id); if (el) el.classList.add('ds-modal--open'); }
+function closeModal(id) { const el = document.getElementById(id); if (el) el.classList.remove('ds-modal--open'); }
+$$('.ds-modal-backdrop').forEach(bp => bp.addEventListener('click', () => bp.parentElement.classList.remove('ds-modal--open')));
+$$('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
+
+// ── 产品列表 ──────────────────────────────────────────────
+async function loadProducts() {
+    const res = await fetch('/api/products');
+    products = await res.json();
+    renderProductTable();
 }
 
-async function loadChart(id) {
-    const res  = await fetch('/api/charts/' + id);
-    const data = await res.json();
-    currentId = id;
-    titleInput.value = data.title;
-    const parsed = JSON.parse(data.data_json || '{"steps":[]}');
-    steps = parsed.steps || [];
-    nextStepId = steps.reduce((m, s) => Math.max(m, s.id + 1), 1);
-    btnDel.style.display = 'inline-block';
+function renderProductTable() {
+    const q = ($('#prodSearch')?.value || '').toLowerCase();
+    const list = products.filter(p =>
+        (p.product_id || '').toLowerCase().includes(q) ||
+        (p.product_name || '').toLowerCase().includes(q) ||
+        (p.biz_dept || '').includes(q)
+    );
+    const tbody = $('#prodTable tbody');
+    const emptyEl = $('#prod-empty');
+    if (!list.length) {
+        tbody.innerHTML = '';
+        emptyEl.style.display = 'block';
+        $('#prodTable').style.display = 'none';
+        return;
+    }
+    emptyEl.style.display = 'none';
+    $('#prodTable').style.display = '';
+    tbody.innerHTML = list.map(p => `
+        <tr>
+            <td>${esc(p.product_id)}</td>
+            <td><strong>${esc(p.product_name)}</strong></td>
+            <td>${esc(p.product_desc || '—')}</td>
+            <td>${esc(p.product_manager || '—')}</td>
+            <td>${esc(p.biz_contact || '—')}</td>
+            <td>${esc(p.biz_dept || '—')}</td>
+            <td class="prod-actions">
+                <button class="prod-btn prod-btn--primary" onclick="openFlowEditor(${p.id}, '${esc(p.product_name)}')">一图一表</button>
+                <button class="prod-btn" onclick="openProductModal(${p.id})">编辑</button>
+                <button class="prod-btn prod-btn--danger" onclick="deleteProduct(${p.id})">删除</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+$('#prodSearch')?.addEventListener('input', renderProductTable);
+
+// ── 产品编辑 ──────────────────────────────────────────────
+function openProductModal(id) {
+    $('#prodEditId').value = '';
+    $('#prodId').value = '';
+    $('#prodName').value = '';
+    $('#prodDesc').value = '';
+    $('#prodManager').value = '';
+    $('#prodBizContact').value = '';
+    $('#prodBizDept').value = '';
+    $('#prodModalTitle').textContent = '新增产品';
+
+    if (id) {
+        const p = products.find(x => x.id === id);
+        if (!p) return;
+        $('#prodEditId').value = p.id;
+        $('#prodId').value = p.product_id;
+        $('#prodId').disabled = true;
+        $('#prodName').value = p.product_name;
+        $('#prodDesc').value = p.product_desc || '';
+        $('#prodManager').value = p.product_manager || '';
+        $('#prodBizContact').value = p.biz_contact || '';
+        $('#prodBizDept').value = p.biz_dept || '';
+        $('#prodModalTitle').textContent = '编辑产品';
+    } else {
+        $('#prodId').disabled = false;
+    }
+    openModal('prodModal');
+}
+
+$('#btnSaveProd').addEventListener('click', async () => {
+    const editId = $('#prodEditId').value;
+    const productId = ($('#prodId').value || '').trim();
+    const productName = ($('#prodName').value || '').trim();
+    if (!productId || !productName) { alert('请填写产品ID和名称'); return; }
+
+    const data = {
+        product_id: productId,
+        product_name: productName,
+        product_desc: ($('#prodDesc').value || '').trim(),
+        product_manager: ($('#prodManager').value || '').trim(),
+        biz_contact: ($('#prodBizContact').value || '').trim(),
+        biz_dept: ($('#prodBizDept').value || '').trim(),
+    };
+
+    try {
+        if (editId) {
+            await fetch('/api/products/' + editId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+        } else {
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                alert('保存失败：' + (err.error || '未知错误'));
+                return;
+            }
+        }
+        closeModal('prodModal');
+        await loadProducts();
+    } catch (e) {
+        alert('请求失败：' + e.message);
+    }
+});
+
+window.deleteProduct = async function (id) {
+    if (!confirm('确认删除该产品？')) return;
+    try {
+        await fetch('/api/products/' + id, { method: 'DELETE' });
+        await loadProducts();
+    } catch (e) { alert('删除失败：' + e.message); }
+};
+
+// ── 流程图编辑器 ──────────────────────────────────────────
+window.openFlowEditor = async function (id, name) {
+    currentProductId = id;
+    showView('flow');
+    $('#flow-product-name').textContent = name;
+    $('#page-title').textContent = '一图一表 — ' + name;
+    $('#header-actions').innerHTML = '';
+
+    // 加载该产品的图表数据
+    try {
+        const res = await fetch('/api/products/' + id + '/chart');
+        const data = await res.json();
+        $('#flow-title').value = data.product_name || '';
+        if (data.chart_data) {
+            const parsed = JSON.parse(data.chart_data);
+            steps = parsed.steps || [];
+            nextStepId = steps.reduce((m, s) => Math.max(m, s.id + 1), 1);
+        } else {
+            steps = [];
+            nextStepId = 1;
+        }
+    } catch {
+        steps = [];
+        nextStepId = 1;
+    }
     renderSteps();
-    renderChartList();
-}
+};
+
+$('#btn-back-to-list').addEventListener('click', () => {
+    currentProductId = null;
+    steps = [];
+    showView('list');
+    loadProducts();
+});
 
 // ── 步骤维护 ──────────────────────────────────────────────
 function renderSteps() {
-    stepsCont.replaceChildren();
+    const container = $('#steps-container');
+    container.replaceChildren();
     steps.forEach((s, i) => {
         const item = document.createElement('div');
         item.className = 'flow-step-item';
@@ -276,10 +424,7 @@ function renderSteps() {
             </div>
         `;
         // 拖拽排序
-        item.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', s.id);
-            item.classList.add('dragging');
-        });
+        item.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', s.id); item.classList.add('dragging'); });
         item.addEventListener('dragend', () => item.classList.remove('dragging'));
         item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('drag-over'); });
         item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
@@ -294,26 +439,21 @@ function renderSteps() {
                 const [moved] = steps.splice(fromIdx, 1);
                 steps.splice(toIdx, 0, moved);
                 renderSteps();
-                renderFlowchart();
             }
         });
-
-        // 编辑
         item.querySelector('.btn-edit-step').addEventListener('click', () => editStep(s));
-        // 删除
         item.querySelector('.btn-del-step').addEventListener('click', () => {
             steps = steps.filter(x => x.id !== s.id);
             renderSteps();
-            renderFlowchart();
         });
-
-        stepsCont.appendChild(item);
+        container.appendChild(item);
     });
     renderFlowchart();
 }
 
 function editStep(step) {
-    const existing = stepsCont.querySelector('.flow-step-form');
+    const container = $('#steps-container');
+    const existing = container.querySelector('.flow-step-form');
     if (existing) existing.remove();
 
     const form = document.createElement('div');
@@ -326,23 +466,22 @@ function editStep(step) {
             <button class="btn-secondary btn-cancel-step">取消</button>
         </div>
     `;
-    stepsCont.appendChild(form);
+    container.appendChild(form);
     form.querySelector('.step-name-input').focus();
-
     form.querySelector('.btn-save-step').addEventListener('click', () => {
         const name = form.querySelector('.step-name-input').value.trim();
         const desc = form.querySelector('.step-desc-input').value.trim();
         if (!name) { alert('请填写步骤名称'); return; }
-        step.name = name;
-        step.desc = desc;
+        step.name = name; step.desc = desc;
         form.remove();
         renderSteps();
     });
     form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
 }
 
-function addStepForm() {
-    const existing = stepsCont.querySelector('.flow-step-form');
+$('#btn-add-step').addEventListener('click', () => {
+    const container = $('#steps-container');
+    const existing = container.querySelector('.flow-step-form');
     if (existing) existing.remove();
 
     const form = document.createElement('div');
@@ -355,37 +494,33 @@ function addStepForm() {
             <button class="btn-secondary btn-cancel-step">取消</button>
         </div>
     `;
-    stepsCont.appendChild(form);
+    container.appendChild(form);
     form.querySelector('.step-name-input').focus();
 
     const newStep = { id: nextStepId++, name: '', desc: '' };
-
     form.querySelector('.btn-save-step').addEventListener('click', () => {
         const name = form.querySelector('.step-name-input').value.trim();
         const desc = form.querySelector('.step-desc-input').value.trim();
         if (!name) { alert('请填写步骤名称'); return; }
-        newStep.name = name;
-        newStep.desc = desc;
+        newStep.name = name; newStep.desc = desc;
         steps.push(newStep);
         form.remove();
         renderSteps();
     });
     form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
-}
-
-btnAddStep.addEventListener('click', addStepForm);
+});
 
 // ── 自动生成流程图 ────────────────────────────────────────
 function renderFlowchart() {
-    const W = 800, H = 600;
-    const nodeW = 180, nodeH = 56, gapY = 70;
+    const W = 800, nodeW = 200, nodeH = 60, gapY = 72;
     const startX = W / 2 - nodeW / 2;
     const startY = 30;
+    const H = Math.max(600, startY + steps.length * (nodeH + gapY) + 40);
 
-    svgEl.setAttribute('viewBox', `0 0 ${W} ${Math.max(H, startY + steps.length * (nodeH + gapY))}`);
+    const svgEl = $('#flow-svg');
+    svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svgEl.innerHTML = '';
 
-    // 定义箭头
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `<marker id="arrow2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
         <polygon points="0 0, 10 3.5, 0 7" fill="#8e8e93"/>
@@ -407,14 +542,12 @@ function renderFlowchart() {
     steps.forEach((s, i) => {
         const y = startY + i * (nodeH + gapY);
 
-        // 连接线
+        // 连线
         if (i > 0) {
             const prevY = startY + (i - 1) * (nodeH + gapY) + nodeH;
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', W / 2);
-            line.setAttribute('y1', prevY);
-            line.setAttribute('x2', W / 2);
-            line.setAttribute('y2', y);
+            line.setAttribute('x1', W / 2); line.setAttribute('y1', prevY);
+            line.setAttribute('x2', W / 2); line.setAttribute('y2', y);
             line.setAttribute('stroke', '#8e8e93');
             line.setAttribute('stroke-width', '2');
             line.setAttribute('marker-end', 'url(#arrow2)');
@@ -426,39 +559,29 @@ function renderFlowchart() {
         g.setAttribute('transform', `translate(${startX}, ${y})`);
 
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('width', nodeW);
-        rect.setAttribute('height', nodeH);
-        rect.setAttribute('rx', '10');
-        rect.setAttribute('fill', '#f0f4ff');
-        rect.setAttribute('stroke', '#007aff');
-        rect.setAttribute('stroke-width', '1.5');
+        rect.setAttribute('width', nodeW); rect.setAttribute('height', nodeH);
+        rect.setAttribute('rx', '10'); rect.setAttribute('fill', '#f0f4ff');
+        rect.setAttribute('stroke', '#007aff'); rect.setAttribute('stroke-width', '1.5');
         g.appendChild(rect);
 
-        // 步骤序号
+        // 序号
         const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        badge.setAttribute('cx', '16');
-        badge.setAttribute('cy', '16');
-        badge.setAttribute('r', '10');
-        badge.setAttribute('fill', '#007aff');
+        badge.setAttribute('cx', '16'); badge.setAttribute('cy', '16');
+        badge.setAttribute('r', '10'); badge.setAttribute('fill', '#007aff');
         g.appendChild(badge);
 
         const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        badgeText.setAttribute('x', '16');
-        badgeText.setAttribute('y', '16');
-        badgeText.setAttribute('dominant-baseline', 'central');
-        badgeText.setAttribute('text-anchor', 'middle');
-        badgeText.setAttribute('font-size', '11');
-        badgeText.setAttribute('fill', '#fff');
+        badgeText.setAttribute('x', '16'); badgeText.setAttribute('y', '16');
+        badgeText.setAttribute('dominant-baseline', 'central'); badgeText.setAttribute('text-anchor', 'middle');
+        badgeText.setAttribute('font-size', '11'); badgeText.setAttribute('fill', '#fff');
         badgeText.setAttribute('font-weight', '700');
         badgeText.textContent = i + 1;
         g.appendChild(badgeText);
 
-        // 步骤名称
+        // 名称
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', '36');
-        text.setAttribute('y', '20');
-        text.setAttribute('font-size', '13');
-        text.setAttribute('fill', '#1d1d1f');
+        text.setAttribute('x', '36'); text.setAttribute('y', '22');
+        text.setAttribute('font-size', '13'); text.setAttribute('fill', '#1d1d1f');
         text.setAttribute('font-weight', '600');
         text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
         text.textContent = s.name;
@@ -467,12 +590,10 @@ function renderFlowchart() {
         // 描述
         if (s.desc) {
             const descText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            descText.setAttribute('x', '36');
-            descText.setAttribute('y', '40');
-            descText.setAttribute('font-size', '11');
-            descText.setAttribute('fill', '#8e8e93');
+            descText.setAttribute('x', '36'); descText.setAttribute('y', '42');
+            descText.setAttribute('font-size', '11'); descText.setAttribute('fill', '#8e8e93');
             descText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
-            descText.textContent = s.desc.length > 20 ? s.desc.slice(0, 20) + '…' : s.desc;
+            descText.textContent = s.desc.length > 22 ? s.desc.slice(0, 22) + '…' : s.desc;
             g.appendChild(descText);
         }
 
@@ -480,51 +601,19 @@ function renderFlowchart() {
     });
 }
 
-// ── 新建 / 保存 / 删除 ─────────────────────────────────────
-btnNew.addEventListener('click', () => {
-    currentId = null;
-    steps = [];
-    nextStepId = 1;
-    titleInput.value = '';
-    btnDel.style.display = 'none';
-    renderSteps();
-    renderChartList();
-    titleInput.focus();
-});
-
-btnSave.addEventListener('click', async () => {
-    const title = titleInput.value.trim() || '未命名流程图';
-    const dataJson = JSON.stringify({ steps });
-    const body = JSON.stringify({ title, data_json: dataJson });
-    const headers = { 'Content-Type': 'application/json' };
-
-    if (currentId) {
-        await fetch('/api/charts/' + currentId, { method: 'PUT', headers, body });
-    } else {
-        const res = await fetch('/api/charts', { method: 'POST', headers, body });
-        const data = await res.json();
-        currentId = data.id;
-        btnDel.style.display = 'inline-block';
-    }
-    const listRes = await fetch('/api/charts');
-    charts = await listRes.json();
-    renderChartList();
-    alert('✅ 已保存');
-});
-
-btnDel.addEventListener('click', async () => {
-    if (!currentId) return;
-    if (!confirm('确定删除这张流程图？')) return;
-    await fetch('/api/charts/' + currentId, { method: 'DELETE' });
-    currentId = null;
-    steps = [];
-    btnDel.style.display = 'none';
-    titleInput.value = '';
-    renderSteps();
-    const listRes = await fetch('/api/charts');
-    charts = await listRes.json();
-    renderChartList();
-    if (charts.length > 0) loadChart(charts[0].id);
+// ── 保存流程图 ────────────────────────────────────────────
+$('#btn-save-flow').addEventListener('click', async () => {
+    if (!currentProductId) return;
+    const title = ($('#flow-title').value || '').trim();
+    const chartData = JSON.stringify({ steps });
+    try {
+        await fetch('/api/products/' + currentProductId + '/chart', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chart_data: chartData, title: title || null }),
+        });
+        alert('✅ 已保存');
+    } catch (e) { alert('保存失败：' + e.message); }
 });
 
 // ── 工具 ──────────────────────────────────────────────────
@@ -535,7 +624,9 @@ function esc(s) {
     return d.innerHTML;
 }
 
-init();
+// ── 初始化 ────────────────────────────────────────────────
+showView('list');
+loadProducts();
 </script>
 </body>
 </html>

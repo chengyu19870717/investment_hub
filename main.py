@@ -77,6 +77,18 @@ def init_db():
             key   TEXT PRIMARY KEY,
             value TEXT
         );
+        CREATE TABLE IF NOT EXISTS products (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id      TEXT UNIQUE NOT NULL,
+            product_name    TEXT NOT NULL,
+            product_desc    TEXT,
+            product_manager TEXT,
+            biz_contact     TEXT,
+            biz_dept        TEXT,
+            chart_data      TEXT,  -- JSON: {steps:[{id,name,desc}]}
+            created_at      TEXT,
+            updated_at      TEXT
+        );
         CREATE TABLE IF NOT EXISTS charts (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             title      TEXT NOT NULL,
@@ -931,6 +943,97 @@ def update_rule(rule_id: str, data: dict):
 def delete_rule(rule_id: str):
     conn = get_db()
     conn.execute("DELETE FROM rules WHERE id=?", (rule_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── 产品管理 API（一图一表入口）────────────────────────────
+
+class ProductBase(BaseModel):
+    product_id:      str
+    product_name:    str
+    product_desc:    Optional[str] = None
+    product_manager: Optional[str] = None
+    biz_contact:     Optional[str] = None
+    biz_dept:        Optional[str] = None
+
+class ProductCreate(ProductBase):
+    pass
+
+class ProductUpdate(BaseModel):
+    product_name:    Optional[str] = None
+    product_desc:    Optional[str] = None
+    product_manager: Optional[str] = None
+    biz_contact:     Optional[str] = None
+    biz_dept:        Optional[str] = None
+
+@app.get("/api/products", response_model=list[dict])
+def list_products():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM products ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/products")
+def create_product(p: ProductCreate):
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO products(product_id,product_name,product_desc,product_manager,biz_contact,biz_dept,chart_data,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (p.product_id, p.product_name, p.product_desc, p.product_manager, p.biz_contact, p.biz_dept, None, now_ts, now_ts)
+        )
+        conn.commit()
+        return {"ok": True, "id": cur.lastrowid}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.put("/api/products/{pid}")
+def update_product(pid: int, p: ProductUpdate):
+    conn = get_db()
+    conn.execute(
+        "UPDATE products SET product_name=?,product_desc=?,product_manager=?,biz_contact=?,biz_dept=?,updated_at=? WHERE id=?",
+        (p.product_name, p.product_desc, p.product_manager, p.biz_contact, p.biz_dept,
+         datetime.now().strftime("%Y-%m-%d %H:%M:%S"), pid)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/products/{pid}")
+def delete_product(pid: int):
+    conn = get_db()
+    conn.execute("DELETE FROM products WHERE id=?", (pid,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+# 获取产品的图表数据
+@app.get("/api/products/{pid}/chart")
+def get_product_chart(pid: int):
+    conn = get_db()
+    row = conn.execute("SELECT id,product_name,chart_data FROM products WHERE id=?", (pid,)).fetchone()
+    conn.close()
+    if not row:
+        return JSONResponse({"error": "产品不存在"}, status_code=404)
+    return {"id": row[0], "product_name": row[1], "chart_data": row[2]}
+
+# 保存产品的图表数据（步骤信息）
+@app.put("/api/products/{pid}/chart")
+def save_product_chart(pid: int, body: dict):
+    chart_data = body.get("chart_data")
+    title = body.get("title")
+    conn = get_db()
+    if title:
+        conn.execute("UPDATE products SET product_name=?,chart_data=?,updated_at=? WHERE id=?",
+                     (title, chart_data, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), pid))
+    else:
+        conn.execute("UPDATE products SET chart_data=?,updated_at=? WHERE id=?",
+                     (chart_data, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), pid))
     conn.commit()
     conn.close()
     return {"ok": True}
