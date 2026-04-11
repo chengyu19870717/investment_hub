@@ -248,7 +248,7 @@
                 fetch('/api/rules').then(r => r.json()),
             ]);
 
-            function parseJ(s) { try { return JSON.parse(s); } catch { return []; } }
+            function parseJ(s) { if (!s) return []; try { return JSON.parse(s) || []; } catch { return []; } }
             function fieldIds(obj) {
                 return [...parseJ(obj.input_json), ...parseJ(obj.output_json)].map(x => x.field_id);
             }

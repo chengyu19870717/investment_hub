@@ -422,64 +422,56 @@
 
     $('#fieldSearch')?.addEventListener('input', renderFieldTable);
 
-    // ── 字段码值子集编辑器 ────────────────────────────────────
-    function addFieldCodeRow(code, label) {
-        const container = document.getElementById('fieldCodeRows');
-        if (!container) return;
-        const row = document.createElement('div');
-        row.className = 'cv-row';
-
-        const codeInput = document.createElement('input');
-        codeInput.type = 'text';
-        codeInput.className = 'cv-code';
-        codeInput.readOnly = true;
-        codeInput.value = code || '';
-
-        const labelInput = document.createElement('input');
-        labelInput.type = 'text';
-        labelInput.className = 'cv-label';
-        labelInput.readOnly = true;
-        labelInput.value = label || '';
-
-        const delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.className = 'cv-del-btn';
-        delBtn.title = '删除';
-        delBtn.textContent = '\u00d7';
-        delBtn.addEventListener('click', () => row.remove());
-
-        row.appendChild(codeInput);
-        row.appendChild(labelInput);
-        row.appendChild(delBtn);
-        container.appendChild(row);
-    }
-
+    // ── 字段码值 Checkbox 选择器 ──────────────────────────────
     // rootVals: 字根全量码值数组 ["01=个人","02=对公"]
-    // fieldVals: 字段已有码值数组（子集），null 表示新建时显示全量
-    function renderFieldCodeRows(rootVals, fieldVals) {
-        const container = document.getElementById('fieldCodeRows');
+    // checkedVals: 已选子集（字段保存的码值），null 表示全选
+    function renderFieldCodeChecks(rootVals, checkedVals) {
+        const container = document.getElementById('fieldCodeCheckList');
         if (!container) return;
         container.textContent = '';
-        const subset = fieldVals && fieldVals.length ? new Set(fieldVals) : null;
+        const checkedSet = checkedVals ? new Set(checkedVals) : null;
         (rootVals || []).forEach(function (v) {
-            if (subset && !subset.has(v)) return;  // 编辑时只显示已选子集
             const sep = v.indexOf('=');
             const code  = sep >= 0 ? v.slice(0, sep) : v;
             const label = sep >= 0 ? v.slice(sep + 1) : '';
-            addFieldCodeRow(code, label);
+
+            const item = document.createElement('label');
+            item.className = 'cv-check-item';
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = v;
+            cb.checked = checkedSet ? checkedSet.has(v) : true;
+
+            const codeSpan = document.createElement('span');
+            codeSpan.className = 'cv-check-item-code';
+            codeSpan.textContent = code;
+
+            item.appendChild(cb);
+            item.appendChild(codeSpan);
+            if (label) {
+                const lblSpan = document.createElement('span');
+                lblSpan.className = 'cv-check-item-label';
+                lblSpan.textContent = label;
+                item.appendChild(lblSpan);
+            }
+            container.appendChild(item);
         });
     }
 
     function getFieldCodeValues() {
-        const rows = document.querySelectorAll('#fieldCodeRows .cv-row');
+        const checks = document.querySelectorAll('#fieldCodeCheckList .cv-check-item input[type="checkbox"]:checked');
         const result = [];
-        rows.forEach(function (row) {
-            const code  = (row.querySelector('.cv-code')?.value  || '').trim();
-            const label = (row.querySelector('.cv-label')?.value || '').trim();
-            if (code) result.push(label ? code + '=' + label : code);
-        });
+        checks.forEach(function (cb) { if (cb.value) result.push(cb.value); });
         return result.length ? JSON.stringify(result) : null;
     }
+
+    document.getElementById('btnCheckAllCode')?.addEventListener('click', function () {
+        document.querySelectorAll('#fieldCodeCheckList input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+    });
+    document.getElementById('btnUncheckAllCode')?.addEventListener('click', function () {
+        document.querySelectorAll('#fieldCodeCheckList input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    });
 
     // ── 字根 Combobox 选择器 ──────────────────────────────────
     let _currentRootVals = [];  // 当前选中字根的全量码值，用于还原
@@ -558,7 +550,7 @@
         const codeGroup = document.getElementById('fieldCodeGroup');
         if (root.root_type === '字符型' && root.code_values) {
             try { _currentRootVals = JSON.parse(root.code_values); } catch (_) { _currentRootVals = []; }
-            renderFieldCodeRows(_currentRootVals, null);
+            renderFieldCodeChecks(_currentRootVals, null);
             codeGroup.style.display = '';
         } else {
             _currentRootVals = [];
@@ -596,9 +588,19 @@
         });
     })();
 
-    // 还原码值
-    document.getElementById('btnResetFieldCode')?.addEventListener('click', function () {
-        renderFieldCodeRows(_currentRootVals, null);
+
+    // ── 拼音自动生成英文名 ────────────────────────────────────
+    let _pinyinTimer = null;
+    $('#fieldNameCn')?.addEventListener('input', function () {
+        clearTimeout(_pinyinTimer);
+        const cn = this.value.trim();
+        if (!cn) { $('#fieldNameEn').value = ''; return; }
+        _pinyinTimer = setTimeout(function () {
+            fetch('/api/pinyin?text=' + encodeURIComponent(cn))
+                .then(r => r.json())
+                .then(d => { if (d.result) $('#fieldNameEn').value = d.result; })
+                .catch(() => {});
+        }, 300);
     });
 
     $('#btnAddField')?.addEventListener('click', () => {
@@ -610,7 +612,7 @@
         $('#fieldType').value = '';
         $('#fieldLength').value = '';
         document.getElementById('fieldCodeGroup').style.display = 'none';
-        document.getElementById('fieldCodeRows').textContent = '';
+        document.getElementById('fieldCodeCheckList').textContent = '';
         _currentRootVals = [];
         rpSetValue('');
         $('#fieldModalTitle').textContent = '新增字段';
@@ -619,13 +621,14 @@
 
     $('#btnSaveField')?.addEventListener('click', async () => {
         const id = ($('#fieldId').value || '').trim();
+        const nameCn = ($('#fieldNameCn').value || '').trim();
         const nameEn = ($('#fieldNameEn').value || '').trim();
-        if (!id || !nameEn) { alert('请填写字段ID和字段英文名'); return; }
+        if (!id || !nameCn) { alert('请填写字段ID和字段中文名'); return; }
         const rootId = (document.getElementById('fieldRootId')?.value || '').trim();
         const root = roots.find(r => r.id === rootId);
         const data = {
-            id, name_en: nameEn,
-            name_cn: ($('#fieldNameCn').value || '').trim(),
+            id, name_en: nameEn || nameCn,
+            name_cn: nameCn,
             root_id: rootId || null,
             root_name: root ? root.name : null,
             field_type: ($('#fieldType').value || '').trim() || null,
@@ -665,12 +668,12 @@
             try { _currentRootVals = JSON.parse(root.code_values); } catch (_) { _currentRootVals = []; }
             let fieldVals = [];
             try { fieldVals = JSON.parse(f.code_values || '[]'); } catch (_) {}
-            renderFieldCodeRows(_currentRootVals, fieldVals.length ? fieldVals : null);
+            renderFieldCodeChecks(_currentRootVals, fieldVals.length ? fieldVals : null);
             codeGroup.style.display = '';
         } else {
             _currentRootVals = [];
             codeGroup.style.display = 'none';
-            document.getElementById('fieldCodeRows').textContent = '';
+            document.getElementById('fieldCodeCheckList').textContent = '';
         }
         $('#fieldModalTitle').textContent = '编辑字段';
         openModal('fieldModal');
@@ -682,21 +685,6 @@
             await api('/api/data-fields/' + id, { method: 'DELETE' });
             await loadFields();
         } catch (e) { alert('删除失败: ' + e.message); }
-    };
-
-    // 字段图谱（面板按钮调用）
-    window.showFieldGraph = function (id) {
-        const f = fields.find(x => x.id === id);
-        if (!f) { alert('找不到字段数据'); return; }
-        const usedByIfaces = ifaces.filter(ifc => {
-            const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
-            return arr.some(x => x.field_id === id);
-        });
-        const usedByRules = rules.filter(ru => {
-            const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
-            return arr.some(x => x.field_id === id);
-        });
-        openGraphModal('字段「' + f.name_en + '」关联图谱', buildGraphHtml([], usedByIfaces, usedByRules));
     };
 
     // ═══════════════════════════════════════════════════════
@@ -816,7 +804,7 @@
     function renderRuleTable() {
         const q = ($('#ruleSearch')?.value || '').toLowerCase();
         const list = rules.filter(ru =>
-            ru.id.toLowerCase().includes(q) || (ru.name || '').toLowerCase().includes(q)
+            String(ru.id).toLowerCase().includes(q) || (ru.name || '').toLowerCase().includes(q)
         );
         const tbody = $('#ruleTable tbody');
         if (!list.length) {
@@ -1099,23 +1087,119 @@
     $('#rulePoolSearch')?.addEventListener('input', () => renderPool('rulePoolList', null, 'rulePoolSearch'));
 
     // ═══════════════════════════════════════════════════════
-    //  工具
+    //  关联图谱 & 导出
+    // ═══════════════════════════════════════════════════════
     let graphData = null;
+
+    function buildGraphHtml(usedFields, usedByIfaces, usedByRules) {
+        let html = '';
+        if (usedFields && usedFields.length) {
+            html += '<div class="ds-graph-section"><h4>📋 关联字段</h4>';
+            html += '<table class="ds-graph-table"><thead><tr><th>字段ID</th><th>字段名</th><th>类型</th></tr></thead><tbody>';
+            html += usedFields.map(f => `<tr><td>${esc(f.id)}</td><td>${esc(f.name_en)}</td><td>${esc(f.field_type || '—')}</td></tr>`).join('');
+            html += '</tbody></table></div>';
+        }
+        html += '<div class="ds-graph-section"><h4>🔗 被接口引用（' + (usedByIfaces ? usedByIfaces.length : 0) + '）</h4>';
+        if (usedByIfaces && usedByIfaces.length) {
+            html += '<table class="ds-graph-table"><thead><tr><th>接口ID</th><th>接口名称</th><th>描述</th></tr></thead><tbody>';
+            html += usedByIfaces.map(i => `<tr><td>${esc(i.id)}</td><td>${esc(i.name)}</td><td>${esc(i.description || '—')}</td></tr>`).join('');
+            html += '</tbody></table></div>';
+        } else {
+            html += '<div class="ds-empty-hint">无接口引用</div></div>';
+        }
+        html += '<div class="ds-graph-section"><h4>⚙️ 被规则引用（' + (usedByRules ? usedByRules.length : 0) + '）</h4>';
+        if (usedByRules && usedByRules.length) {
+            html += '<table class="ds-graph-table"><thead><tr><th>规则ID</th><th>规则名称</th><th>描述</th></tr></thead><tbody>';
+            html += usedByRules.map(r => `<tr><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.description || '—')}</td></tr>`).join('');
+            html += '</tbody></table></div>';
+        } else {
+            html += '<div class="ds-empty-hint">无规则引用</div></div>';
+        }
+        return html;
+    }
+
+    function openGraphModal(title, html, data) {
+        $('#graphModalTitle').textContent = title;
+        document.getElementById('graphContent').innerHTML = html;
+        graphData = data || null;
+        openModal('graphModal');
+    }
+
+    // 字段图谱（面板按钮调用）
+    window.showFieldGraph = function (id) {
+        const f = fields.find(x => x.id === id);
+        if (!f) { alert('找不到字段数据'); return; }
+        const usedByIfaces = ifaces.filter(ifc => {
+            const arr = [...parseJSON(ifc.input_json, []), ...parseJSON(ifc.output_json, [])];
+            return arr.some(x => x.field_id === id);
+        });
+        const usedByRules = rules.filter(ru => {
+            const arr = [...parseJSON(ru.input_json, []), ...parseJSON(ru.output_json, [])];
+            return arr.some(x => x.field_id === id);
+        });
+        openGraphModal('字段「' + f.name_en + '」关联图谱', buildGraphHtml([], usedByIfaces, usedByRules), {
+            type: '字段',
+            name: f.name_en,
+            usedFields: [],
+            usedByIfaces: usedByIfaces,
+            usedByRules: usedByRules,
+        });
+    };
 
     $('#btnExportGraph')?.addEventListener('click', () => {
         if (!graphData) return;
-        let csv = '类型,ID,名称,描述/含义\n';
-        csv += graphData.type + ',"' + graphData.name + '",\n';
-        graphData.usedFields.forEach(f => {
-            csv += '字段,"' + f.id + '","' + f.name_en + '","' + (f.field_type || '') + '"\n';
-        });
-        graphData.usedByIfaces.forEach(i => {
-            csv += '接口,"' + i.id + '","' + i.name + '","' + (i.description || '') + '"\n';
-        });
-        graphData.usedByRules.forEach(r => {
-            csv += '规则,"' + r.id + '","' + r.name + '","' + (r.description || '') + '"\n';
-        });
-        downloadFile(csv, 'graph_' + graphData.name + '.csv', 'text/csv;charset=utf-8;');
+        // 构建 Excel (HTML 格式，Excel 原生支持)
+        let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta charset="utf-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+<x:ExcelWorksheet><x:Name>关联图谱</x:Name><x:WorksheetOptions>
+<x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>
+</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+table{border-collapse:collapse;font-size:12px;}
+th{background:#4472C4;color:#fff;padding:6px 12px;border:1px solid #D9E2F3;font-weight:600;}
+td{padding:5px 12px;border:1px solid #D9E2F3;}
+.section{background:#E9EFF7;font-weight:600;padding:4px 12px;font-size:13px;}
+</style></head><body>
+<h2>${graphData.type}「${graphData.name}」关联图谱</h2>
+<p>导出时间：${new Date().toLocaleString('zh-CN')}</p>
+`;
+
+        // 关联字段
+        if (graphData.usedFields && graphData.usedFields.length) {
+            html += '<table><tr class="section"><td colspan="3">📋 关联字段（' + graphData.usedFields.length + '）</td></tr>';
+            html += '<tr><th>字段ID</th><th>字段名</th><th>类型</th></tr>';
+            graphData.usedFields.forEach(f => {
+                html += `<tr><td>${f.id}</td><td>${f.name_en}</td><td>${f.field_type || '—'}</td></tr>`;
+            });
+            html += '</table><br>';
+        }
+
+        // 被接口引用
+        html += '<table><tr class="section"><td colspan="3">🔗 被接口引用（' + (graphData.usedByIfaces ? graphData.usedByIfaces.length : 0) + '）</td></tr>';
+        html += '<tr><th>接口ID</th><th>接口名称</th><th>描述</th></tr>';
+        if (graphData.usedByIfaces && graphData.usedByIfaces.length) {
+            graphData.usedByIfaces.forEach(i => {
+                html += `<tr><td>${i.id}</td><td>${i.name}</td><td>${i.description || '—'}</td></tr>`;
+            });
+        } else {
+            html += '<tr><td colspan="3" style="color:#999;">无接口引用</td></tr>';
+        }
+        html += '</table><br>';
+
+        // 被规则引用
+        html += '<table><tr class="section"><td colspan="3">⚙️ 被规则引用（' + (graphData.usedByRules ? graphData.usedByRules.length : 0) + '）</td></tr>';
+        html += '<tr><th>规则ID</th><th>规则名称</th><th>描述</th></tr>';
+        if (graphData.usedByRules && graphData.usedByRules.length) {
+            graphData.usedByRules.forEach(r => {
+                html += `<tr><td>${r.id}</td><td>${r.name}</td><td>${r.description || '—'}</td></tr>`;
+            });
+        } else {
+            html += '<tr><td colspan="3" style="color:#999;">无规则引用</td></tr>';
+        }
+        html += '</table></body></html>';
+
+        downloadFile(html, `关联图谱_${graphData.name}.xls`, 'application/vnd.ms-excel;charset=utf-8;');
     });
 
     function downloadFile(content, filename, mime) {
@@ -1134,7 +1218,8 @@
     //  工具
     // ═══════════════════════════════════════════════════════
     function parseJSON(str, fallback) {
-        try { return JSON.parse(str); } catch { return fallback; }
+        if (!str) return fallback;
+        try { return JSON.parse(str) ?? fallback; } catch { return fallback; }
     }
 
     function esc(s) {

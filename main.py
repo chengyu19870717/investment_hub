@@ -7,6 +7,7 @@ from typing import Optional
 from datetime import datetime
 from pathlib import Path
 import sqlite3, json, re, os, subprocess
+from pypinyin import lazy_pinyin, Style
 
 app = FastAPI()
 
@@ -27,6 +28,15 @@ def data_standard_page(request: Request):
 @app.get("/data-graph", response_class=HTMLResponse)
 def data_graph_page(request: Request):
     return templates.TemplateResponse("data_graph.html", {"request": request})
+
+@app.get("/api/pinyin")
+def to_pinyin(text: str = ""):
+    """将中文转为拼音首字母大写驼峰（用于自动生成字段英文名）"""
+    if not text.strip():
+        return {"result": ""}
+    parts = lazy_pinyin(text.strip(), style=Style.NORMAL)
+    result = "_".join(p for p in parts if p.isalpha())
+    return {"result": result}
 
 FEATURES = [
     {"title": "股票分析",       "url": "/stock",         "icon": "📈", "description": "每日复盘报告可视化",   "status": "active"},
@@ -278,6 +288,13 @@ def get_stock_report(date: str):
 
 def _parse_report(md: str) -> list:
     stocks = []
+    # 先从排行榜表格提取 reason（名称 → reason 映射）
+    reason_map = {}
+    for rm in re.finditer(
+        r"\|\s*\d+\s*\|\s*\*\*(.+?)\*\*\([^)]+\)\s*\|\s*[🟢🟡🔴][^|]+\|[^|]+\|\s*(.+?)\s*\|", md
+    ):
+        reason_map[rm.group(1).strip()] = rm.group(2).strip()
+
     # 按股票分段（### N. 名称 (代码) emoji）
     blocks = re.split(r"\n(?=### \d+\.)", md)
     for block in blocks:
@@ -325,8 +342,68 @@ def _parse_report(md: str) -> list:
             "indicators": indicators, "scores": scores,
             "signals": [s for s in signals if s and s != "无明显信号"],
             "chip": chip,
+            "reason": reason_map.get(name, ""),
         })
     return stocks
+
+
+# ── Watchlist 管理 API ───────────────────────────────────
+
+WATCHLIST_PATH = Path.home() / "Desktop" / "quant_trading" / "config" / "watchlist.json"
+
+def _read_watchlist() -> list:
+    if WATCHLIST_PATH.exists():
+        with open(WATCHLIST_PATH, "r", encoding="utf-8") as f:
+            return json.load(f).get("stocks", [])
+    return []
+
+def _write_watchlist(stocks: list):
+    data = {"stocks": stocks}
+    WATCHLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(WATCHLIST_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+@app.get("/api/watchlist")
+def get_watchlist():
+    return _read_watchlist()
+
+@app.post("/api/watchlist")
+async def add_watchlist(request: Request):
+    body = await request.json()
+    code = body.get("code", "").strip()
+    name = body.get("name", "").strip()
+    if not code or not name:
+        return JSONResponse({"error": "code 和 name 不能为空"}, status_code=400)
+    stocks = _read_watchlist()
+    if any(s[0] == code for s in stocks):
+        return JSONResponse({"error": f"{code} 已在监控列表中"}, status_code=409)
+    stocks.append([code, name])
+    _write_watchlist(stocks)
+    return {"ok": True, "stocks": stocks}
+
+@app.delete("/api/watchlist/{code}")
+def remove_watchlist(code: str):
+    stocks = _read_watchlist()
+    new_stocks = [s for s in stocks if s[0] != code]
+    if len(new_stocks) == len(stocks):
+        return JSONResponse({"error": f"{code} 不在监控列表中"}, status_code=404)
+    _write_watchlist(new_stocks)
+    return {"ok": True, "stocks": new_stocks}
+
+@app.get("/api/stock/search")
+def search_stock(q: str = ""):
+    """股票搜索：精准代码匹配 或 名称模糊搜索"""
+    if not q.strip():
+        return []
+    import sys
+    quant_src = Path.home() / "Desktop" / "quant_trading" / "src"
+    if str(quant_src) not in sys.path:
+        sys.path.insert(0, str(quant_src))
+    try:
+        from data_collector import StockDataCollector
+        return StockDataCollector.search_stock(q.strip())
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # ── 录音转会议纪要 API ────────────────────────────────────
@@ -713,7 +790,7 @@ def update_root(root_id: str, data: dict):
         "UPDATE data_roots SET name=?,meaning=?,root_type=?,length=?,code_values=?,remark=?,updated_at=? WHERE id=?",
         (data["name"], data.get("meaning"), data.get("root_type"),
          data.get("length"), data.get("code_values"), data.get("remark"),
-         data.get("updated_at", now()), root_id)
+         data.get("updated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"), root_id)
     )
     conn.commit()
     conn.close()
@@ -758,7 +835,7 @@ def update_field(field_id: str, data: dict):
         (data["name_en"], data.get("name_cn"), data.get("meaning"),
          data.get("root_id"), data.get("root_name"), data.get("field_type"),
          data.get("length"), data.get("code_values"), data.get("remark"),
-         data.get("updated_at", now()), field_id)
+         data.get("updated_at") or datetime.now().strftime('%Y-%m-%d %H:%M:%S'), field_id)
     )
     conn.commit()
     conn.close()
@@ -801,7 +878,7 @@ def update_interface(iface_id: str, data: dict):
         "UPDATE interfaces SET name=?,description=?,input_json=?,output_json=?,updated_at=? WHERE id=?",
         (data["name"], data.get("description"),
          data.get("input_json", "[]"), data.get("output_json", "[]"),
-         data.get("updated_at", now()), iface_id)
+         data.get("updated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"), iface_id)
     )
     conn.commit()
     conn.close()
@@ -844,7 +921,7 @@ def update_rule(rule_id: str, data: dict):
         "UPDATE rules SET name=?,description=?,input_json=?,output_json=?,updated_at=? WHERE id=?",
         (data["name"], data.get("description"),
          data.get("input_json", "[]"), data.get("output_json", "[]"),
-         data.get("updated_at", now()), rule_id)
+         data.get("updated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rule_id)
     )
     conn.commit()
     conn.close()

@@ -222,12 +222,12 @@
                         <input type="text" id="fieldId" placeholder="如：FIELD_001">
                     </div>
                     <div class="ds-form-group">
-                        <label>字段英文名 *</label>
-                        <input type="text" id="fieldNameEn" required>
+                        <label>字段中文名 *</label>
+                        <input type="text" id="fieldNameCn">
                     </div>
                     <div class="ds-form-group">
-                        <label>字段中文名</label>
-                        <input type="text" id="fieldNameCn">
+                        <label>字段英文名（自动生成）</label>
+                        <input type="text" id="fieldNameEn" readonly style="background:#f2f2f7;" placeholder="输入中文名后自动生成">
                     </div>
                     <div class="ds-form-group" style="grid-column:1/-1;">
                         <label>引用字根</label>
@@ -250,18 +250,14 @@
                     </div>
                     <div class="ds-form-group" id="fieldCodeGroup" style="grid-column:1/-1;display:none;">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                            <label style="margin:0;">字段码值（从字根码值中删减，保留子集）</label>
-                            <button type="button" class="btn-secondary" id="btnResetFieldCode" style="padding:3px 10px;font-size:12px;">还原</button>
-                        </div>
-                        <div class="cv-editor">
-                            <div class="cv-header">
-                                <span>码值编码</span>
-                                <span>码值含义</span>
-                                <span></span>
+                            <label style="margin:0;">字段码值（勾选需要保留的码值）</label>
+                            <div style="display:flex;gap:8px;">
+                                <button type="button" class="btn-secondary" id="btnCheckAllCode" style="padding:3px 10px;font-size:12px;">全选</button>
+                                <button type="button" class="btn-secondary" id="btnUncheckAllCode" style="padding:3px 10px;font-size:12px;">全不选</button>
                             </div>
-                            <div id="fieldCodeRows"></div>
                         </div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">点击 × 删除不需要的码值；点击「还原」恢复字根全量码值</div>
+                        <div id="fieldCodeCheckList" class="cv-check-list"></div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">勾选后保存，未勾选的码值不会保留在字段中</div>
                     </div>
                     <div class="ds-form-group" style="grid-column:1/-1;">
                         <label>字段备注</label>
@@ -447,6 +443,6 @@
         </div>
     </div>
 
-    <script src="/static/js/data_standard.js"></script>
+    <script src="/static/js/data_standard.js?v=3"></script>
 </body>
 </html>

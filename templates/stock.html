@@ -77,6 +77,56 @@
     background: var(--badge-bg);
     color: var(--text-muted);
 }
+
+/* 判断依据 */
+.rank-reason {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.5;
+}
+
+/* Watchlist 管理面板 */
+.watchlist-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+.watchlist-panel-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+.watchlist-panel-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.watchlist-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.watchlist-tag {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--badge-bg); border-radius: 6px; padding: 4px 10px;
+    font-size: 13px; color: var(--text-primary);
+}
+.watchlist-tag-del {
+    cursor: pointer; color: var(--text-muted); font-size: 15px; line-height: 1;
+    border: none; background: none; padding: 0;
+}
+.watchlist-tag-del:hover { color: #ff3b30; }
+.watchlist-search-row { display: flex; gap: 8px; }
+.watchlist-search-input {
+    flex: 1; padding: 7px 12px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg-page); color: var(--text-primary);
+    font-size: 13px; outline: none;
+}
+.watchlist-search-input:focus { border-color: var(--accent); }
+.watchlist-results {
+    position: absolute; z-index: 100; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    width: 260px; max-height: 200px; overflow-y: auto; margin-top: 4px;
+}
+.watchlist-result-item {
+    padding: 8px 14px; cursor: pointer; font-size: 13px;
+    display: flex; justify-content: space-between;
+}
+.watchlist-result-item:hover { background: var(--badge-bg); }
+.watchlist-search-wrap { position: relative; flex: 1; }
 </style>
 </head>
 <body>
@@ -97,6 +147,7 @@
                         <option value="{{ d }}">{{ d }}</option>
                         {% endfor %}
                     </select>
+                    <button class="btn-secondary" title="管理监控股票" onclick="toggleWatchlistPanel()">⚙ 管理</button>
                     <button id="refresh-btn" class="btn-secondary" title="后台刷新">↻</button>
                 </div>
             </div>
@@ -122,6 +173,22 @@
     </div>
 
     <main class="main" id="stock-main">
+        <!-- Watchlist 管理面板 -->
+        <div class="watchlist-panel" id="watchlist-panel" style="display:none;">
+            <div class="watchlist-panel-header">
+                <span class="watchlist-panel-title">📋 监控股票管理</span>
+                <button class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="toggleWatchlistPanel()">收起</button>
+            </div>
+            <div class="watchlist-list" id="watchlist-tags"></div>
+            <div class="watchlist-search-row">
+                <div class="watchlist-search-wrap">
+                    <input type="text" class="watchlist-search-input" id="watchlist-search"
+                           placeholder="输入股票代码或名称搜索…">
+                    <div class="watchlist-results" id="watchlist-results" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+
         <div id="loading" style="text-align:center;padding:60px 0;color:var(--text-muted);">加载中…</div>
         <div id="stock-content" style="display:none;">
             <!-- 排行榜 -->
@@ -190,6 +257,14 @@ function renderRank(stocks) {
         });
 
         info.appendChild(row1); info.appendChild(barWrap); info.appendChild(sigEl);
+
+        if (s.reason) {
+            const reasonEl = document.createElement('div');
+            reasonEl.className = 'rank-reason';
+            reasonEl.textContent = '💡 ' + s.reason;
+            info.appendChild(reasonEl);
+        }
+
         card.appendChild(num); card.appendChild(info);
         el.appendChild(card);
     });
@@ -422,6 +497,98 @@ document.getElementById('toast-dismiss-btn').addEventListener('click', () => {
 });
 
 if (dateSelect.value) loadReport(dateSelect.value);
+
+// ── Watchlist 管理 ────────────────────────────────────
+let watchlist = [];
+
+async function loadWatchlist() {
+    const res = await fetch('/api/watchlist');
+    watchlist = await res.json();
+    renderWatchlistTags();
+}
+
+function renderWatchlistTags() {
+    const el = document.getElementById('watchlist-tags');
+    el.replaceChildren();
+    watchlist.forEach(([code, name]) => {
+        const tag = document.createElement('div'); tag.className = 'watchlist-tag';
+        const textSpan = document.createElement('span');
+        const nameNode = document.createTextNode(name + ' ');
+        const codeSpan = document.createElement('span');
+        codeSpan.style.cssText = 'color:var(--text-muted);font-size:11px;';
+        codeSpan.textContent = code;
+        textSpan.appendChild(nameNode); textSpan.appendChild(codeSpan);
+        const del = document.createElement('button'); del.className = 'watchlist-tag-del'; del.textContent = '×';
+        del.onclick = () => removeStock(code, name);
+        tag.appendChild(textSpan); tag.appendChild(del);
+        el.appendChild(tag);
+    });
+}
+
+async function removeStock(code, name) {
+    if (!confirm('确认移除 ' + name + '（' + code + '）？')) return;
+    const res = await fetch('/api/watchlist/' + code, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    watchlist = data.stocks;
+    renderWatchlistTags();
+}
+
+async function addStock(code, name) {
+    const res = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, name })
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    watchlist = data.stocks;
+    renderWatchlistTags();
+    document.getElementById('watchlist-search').value = '';
+    document.getElementById('watchlist-results').style.display = 'none';
+}
+
+function toggleWatchlistPanel() {
+    const panel = document.getElementById('watchlist-panel');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        loadWatchlist();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+// 搜索框逻辑
+let searchTimer = null;
+document.getElementById('watchlist-search').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    const q = this.value.trim();
+    if (!q) { document.getElementById('watchlist-results').style.display = 'none'; return; }
+    searchTimer = setTimeout(async () => {
+        const res = await fetch('/api/stock/search?q=' + encodeURIComponent(q));
+        const items = await res.json();
+        const el = document.getElementById('watchlist-results');
+        el.replaceChildren();
+        if (!items.length) { el.style.display = 'none'; return; }
+        items.forEach(item => {
+            const row = document.createElement('div'); row.className = 'watchlist-result-item';
+            const nameNode = document.createElement('span'); nameNode.textContent = item.name;
+            const codeNode = document.createElement('span');
+            codeNode.style.cssText = 'color:var(--text-muted);font-size:12px;';
+            codeNode.textContent = item.code;
+            row.appendChild(nameNode); row.appendChild(codeNode);
+            row.onclick = () => addStock(item.code, item.name);
+            el.appendChild(row);
+        });
+        el.style.display = 'block';
+    }, 300);
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.watchlist-search-wrap')) {
+        document.getElementById('watchlist-results').style.display = 'none';
+    }
+});
 </script>
 </body>
 </html>

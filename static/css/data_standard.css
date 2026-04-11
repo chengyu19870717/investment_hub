@@ -576,3 +576,46 @@
     transition: background 0.15s;
 }
 .cv-add-btn:hover { background: var(--accent-light, #f0f7ff); }
+
+/* ── 码值 Checkbox 列表（字段码值子集选择）──────────────── */
+.cv-check-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-page);
+}
+.cv-check-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+}
+.cv-check-item:hover { border-color: var(--accent); background: var(--accent-light, #f0f7ff); }
+.cv-check-item input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.cv-check-item-code {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.cv-check-item-label {
+    color: var(--text-muted);
+    font-size: 12px;
+}
