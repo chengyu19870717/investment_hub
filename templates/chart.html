@@ -107,6 +107,30 @@
     .flow-step-form input:focus, .flow-step-form textarea:focus { border-color: var(--accent); }
     .flow-step-form textarea { resize: vertical; min-height: 40px; }
     .flow-step-form-btns { display: flex; gap: 8px; }
+
+    /* 通用 Modal（复用自数据标准） */
+    .ds-modal { display: none; position: fixed; inset: 0; z-index: 1000; }
+    .ds-modal--open { display: flex !important; align-items: center; justify-content: center; }
+    .ds-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+    .ds-modal-content {
+        position: relative; background: var(--bg-card); border-radius: 14px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-height: 90vh;
+        display: flex; flex-direction: column; z-index: 1; width: 600px;
+    }
+    .ds-modal-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .ds-modal-header h3 { font-size: 16px; font-weight: 600; }
+    .ds-modal-close {
+        border: none; background: none; font-size: 22px; color: var(--text-muted);
+        cursor: pointer; padding: 0 4px; line-height: 1;
+    }
+    .ds-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .ds-modal-footer {
+        display: flex; align-items: center; gap: 8px;
+        padding: 12px 20px; border-top: 1px solid var(--border);
+    }
     </style>
 </head>
 <body>
