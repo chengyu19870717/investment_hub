@@ -50,14 +50,18 @@
     function now() { return new Date().toISOString().slice(0, 19).replace('T', ' '); }
 
     // ── Tab Switching ─────────────────────────────────────
-    $$('#dsTabs .ds-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tab = btn.dataset.tab;
-            $$('#dsTabs .ds-tab').forEach(b => b.classList.remove('ds-tab--active'));
-            btn.classList.add('ds-tab--active');
-            $$('.ds-panel').forEach(p => p.classList.remove('ds-panel--active'));
-            document.getElementById('panel-' + tab).classList.add('ds-panel--active');
+    let activeTab = 'roots';
+    function switchTab(tab) {
+        activeTab = tab;
+        $$('#dsTabs .ds-tab').forEach(b => {
+            b.classList.toggle('ds-tab--active', b.dataset.tab === tab);
         });
+        $$('.ds-panel').forEach(p => {
+            p.classList.toggle('ds-panel--active', p.id === 'panel-' + tab);
+        });
+    }
+    $$('#dsTabs .ds-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
 
     // ── Modal close buttons ───────────────────────────────
@@ -278,6 +282,7 @@
             }
             closeModal('rootModal');
             await loadRoots();
+            switchTab('roots');
         } catch (e) { alert('保存失败: ' + e.message); }
     });
 
@@ -304,6 +309,7 @@
         try {
             await api('/api/data-roots/' + id, { method: 'DELETE' });
             await loadRoots();
+            switchTab('roots');
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
@@ -647,6 +653,7 @@
             }
             closeModal('fieldModal');
             await loadFields();
+            switchTab('fields');
         } catch (e) { alert('保存失败: ' + e.message); }
     });
 
@@ -684,6 +691,7 @@
         try {
             await api('/api/data-fields/' + id, { method: 'DELETE' });
             await loadFields();
+            switchTab('fields');
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
@@ -763,6 +771,7 @@
             }
             closeModal('ifaceModal');
             await loadIfaces();
+            switchTab('interfaces');
         } catch (e) { alert('保存失败: ' + e.message); }
     });
 
@@ -787,6 +796,7 @@
         try {
             await api('/api/interfaces/' + id, { method: 'DELETE' });
             await loadIfaces();
+            switchTab('interfaces');
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
@@ -866,6 +876,7 @@
             }
             closeModal('ruleModal');
             await loadRules();
+            switchTab('rules');
         } catch (e) { alert('保存失败: ' + e.message); }
     });
 
@@ -890,6 +901,7 @@
         try {
             await api('/api/rules/' + id, { method: 'DELETE' });
             await loadRules();
+            switchTab('rules');
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
