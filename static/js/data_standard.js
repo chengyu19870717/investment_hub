@@ -767,8 +767,8 @@
     });
 
     window.editIface = async function (id) {
-        const ifc = ifaces.find(x => x.id === id);
-        if (!ifc) return;
+        const ifc = ifaces.find(x => String(x.id) === String(id));
+        if (!ifc) { alert('找不到接口数据: ' + id); return; }
         $('#ifaceEditId').value = ifc.id;
         $('#ifaceId').value = ifc.id;
         $('#ifaceName').value = ifc.name;
@@ -870,8 +870,8 @@
     });
 
     window.editRule = async function (id) {
-        const ru = rules.find(x => x.id === id);
-        if (!ru) return;
+        const ru = rules.find(x => String(x.id) === String(id));
+        if (!ru) { alert('找不到规则数据: ' + id); return; }
         $('#ruleEditId').value = ru.id;
         $('#ruleId').value = ru.id;
         $('#ruleName').value = ru.name;
