@@ -5,6 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>一图一表 - 程钰的百宝箱</title>
     <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <style>
+    /* 流程图自动生成布局 */
+    .flow-layout {
+        display: flex;
+        gap: 16px;
+        height: calc(100vh - 160px);
+        min-height: 400px;
+    }
+    .flow-steps-panel {
+        width: 340px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+    }
+    .flow-svg-panel {
+        flex: 1;
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    .flow-svg-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+    }
+    .flow-svg-wrap {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+    }
+    .flow-svg-wrap svg {
+        max-width: 100%;
+    }
+
+    /* 步骤列表 */
+    .flow-title-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-family: inherit;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        outline: none;
+    }
+    .flow-title-input:focus { border-color: var(--accent); }
+
+    .flow-step-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        background: var(--bg-card);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        box-shadow: var(--shadow);
+        border: 2px solid transparent;
+        transition: border-color 0.15s;
+        cursor: grab;
+    }
+    .flow-step-item:active { cursor: grabbing; }
+    .flow-step-item.dragging { opacity: 0.4; border-color: var(--accent); }
+    .flow-step-item.drag-over { border-color: var(--accent); background: var(--accent-light); }
+
+    .flow-step-num {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+    .flow-step-body { flex: 1; min-width: 0; }
+    .flow-step-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+    }
+    .flow-step-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .flow-step-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .flow-step-btn {
+        border: none;
+        background: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    .flow-step-btn:hover { color: var(--accent); background: var(--accent-light); }
+    .flow-step-btn--danger:hover { color: #ff3b30; background: #fff0ef; }
+
+    /* 步骤编辑表单 */
+    .flow-step-form {
+        background: var(--bg-card);
+        border-radius: var(--radius-sm);
+        padding: 12px;
+        box-shadow: var(--shadow);
+        border: 1px dashed var(--accent);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .flow-step-form input,
+    .flow-step-form textarea {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        background: var(--bg-page);
+        color: var(--text-primary);
+        outline: none;
+    }
+    .flow-step-form input:focus,
+    .flow-step-form textarea:focus { border-color: var(--accent); }
+    .flow-step-form textarea { resize: vertical; min-height: 40px; }
+    .flow-step-form-btns { display: flex; gap: 8px; }
+    </style>
 </head>
 <body>
 <div class="page page--wide" style="max-width:100%;padding:0;">
@@ -21,49 +167,36 @@
                 <div style="display:flex;gap:8px;">
                     <button id="btn-new"    class="btn-secondary">＋ 新建</button>
                     <button id="btn-delete" class="btn-secondary" style="color:#ff3b30;display:none;">删除</button>
+                    <button id="btn-save"    class="btn-primary">保存</button>
                 </div>
             </div>
         </div>
     </header>
 
     <div class="main" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;">
-        <div class="chart-layout">
-            <!-- 左侧列表 -->
-            <div class="chart-sidebar">
-                <div class="chart-sidebar-title">已保存流程图</div>
-                <div id="chart-list"></div>
-                <div id="chart-empty" style="font-size:13px;color:var(--text-muted);padding:8px 0;">暂无图表，点击新建</div>
+        <!-- 图表列表 -->
+        <div id="chart-list-bar" style="margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">已保存流程图</div>
+            <div id="chart-list" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+            <div id="chart-empty" style="font-size:13px;color:var(--text-muted);">暂无图表，点击新建</div>
+        </div>
+
+        <div class="flow-layout">
+            <!-- 左侧：步骤维护 -->
+            <div class="flow-steps-panel">
+                <input type="text" class="flow-title-input" id="flow-title" placeholder="流程图名称…">
+                <div id="steps-container"></div>
+                <button class="btn-secondary" id="btn-add-step" style="width:100%;">＋ 添加步骤</button>
             </div>
 
-            <!-- 右侧画布 -->
-            <div class="chart-canvas-wrap">
-                <!-- 工具栏 -->
-                <div class="chart-toolbar">
-                    <input type="text" id="chart-title" placeholder="流程图名称…" maxlength="40">
-                    <button id="btn-add-node"  class="btn-secondary">＋ 节点</button>
-                    <button id="btn-link-mode" class="btn-secondary" id="btn-link">连线</button>
-                    <button id="btn-save"      class="btn-primary">保存</button>
+            <!-- 右侧：自动生成流程图 -->
+            <div class="flow-svg-panel">
+                <div class="flow-svg-toolbar">
+                    <span style="font-size:13px;font-weight:600;color:var(--text-muted);">自动生成流程图</span>
                 </div>
-
-                <!-- SVG 画布 -->
-                <svg id="diagram-svg" class="chart-svg">
-                    <defs>
-                        <marker id="arrow" markerWidth="10" markerHeight="7"
-                                refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#8e8e93"/>
-                        </marker>
-                    </defs>
-                    <g id="edges-layer"></g>
-                    <g id="nodes-layer"></g>
-                </svg>
-
-                <!-- 悬浮输入框（编辑节点文字用） -->
-                <input type="text" id="node-label-input" maxlength="30"
-                       style="display:none;position:absolute;border:2px solid var(--accent);
-                              border-radius:6px;padding:4px 8px;font-size:13px;font-family:inherit;
-                              background:#fff;outline:none;text-align:center;z-index:10;">
-
-                <div class="chart-hint" id="chart-hint">双击节点编辑文字 · 拖动节点移动 · 连线模式：依次点两个节点</div>
+                <div class="flow-svg-wrap">
+                    <svg id="flow-svg" viewBox="0 0 800 600" width="800" height="600"></svg>
+                </div>
             </div>
         </div>
     </div>
@@ -72,36 +205,26 @@
 
 <script>
 // ── 状态 ──────────────────────────────────────────────────
-const NODE_W = 120, NODE_H = 44, NODE_R = 8;
-let charts      = [];   // [{id, title, updated_at}]
-let currentId   = null; // 当前编辑的图表 id（null = 新建未保存）
-let nodes       = [];   // [{id, x, y, label}]
-let edges       = [];   // [{id, from, to}]
-let nextNodeId  = 1;
-let nextEdgeId  = 1;
-let linkMode    = false;
-let linkSource  = null; // 连线第一个节点 id
-let dragging    = null; // {nodeId, ox, oy}
-let svgRect     = null;
+let charts    = [];
+let currentId = null;
+let steps     = []; // [{id, name, desc}]
+let nextStepId = 1;
 
-// ── DOM 引用 ──────────────────────────────────────────────
-const svg        = document.getElementById('diagram-svg');
-const edgesLayer = document.getElementById('edges-layer');
-const nodesLayer = document.getElementById('nodes-layer');
-const labelInput = document.getElementById('node-label-input');
-const chartList  = document.getElementById('chart-list');
-const chartEmpty = document.getElementById('chart-empty');
-const titleInput = document.getElementById('chart-title');
-const btnNew     = document.getElementById('btn-new');
-const btnDel     = document.getElementById('btn-delete');
-const btnAdd     = document.getElementById('btn-add-node');
-const btnLink    = document.getElementById('btn-link-mode');
-const btnSave    = document.getElementById('btn-save');
-const hint       = document.getElementById('chart-hint');
+// ── DOM ───────────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const titleInput = $('#flow-title');
+const stepsCont  = $('#steps-container');
+const chartList  = $('#chart-list');
+const chartEmpty = $('#chart-empty');
+const btnNew     = $('#btn-new');
+const btnDel     = $('#btn-delete');
+const btnSave    = $('#btn-save');
+const btnAddStep = $('#btn-add-step');
+const svgEl      = $('#flow-svg');
 
 // ── 初始化 ────────────────────────────────────────────────
 async function init() {
-    const res  = await fetch('/api/charts');
+    const res = await fetch('/api/charts');
     charts = await res.json();
     renderChartList();
     if (charts.length > 0) loadChart(charts[0].id);
@@ -111,12 +234,12 @@ function renderChartList() {
     chartList.replaceChildren();
     chartEmpty.style.display = charts.length === 0 ? 'block' : 'none';
     charts.forEach(c => {
-        const item = document.createElement('div');
-        item.className = 'chart-list-item' + (c.id === currentId ? ' chart-list-item--active' : '');
-        item.textContent = c.title || '未命名';
-        item.dataset.id = c.id;
-        item.addEventListener('click', () => loadChart(c.id));
-        chartList.appendChild(item);
+        const tag = document.createElement('span');
+        tag.className = 'chart-list-item' + (c.id === currentId ? ' chart-list-item--active' : '');
+        tag.textContent = c.title || '未命名';
+        tag.style.cursor = 'pointer';
+        tag.addEventListener('click', () => loadChart(c.id));
+        chartList.appendChild(tag);
     });
 }
 
@@ -125,307 +248,292 @@ async function loadChart(id) {
     const data = await res.json();
     currentId = id;
     titleInput.value = data.title;
-    const parsed = JSON.parse(data.data_json || '{"nodes":[],"edges":[]}');
-    nodes = parsed.nodes || [];
-    edges = parsed.edges || [];
-    nextNodeId = nodes.reduce((m, n) => Math.max(m, n.id + 1), 1);
-    nextEdgeId = edges.reduce((m, e) => Math.max(m, e.id + 1), 1);
+    const parsed = JSON.parse(data.data_json || '{"steps":[]}');
+    steps = parsed.steps || [];
+    nextStepId = steps.reduce((m, s) => Math.max(m, s.id + 1), 1);
     btnDel.style.display = 'inline-block';
-    renderAll();
+    renderSteps();
     renderChartList();
 }
 
-// ── 渲染 ──────────────────────────────────────────────────
-function renderAll() {
-    renderEdges();
-    renderNodes();
-}
+// ── 步骤维护 ──────────────────────────────────────────────
+function renderSteps() {
+    stepsCont.replaceChildren();
+    steps.forEach((s, i) => {
+        const item = document.createElement('div');
+        item.className = 'flow-step-item';
+        item.draggable = true;
+        item.dataset.stepId = s.id;
+        item.innerHTML = `
+            <div class="flow-step-num">${i + 1}</div>
+            <div class="flow-step-body">
+                <div class="flow-step-name">${esc(s.name)}</div>
+                ${s.desc ? '<div class="flow-step-desc">' + esc(s.desc) + '</div>' : ''}
+            </div>
+            <div class="flow-step-actions">
+                <button class="flow-step-btn btn-edit-step" title="编辑">✏️</button>
+                <button class="flow-step-btn flow-step-btn--danger btn-del-step" title="删除">🗑️</button>
+            </div>
+        `;
+        // 拖拽排序
+        item.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', s.id);
+            item.classList.add('dragging');
+        });
+        item.addEventListener('dragend', () => item.classList.remove('dragging'));
+        item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('drag-over'); });
+        item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+        item.addEventListener('drop', e => {
+            e.preventDefault();
+            item.classList.remove('drag-over');
+            const fromId = parseInt(e.dataTransfer.getData('text/plain'));
+            const toId = s.id;
+            if (fromId !== toId) {
+                const fromIdx = steps.findIndex(x => x.id === fromId);
+                const toIdx = steps.findIndex(x => x.id === toId);
+                const [moved] = steps.splice(fromIdx, 1);
+                steps.splice(toIdx, 0, moved);
+                renderSteps();
+                renderFlowchart();
+            }
+        });
 
-function renderEdges() {
-    edgesLayer.replaceChildren();
-    edges.forEach(e => {
-        const src = nodes.find(n => n.id === e.from);
-        const dst = nodes.find(n => n.id === e.to);
-        if (!src || !dst) return;
-        const {x1,y1,x2,y2} = edgeEndpoints(src, dst);
-        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
-        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('stroke', '#8e8e93');
-        line.setAttribute('stroke-width', '1.5');
-        line.setAttribute('marker-end', 'url(#arrow)');
-        line.dataset.edgeId = e.id;
-        line.addEventListener('click', ev => { ev.stopPropagation(); deleteEdge(e.id); });
-        line.style.cursor = 'pointer';
-        edgesLayer.appendChild(line);
+        // 编辑
+        item.querySelector('.btn-edit-step').addEventListener('click', () => editStep(s));
+        // 删除
+        item.querySelector('.btn-del-step').addEventListener('click', () => {
+            steps = steps.filter(x => x.id !== s.id);
+            renderSteps();
+            renderFlowchart();
+        });
+
+        stepsCont.appendChild(item);
     });
+    renderFlowchart();
 }
 
-function edgeEndpoints(src, dst) {
-    const sx = src.x + NODE_W / 2, sy = src.y + NODE_H / 2;
-    const dx = dst.x + NODE_W / 2, dy = dst.y + NODE_H / 2;
-    const angle = Math.atan2(dy - sy, dx - sx);
-    // 求矩形边缘交点
-    const hw = NODE_W / 2, hh = NODE_H / 2;
-    const tanA = Math.tan(angle);
-    let x1, y1, x2, y2;
-    // 出发点
-    if (Math.abs(Math.cos(angle)) * hh > Math.abs(Math.sin(angle)) * hw) {
-        const sign = Math.cos(angle) > 0 ? 1 : -1;
-        x1 = sx + sign * hw; y1 = sy + sign * hw * tanA;
-    } else {
-        const sign = Math.sin(angle) > 0 ? 1 : -1;
-        x1 = sx + sign * hh / tanA; y1 = sy + sign * hh;
-    }
-    // 到达点
-    const angle2 = angle + Math.PI;
-    const tanA2  = Math.tan(angle2);
-    if (Math.abs(Math.cos(angle2)) * hh > Math.abs(Math.sin(angle2)) * hw) {
-        const sign = Math.cos(angle2) > 0 ? 1 : -1;
-        x2 = dx + sign * hw; y2 = dy + sign * hw * tanA2;
-    } else {
-        const sign = Math.sin(angle2) > 0 ? 1 : -1;
-        x2 = dx + sign * hh / tanA2; y2 = dy + sign * hh;
-    }
-    return {x1, y1, x2, y2};
+function editStep(step) {
+    const existing = stepsCont.querySelector('.flow-step-form');
+    if (existing) existing.remove();
+
+    const form = document.createElement('div');
+    form.className = 'flow-step-form';
+    form.innerHTML = `
+        <input type="text" class="step-name-input" placeholder="步骤名称" value="${esc(step.name)}">
+        <textarea class="step-desc-input" placeholder="步骤描述（可选）">${esc(step.desc || '')}</textarea>
+        <div class="flow-step-form-btns">
+            <button class="btn-primary btn-save-step">保存</button>
+            <button class="btn-secondary btn-cancel-step">取消</button>
+        </div>
+    `;
+    stepsCont.appendChild(form);
+    form.querySelector('.step-name-input').focus();
+
+    form.querySelector('.btn-save-step').addEventListener('click', () => {
+        const name = form.querySelector('.step-name-input').value.trim();
+        const desc = form.querySelector('.step-desc-input').value.trim();
+        if (!name) { alert('请填写步骤名称'); return; }
+        step.name = name;
+        step.desc = desc;
+        form.remove();
+        renderSteps();
+    });
+    form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
 }
 
-function renderNodes() {
-    nodesLayer.replaceChildren();
-    nodes.forEach(n => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-        g.setAttribute('transform', `translate(${n.x},${n.y})`);
-        g.dataset.nodeId = n.id;
-        g.style.cursor = 'grab';
+function addStepForm() {
+    const existing = stepsCont.querySelector('.flow-step-form');
+    if (existing) existing.remove();
 
-        const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-        rect.setAttribute('width',  NODE_W);
-        rect.setAttribute('height', NODE_H);
-        rect.setAttribute('rx', NODE_R);
-        rect.setAttribute('fill',   '#f0f4ff');
+    const form = document.createElement('div');
+    form.className = 'flow-step-form';
+    form.innerHTML = `
+        <input type="text" class="step-name-input" placeholder="步骤名称">
+        <textarea class="step-desc-input" placeholder="步骤描述（可选）"></textarea>
+        <div class="flow-step-form-btns">
+            <button class="btn-primary btn-save-step">添加</button>
+            <button class="btn-secondary btn-cancel-step">取消</button>
+        </div>
+    `;
+    stepsCont.appendChild(form);
+    form.querySelector('.step-name-input').focus();
+
+    const newStep = { id: nextStepId++, name: '', desc: '' };
+
+    form.querySelector('.btn-save-step').addEventListener('click', () => {
+        const name = form.querySelector('.step-name-input').value.trim();
+        const desc = form.querySelector('.step-desc-input').value.trim();
+        if (!name) { alert('请填写步骤名称'); return; }
+        newStep.name = name;
+        newStep.desc = desc;
+        steps.push(newStep);
+        form.remove();
+        renderSteps();
+    });
+    form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
+}
+
+btnAddStep.addEventListener('click', addStepForm);
+
+// ── 自动生成流程图 ────────────────────────────────────────
+function renderFlowchart() {
+    const W = 800, H = 600;
+    const nodeW = 180, nodeH = 56, gapY = 70;
+    const startX = W / 2 - nodeW / 2;
+    const startY = 30;
+
+    svgEl.setAttribute('viewBox', `0 0 ${W} ${Math.max(H, startY + steps.length * (nodeH + gapY))}`);
+    svgEl.innerHTML = '';
+
+    // 定义箭头
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `<marker id="arrow2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#8e8e93"/>
+    </marker>`;
+    svgEl.appendChild(defs);
+
+    if (steps.length === 0) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', W / 2);
+        text.setAttribute('y', H / 2);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('font-size', '16');
+        text.setAttribute('fill', '#8e8e93');
+        text.textContent = '添加步骤后自动生成流程图';
+        svgEl.appendChild(text);
+        return;
+    }
+
+    steps.forEach((s, i) => {
+        const y = startY + i * (nodeH + gapY);
+
+        // 连接线
+        if (i > 0) {
+            const prevY = startY + (i - 1) * (nodeH + gapY) + nodeH;
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', W / 2);
+            line.setAttribute('y1', prevY);
+            line.setAttribute('x2', W / 2);
+            line.setAttribute('y2', y);
+            line.setAttribute('stroke', '#8e8e93');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('marker-end', 'url(#arrow2)');
+            svgEl.appendChild(line);
+        }
+
+        // 节点
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', `translate(${startX}, ${y})`);
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', nodeW);
+        rect.setAttribute('height', nodeH);
+        rect.setAttribute('rx', '10');
+        rect.setAttribute('fill', '#f0f4ff');
         rect.setAttribute('stroke', '#007aff');
         rect.setAttribute('stroke-width', '1.5');
+        g.appendChild(rect);
 
-        const text = document.createElementNS('http://www.w3.org/2000/svg','text');
-        text.setAttribute('x', NODE_W / 2);
-        text.setAttribute('y', NODE_H / 2);
-        text.setAttribute('dominant-baseline', 'central');
-        text.setAttribute('text-anchor', 'middle');
+        // 步骤序号
+        const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        badge.setAttribute('cx', '16');
+        badge.setAttribute('cy', '16');
+        badge.setAttribute('r', '10');
+        badge.setAttribute('fill', '#007aff');
+        g.appendChild(badge);
+
+        const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        badgeText.setAttribute('x', '16');
+        badgeText.setAttribute('y', '16');
+        badgeText.setAttribute('dominant-baseline', 'central');
+        badgeText.setAttribute('text-anchor', 'middle');
+        badgeText.setAttribute('font-size', '11');
+        badgeText.setAttribute('fill', '#fff');
+        badgeText.setAttribute('font-weight', '700');
+        badgeText.textContent = i + 1;
+        g.appendChild(badgeText);
+
+        // 步骤名称
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', '36');
+        text.setAttribute('y', '20');
         text.setAttribute('font-size', '13');
         text.setAttribute('fill', '#1d1d1f');
+        text.setAttribute('font-weight', '600');
         text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
-        text.textContent = n.label;
-
-        g.appendChild(rect);
+        text.textContent = s.name;
         g.appendChild(text);
 
-        // 事件
-        g.addEventListener('mousedown', ev => onNodeMouseDown(ev, n.id));
-        g.addEventListener('dblclick',  ev => { ev.stopPropagation(); startEditLabel(n.id, g); });
-        g.addEventListener('click',     ev => { ev.stopPropagation(); onNodeClick(n.id, g, rect); });
+        // 描述
+        if (s.desc) {
+            const descText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            descText.setAttribute('x', '36');
+            descText.setAttribute('y', '40');
+            descText.setAttribute('font-size', '11');
+            descText.setAttribute('fill', '#8e8e93');
+            descText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
+            descText.textContent = s.desc.length > 20 ? s.desc.slice(0, 20) + '…' : s.desc;
+            g.appendChild(descText);
+        }
 
-        nodesLayer.appendChild(g);
+        svgEl.appendChild(g);
     });
 }
 
-// ── 拖拽 ──────────────────────────────────────────────────
-function getSVGPoint(ev) {
-    svgRect = svg.getBoundingClientRect();
-    return { x: ev.clientX - svgRect.left, y: ev.clientY - svgRect.top };
-}
-
-function onNodeMouseDown(ev, id) {
-    if (linkMode) return;
-    ev.stopPropagation();
-    const pt  = getSVGPoint(ev);
-    const node = nodes.find(n => n.id === id);
-    dragging = { nodeId: id, ox: pt.x - node.x, oy: pt.y - node.y };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup',   onMouseUp);
-}
-
-function onMouseMove(ev) {
-    if (!dragging) return;
-    const pt   = getSVGPoint(ev);
-    const node = nodes.find(n => n.id === dragging.nodeId);
-    node.x = Math.max(0, pt.x - dragging.ox);
-    node.y = Math.max(0, pt.y - dragging.oy);
-    // 更新节点 g 位置
-    const g = nodesLayer.querySelector(`[data-node-id="${dragging.nodeId}"]`);
-    if (g) g.setAttribute('transform', `translate(${node.x},${node.y})`);
-    renderEdges(); // 同步更新连线
-}
-
-function onMouseUp() {
-    dragging = null;
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup',   onMouseUp);
-}
-
-// ── 连线模式 ──────────────────────────────────────────────
-function onNodeClick(id, g, rect) {
-    if (!linkMode) return;
-    if (!linkSource) {
-        linkSource = id;
-        rect.setAttribute('stroke', '#ff9500');
-        hint.textContent = '已选第一个节点，点击第二个节点完成连线';
-    } else {
-        if (linkSource !== id) {
-            // 避免重复边
-            const dup = edges.find(e => e.from === linkSource && e.to === id);
-            if (!dup) {
-                edges.push({ id: nextEdgeId++, from: linkSource, to: id });
-                renderEdges();
-            }
-        }
-        // 重置第一个节点样式
-        const srcG = nodesLayer.querySelector(`[data-node-id="${linkSource}"]`);
-        if (srcG) srcG.querySelector('rect').setAttribute('stroke', '#007aff');
-        linkSource = null;
-        hint.textContent = '点击选择第二个节点，或再次点击退出连线模式';
-    }
-}
-
-btnLink.addEventListener('click', () => {
-    linkMode = !linkMode;
-    linkSource = null;
-    btnLink.style.background = linkMode ? 'var(--accent-light)' : '';
-    btnLink.style.color      = linkMode ? 'var(--accent)' : '';
-    hint.textContent = linkMode
-        ? '连线模式：依次点击两个节点建立箭头连接'
-        : '双击节点编辑文字 · 拖动节点移动 · 连线模式：依次点两个节点';
-    // 恢复所有节点颜色
-    nodesLayer.querySelectorAll('rect').forEach(r => r.setAttribute('stroke','#007aff'));
-});
-
-// ── 编辑标签 ──────────────────────────────────────────────
-let editingNodeId = null;
-
-function startEditLabel(id, g) {
-    const node    = nodes.find(n => n.id === id);
-    svgRect       = svg.getBoundingClientRect();
-    editingNodeId = id;
-
-    const scaleX = svgRect.width  / svg.viewBox.baseVal.width  || 1;
-    const scaleY = svgRect.height / svg.viewBox.baseVal.height || 1;
-
-    // 取 g 的实际位置
-    const gRect = g.getBoundingClientRect();
-    const wrap  = svg.parentElement;
-    const wrapRect = wrap.getBoundingClientRect();
-
-    labelInput.style.display = 'block';
-    labelInput.style.left    = (gRect.left - wrapRect.left) + 'px';
-    labelInput.style.top     = (gRect.top  - wrapRect.top)  + 'px';
-    labelInput.style.width   = gRect.width  + 'px';
-    labelInput.style.height  = gRect.height + 'px';
-    labelInput.value         = node.label;
-    labelInput.focus();
-    labelInput.select();
-}
-
-labelInput.addEventListener('blur',    commitLabel);
-labelInput.addEventListener('keydown', ev => { if (ev.key === 'Enter') { commitLabel(); } });
-
-function commitLabel() {
-    if (editingNodeId === null) return;
-    const node = nodes.find(n => n.id === editingNodeId);
-    if (node) node.label = labelInput.value.trim() || node.label;
-    labelInput.style.display = 'none';
-    editingNodeId = null;
-    renderNodes();
-}
-
-// ── 添加节点 ──────────────────────────────────────────────
-btnAdd.addEventListener('click', () => {
-    svgRect = svg.getBoundingClientRect();
-    const cx = (svgRect.width  / 2 - NODE_W / 2) + (Math.random() - 0.5) * 80;
-    const cy = (svgRect.height / 2 - NODE_H / 2) + (Math.random() - 0.5) * 60;
-    nodes.push({ id: nextNodeId++, x: Math.max(0, cx), y: Math.max(0, cy), label: '步骤' });
-    renderNodes();
-});
-
-// ── 删除边 ────────────────────────────────────────────────
-function deleteEdge(id) {
-    edges = edges.filter(e => e.id !== id);
-    renderEdges();
-}
-
-// ── SVG 点击空白区：取消连线选择 ─────────────────────────
-svg.addEventListener('click', () => {
-    if (linkSource) {
-        const srcG = nodesLayer.querySelector(`[data-node-id="${linkSource}"]`);
-        if (srcG) srcG.querySelector('rect').setAttribute('stroke', '#007aff');
-        linkSource = null;
-    }
-});
-
-// ── SVG 右键删除节点 ──────────────────────────────────────
-nodesLayer.addEventListener('contextmenu', ev => {
-    ev.preventDefault();
-    const g = ev.target.closest('[data-node-id]');
-    if (!g) return;
-    const id = parseInt(g.dataset.nodeId);
-    nodes = nodes.filter(n => n.id !== id);
-    edges = edges.filter(e => e.from !== id && e.to !== id);
-    renderAll();
-});
-
-// ── 保存 ──────────────────────────────────────────────────
-btnSave.addEventListener('click', saveChart);
-
-async function saveChart() {
-    const title    = titleInput.value.trim() || '未命名流程图';
-    const dataJson = JSON.stringify({ nodes, edges });
-    const body     = JSON.stringify({ title, data_json: dataJson });
-    const headers  = { 'Content-Type': 'application/json' };
-
-    let res;
-    if (currentId) {
-        res = await fetch('/api/charts/' + currentId, { method: 'PUT', headers, body });
-    } else {
-        res = await fetch('/api/charts', { method: 'POST', headers, body });
-        const data = await res.json();
-        currentId = data.id;
-        btnDel.style.display = 'inline-block';
-    }
-    // 刷新列表
-    const listRes = await fetch('/api/charts');
-    charts = await listRes.json();
-    renderChartList();
-    hint.textContent = '✅ 已保存';
-    setTimeout(() => { hint.textContent = '双击节点编辑文字 · 拖动节点移动 · 连线模式：依次点两个节点'; }, 2000);
-}
-
-// ── 新建 ──────────────────────────────────────────────────
+// ── 新建 / 保存 / 删除 ─────────────────────────────────────
 btnNew.addEventListener('click', () => {
-    currentId   = null;
-    nodes       = [];
-    edges       = [];
-    nextNodeId  = 1;
-    nextEdgeId  = 1;
+    currentId = null;
+    steps = [];
+    nextStepId = 1;
     titleInput.value = '';
     btnDel.style.display = 'none';
-    renderAll();
+    renderSteps();
     renderChartList();
     titleInput.focus();
 });
 
-// ── 删除 ──────────────────────────────────────────────────
+btnSave.addEventListener('click', async () => {
+    const title = titleInput.value.trim() || '未命名流程图';
+    const dataJson = JSON.stringify({ steps });
+    const body = JSON.stringify({ title, data_json: dataJson });
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (currentId) {
+        await fetch('/api/charts/' + currentId, { method: 'PUT', headers, body });
+    } else {
+        const res = await fetch('/api/charts', { method: 'POST', headers, body });
+        const data = await res.json();
+        currentId = data.id;
+        btnDel.style.display = 'inline-block';
+    }
+    const listRes = await fetch('/api/charts');
+    charts = await listRes.json();
+    renderChartList();
+    alert('✅ 已保存');
+});
+
 btnDel.addEventListener('click', async () => {
     if (!currentId) return;
     if (!confirm('确定删除这张流程图？')) return;
     await fetch('/api/charts/' + currentId, { method: 'DELETE' });
     currentId = null;
-    nodes = []; edges = [];
+    steps = [];
     btnDel.style.display = 'none';
     titleInput.value = '';
-    renderAll();
+    renderSteps();
     const listRes = await fetch('/api/charts');
     charts = await listRes.json();
     renderChartList();
     if (charts.length > 0) loadChart(charts[0].id);
 });
+
+// ── 工具 ──────────────────────────────────────────────────
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
 
 init();
 </script>
