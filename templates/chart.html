@@ -236,8 +236,7 @@ function showView(view) {
     $('#view-flow-editor').style.display = view === 'flow' ? '' : 'none';
     if (view === 'list') {
         $('#page-title').textContent = '一图一表';
-        $('#header-actions').innerHTML = '<button class="btn-primary" id="btn-add-product">＋ 新增产品</button>';
-        $('#btn-add-product').addEventListener('click', openProductModal);
+        $('#header-actions').innerHTML = '';
     }
 }
 
@@ -625,6 +624,7 @@ function esc(s) {
 }
 
 // ── 初始化 ────────────────────────────────────────────────
+$('#btn-add-product').addEventListener('click', () => openProductModal());
 showView('list');
 loadProducts();
 </script>
