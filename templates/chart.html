@@ -62,9 +62,12 @@
         border-bottom: 1px solid var(--border);
     }
     .flow-svg-wrap {
-        flex: 1; padding: 20px; display: flex; align-items: flex-start; justify-content: center;
+        flex: 1; padding: 20px; overflow: auto; display: flex;
+        flex-direction: column; align-items: center;
     }
-    .flow-svg-wrap svg { max-width: 100%; }
+    .flow-svg-wrap svg { display: block; }
+    .flow-expand-btn { cursor: pointer; transition: fill 0.15s; }
+    .flow-expand-btn:hover { fill: #0056b3; }
     .flow-title-input {
         width: 100%; padding: 10px 12px; border: 1px solid var(--border);
         border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
@@ -609,114 +612,201 @@ $('#btn-add-step').addEventListener('click', () => {
     form.querySelector('.btn-cancel-step').addEventListener('click', () => form.remove());
 });
 
-// ── 自动生成流程图（支持多层级）─────────────────────────────
+// ── 交互式流程图渲染 ──────────────────────────────────────
+let expandedNodes = new Set(); // 记录哪些节点展开了
+
 function renderFlowchart() {
-    const W = 800, nodeW = 200, nodeH = 60, gapY = 72;
-    const startY = 30;
-    const levelOffsets = { 1: W/2 - nodeW/2, 2: W/2 - nodeW/2 + 60, 3: W/2 - nodeW/2 + 120 };
+    const nodeW = 160, nodeH = 56, nodeGap = 30;
     const levelColors = { 1: '#007aff', 2: '#ff9500', 3: '#34c759' };
-    const H = Math.max(600, startY + steps.length * (nodeH + gapY) + 40);
+    const levelBgColors = { 1: '#f0f4ff', 2: '#fff7ed', 3: '#f0fdf4' };
+    const childOffsetX = nodeW + 10; // 子节点缩进
 
-    const svgEl = $('#flow-svg');
-    svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svgEl.innerHTML = '';
-
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    defs.innerHTML = `<marker id="arrow2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-        <polygon points="0 0, 10 3.5, 0 7" fill="#8e8e93"/>
-    </marker>`;
-    svgEl.appendChild(defs);
-
-    if (steps.length === 0) {
+    // 获取 L1 步骤
+    const l1Steps = steps.filter(s => s.level === 1);
+    if (l1Steps.length === 0 && steps.length === 0) {
+        const svgEl = $('#flow-svg');
+        svgEl.setAttribute('viewBox', '0 0 400 200');
+        svgEl.innerHTML = '';
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', W / 2);
-        text.setAttribute('y', H / 2);
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('font-size', '16');
+        text.setAttribute('x', '200'); text.setAttribute('y', '100');
+        text.setAttribute('text-anchor', 'middle'); text.setAttribute('font-size', '16');
         text.setAttribute('fill', '#8e8e93');
         text.textContent = '添加步骤后自动生成流程图';
         svgEl.appendChild(text);
         return;
     }
 
-    steps.forEach((s, i) => {
-        const level = s.level || 1;
-        const x = levelOffsets[level] || levelOffsets[1];
-        const y = startY + i * (nodeH + gapY);
-        const color = levelColors[level] || levelColors[1];
+    // 计算 SVG 尺寸
+    const totalW = l1Steps.length * (nodeW + nodeGap) + 80;
+    const maxDepth = getMaxDepth(steps);
+    const totalH = Math.max(400, 120 + maxDepth * (nodeH + 40));
 
-        // 连线
-        if (i > 0) {
-            const prevLevel = steps[i-1].level || 1;
-            const prevX = levelOffsets[prevLevel] || levelOffsets[1];
-            const prevY = startY + (i - 1) * (nodeH + gapY) + nodeH;
+    const svgEl = $('#flow-svg');
+    svgEl.setAttribute('viewBox', `0 0 ${Math.max(totalW, 500)} ${totalH}`);
+    svgEl.innerHTML = '';
 
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', prevX + nodeW/2);
-            line.setAttribute('y1', prevY);
-            line.setAttribute('x2', x + nodeW/2);
-            line.setAttribute('y2', y);
-            line.setAttribute('stroke', '#8e8e93');
-            line.setAttribute('stroke-width', level !== prevLevel ? '1.5' : '2');
-            if (level !== prevLevel) line.setAttribute('stroke-dasharray', '4,3');
-            line.setAttribute('marker-end', 'url(#arrow2)');
-            svgEl.appendChild(line);
-        }
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `<marker id="arrow3" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#8e8e93"/>
+    </marker>`;
+    svgEl.appendChild(defs);
 
-        // 节点
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.setAttribute('transform', `translate(${x}, ${y})`);
+    // 渲染 L1 步骤及其子步骤
+    l1Steps.forEach((step, i) => {
+        const x = 40 + i * (nodeW + nodeGap);
+        const y = 40;
+        const children = steps.filter(s => s.parent_id === step.id);
+        const hasChildren = children.length > 0;
+        const isExpanded = expandedNodes.has(step.id);
 
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('width', nodeW); rect.setAttribute('height', nodeH);
-        rect.setAttribute('rx', '10'); rect.setAttribute('fill', level === 1 ? '#f0f4ff' : level === 2 ? '#fff7ed' : '#f0fdf4');
-        rect.setAttribute('stroke', color); rect.setAttribute('stroke-width', level === 1 ? '1.5' : '1');
-        g.appendChild(rect);
-
-        // 层级标签
-        const lvlLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        lvlLabel.setAttribute('x', nodeW - 8); lvlLabel.setAttribute('y', 12);
-        lvlLabel.setAttribute('text-anchor', 'end'); lvlLabel.setAttribute('font-size', '9');
-        lvlLabel.setAttribute('fill', color); lvlLabel.setAttribute('font-weight', '600');
-        lvlLabel.textContent = `L${level}`;
-        g.appendChild(lvlLabel);
-
-        // 序号
-        const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        badge.setAttribute('cx', '16'); badge.setAttribute('cy', '16');
-        badge.setAttribute('r', '10'); badge.setAttribute('fill', color);
-        g.appendChild(badge);
-
-        const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        badgeText.setAttribute('x', '16'); badgeText.setAttribute('y', '16');
-        badgeText.setAttribute('dominant-baseline', 'central'); badgeText.setAttribute('text-anchor', 'middle');
-        badgeText.setAttribute('font-size', '11'); badgeText.setAttribute('fill', '#fff');
-        badgeText.setAttribute('font-weight', '700');
-        badgeText.textContent = i + 1;
-        g.appendChild(badgeText);
-
-        // 名称
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', '36'); text.setAttribute('y', '22');
-        text.setAttribute('font-size', level === 1 ? '13' : '12');
-        text.setAttribute('fill', '#1d1d1f');
-        text.setAttribute('font-weight', level === 1 ? '600' : '400');
-        text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
-        text.textContent = s.name;
-        g.appendChild(text);
-
-        // 描述
-        if (s.desc) {
-            const descText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            descText.setAttribute('x', '36'); descText.setAttribute('y', '42');
-            descText.setAttribute('font-size', '11'); descText.setAttribute('fill', '#8e8e93');
-            descText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
-            descText.textContent = s.desc.length > 22 ? s.desc.slice(0, 22) + '…' : s.desc;
-            g.appendChild(descText);
-        }
-
-        svgEl.appendChild(g);
+        renderNode(svgEl, step, x, y, nodeW, nodeH, levelColors, levelBgColors, i + 1, hasChildren, isExpanded, children, childOffsetX, y, nodeW, nodeH, nodeGap, defs);
     });
+}
+
+function renderNode(svg, step, x, y, nodeW, nodeH, colors, bgColors, order, hasChildren, isExpanded, children, childOffsetX, childBaseY, childNodeW, childNodeH, childNodeGap, defs) {
+    const color = colors[step.level] || colors[1];
+    const bgColor = bgColors[step.level] || bgColors[1];
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', `translate(${x}, ${y})`);
+    g.dataset.stepId = step.id;
+    g.style.cursor = 'grab';
+
+    // 拖拽排序（同层级）
+    g.addEventListener('dragstart', ev => {
+        ev.dataTransfer.setData('text/plain', step.id);
+        g.style.opacity = '0.4';
+    });
+    g.addEventListener('dragend', () => { g.style.opacity = ''; });
+    g.addEventListener('dragover', ev => { ev.preventDefault(); });
+    g.addEventListener('drop', ev => {
+        ev.preventDefault();
+        const fromId = parseInt(ev.dataTransfer.getData('text/plain'));
+        const toId = step.id;
+        if (fromId !== toId) {
+            const siblings = steps.filter(s => s.level === step.level);
+            const fromIdx = siblings.findIndex(s => s.id === fromId);
+            const toIdx = siblings.findIndex(s => s.id === toId);
+            const [moved] = siblings.splice(fromIdx, 1);
+            siblings.splice(toIdx, 0, moved);
+            // 替换回 steps 中的对应位置
+            let levelIdx = 0;
+            for (let i = 0; i < steps.length; i++) {
+                if (steps[i].level === step.level) {
+                    steps[i] = siblings[levelIdx];
+                    levelIdx++;
+                }
+            }
+            renderSteps();
+        }
+    });
+    g.draggable = true;
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', nodeW); rect.setAttribute('height', nodeH);
+    rect.setAttribute('rx', '10'); rect.setAttribute('fill', bgColor);
+    rect.setAttribute('stroke', color); rect.setAttribute('stroke-width', step.level === 1 ? '2' : '1.5');
+    g.appendChild(rect);
+
+    // 序号
+    const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    badge.setAttribute('cx', '14'); badge.setAttribute('cy', '14');
+    badge.setAttribute('r', '8'); badge.setAttribute('fill', color);
+    g.appendChild(badge);
+
+    const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    badgeText.setAttribute('x', '14'); badgeText.setAttribute('y', '14');
+    badgeText.setAttribute('dominant-baseline', 'central'); badgeText.setAttribute('text-anchor', 'middle');
+    badgeText.setAttribute('font-size', '9'); badgeText.setAttribute('fill', '#fff');
+    badgeText.setAttribute('font-weight', '700');
+    badgeText.textContent = order;
+    g.appendChild(badgeText);
+
+    // 名称
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', '28'); text.setAttribute('y', '22');
+    text.setAttribute('font-size', step.level === 1 ? '12' : '11');
+    text.setAttribute('fill', '#1d1d1f');
+    text.setAttribute('font-weight', step.level === 1 ? '600' : '400');
+    text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
+    text.textContent = step.name.length > 12 ? step.name.slice(0, 12) + '…' : step.name;
+    g.appendChild(text);
+
+    // 描述
+    if (step.desc) {
+        const descText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        descText.setAttribute('x', '28'); descText.setAttribute('y', '40');
+        descText.setAttribute('font-size', '9'); descText.setAttribute('fill', '#8e8e93');
+        descText.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif');
+        descText.textContent = step.desc.length > 16 ? step.desc.slice(0, 16) + '…' : step.desc;
+        g.appendChild(descText);
+    }
+
+    // 展开/收起按钮
+    if (hasChildren) {
+        const btnX = nodeW - 4;
+        const btnY = nodeH / 2;
+        const btnR = 10;
+
+        const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        bgCircle.setAttribute('cx', btnX); bgCircle.setAttribute('cy', btnY);
+        bgCircle.setAttribute('r', btnR); bgCircle.setAttribute('fill', '#fff');
+        bgCircle.setAttribute('stroke', color); bgCircle.setAttribute('stroke-width', '1.5');
+        bgCircle.classList.add('flow-expand-btn');
+        g.appendChild(bgCircle);
+
+        const symbol = isExpanded ? '−' : '+';
+        const plusText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        plusText.setAttribute('x', btnX); plusText.setAttribute('y', btnY + 1);
+        plusText.setAttribute('dominant-baseline', 'central'); plusText.setAttribute('text-anchor', 'middle');
+        plusText.setAttribute('font-size', '14'); plusText.setAttribute('fill', color);
+        plusText.setAttribute('font-weight', '700');
+        plusText.textContent = symbol;
+        g.appendChild(plusText);
+
+        bgCircle.addEventListener('click', ev => {
+            ev.stopPropagation();
+            if (isExpanded) expandedNodes.delete(step.id);
+            else expandedNodes.add(step.id);
+            renderFlowchart();
+        });
+        plusText.addEventListener('click', ev => {
+            ev.stopPropagation();
+            if (isExpanded) expandedNodes.delete(step.id);
+            else expandedNodes.add(step.id);
+            renderFlowchart();
+        });
+    }
+
+    svg.appendChild(g);
+
+    // 连线到子节点
+    if (hasChildren && isExpanded) {
+        children.forEach((child, ci) => {
+            const childX = x + childOffsetX;
+            const childY = childBaseY + nodeH + 20 + ci * (childNodeH + 10);
+
+            // 连线
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x + nodeW); line.setAttribute('y1', y + nodeH / 2);
+            line.setAttribute('x2', childX); line.setAttribute('y2', childY + childNodeH / 2);
+            line.setAttribute('stroke', '#c0c0c0');
+            line.setAttribute('stroke-width', '1.5');
+            line.setAttribute('stroke-dasharray', '4,3');
+            line.setAttribute('marker-end', 'url(#arrow3)');
+            svg.appendChild(line);
+
+            // 渲染子节点（递归支持 L3）
+            const grandChildren = steps.filter(s => s.parent_id === child.id);
+            const grandHasChildren = grandChildren.length > 0;
+            const grandIsExpanded = expandedNodes.has(child.id);
+            renderNode(svg, child, childX, childY, childNodeW - 20, childNodeH, colors, bgColors, ci + 1, grandHasChildren, grandIsExpanded, grandChildren, childOffsetX - 20, childY, childNodeW - 20, childNodeH, childNodeGap, defs);
+        });
+    }
+}
+
+function getMaxDepth(steps) {
+    return steps.length > 0 ? Math.max(...steps.map(s => s.level || 1)) : 1;
 }
 
 // ── 保存流程图 ────────────────────────────────────────────
