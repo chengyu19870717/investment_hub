@@ -44,6 +44,7 @@ FEATURES = [
     {"title": "一图一表",       "url": "/chart",         "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active"},
     {"title": "待办管理",       "url": "/tasks",         "icon": "📝", "description": "快速登记和管理待办",   "status": "active"},
     {"title": "数据标准",       "url": "/data-standard",  "icon": "📐", "description": "数据标准化配置与管理",   "status": "active"},
+    {"title": "量化参数",       "url": "/quant-params",   "icon": "⚖️", "description": "因子权重配置与管理",     "status": "active"},
     {"title": "代理网关",       "url": "/proxy",          "icon": "🌐", "description": "一键开关系统代理服务",   "status": "active"},
 ]
 
@@ -167,6 +168,101 @@ def init_db():
         )
     """)
 
+    # 量化参数 — 因子权重配置
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS factor_weights (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            factor_key      TEXT UNIQUE NOT NULL,
+            factor_name     TEXT NOT NULL,
+            weight          REAL NOT NULL DEFAULT 0,
+            description     TEXT,
+            is_active       INTEGER DEFAULT 1,
+            created_at      TEXT,
+            updated_at      TEXT
+        )
+    """)
+
+    # 初始化默认因子权重（来自股神计划 ai_scorer.py）
+    existing_factors = conn.execute("SELECT COUNT(*) FROM factor_weights").fetchone()[0]
+    if existing_factors == 0:
+        now = datetime.now().isoformat()
+        defaults = [
+            ("technical",   "技术面", 0.30, "技术指标评分（MA/MACD/KDJ/布林带等）"),
+            ("fundamental", "基本面", 0.20, "基本面指标评分（毛利率/ROE/营收增长/PE等）"),
+            ("money_flow",  "资金面", 0.20, "资金流向评分（主力净流入/流通市值）"),
+            ("sentiment",   "情绪面", 0.15, "市场情绪评分（换手率/量比/涨跌幅）"),
+            ("chip",        "筹码面", 0.15, "筹码分布评分（筹码密集/获利比/筹码宽度）"),
+        ]
+        for key, name, w, desc in defaults:
+            conn.execute(
+                "INSERT INTO factor_weights(factor_key,factor_name,weight,description,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                (key, name, w, desc, now, now),
+            )
+
+    # 因子细项参数表
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS factor_sub_params (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            factor_key  TEXT NOT NULL,
+            param_key   TEXT NOT NULL,
+            param_name  TEXT NOT NULL,
+            param_value REAL NOT NULL,
+            description TEXT,
+            UNIQUE(factor_key, param_key)
+        )
+    """)
+
+    # 初始化默认细项参数（对应 ai_scorer.py 硬编码值）
+    existing_sub = conn.execute("SELECT COUNT(*) FROM factor_sub_params").fetchone()[0]
+    if existing_sub == 0:
+        sub_defaults = [
+            # 技术面
+            ("technical", "signal_score",       "信号单项得分",       12, "每个看多/看空信号的得分绝对值"),
+            ("technical", "multi_signal_bonus",  "多信号共振加分",     10, "≥2个同向信号时额外加/减分"),
+            ("technical", "ma20_far_penalty",    "MA20远距惩罚(>10%)", 15, "股价偏离MA20超过10%时扣分"),
+            ("technical", "ma20_mid_penalty",    "MA20中距惩罚(>5%)",  8,  "股价偏离MA20超过5%时扣分"),
+            # 基本面
+            ("fundamental", "gm_high_score",      "高毛利率加分(>30%)", 15, "毛利率高于30%加分"),
+            ("fundamental", "gm_mid_score",       "中毛利率加分(>20%)", 10, "毛利率高于20%加分"),
+            ("fundamental", "gm_low_penalty",     "低毛利率惩罚(<5%)",  10, "毛利率低于5%扣分"),
+            ("fundamental", "roe_high_score",     "高ROE加分(>15%)",    15, "ROE高于15%加分"),
+            ("fundamental", "roe_mid_score",      "中ROE加分(>10%)",    10, "ROE高于10%加分"),
+            ("fundamental", "roe_neg_penalty",    "负ROE惩罚",          15, "ROE为负时扣分"),
+            ("fundamental", "rev_growth_score",   "营收增长加分(>20%)", 10, "营收增长超过20%加分"),
+            ("fundamental", "profit_growth_score","利润增长加分(>20%)", 10, "净利润增长超过20%加分"),
+            ("fundamental", "pe_good_score",      "合理PE加分(0~20)",   10, "PE处于0~20合理区间加分"),
+            ("fundamental", "pe_missing_penalty", "PE缺失惩罚",         15, "PE数据缺失或为0时扣分"),
+            ("fundamental", "pe_bad_penalty",     "PE异常惩罚(>100)",   10, "PE超过100或为负时扣分"),
+            ("fundamental", "pb_good_score",      "合理PB加分(0~2)",    5,  "PB处于0~2合理区间加分"),
+            ("fundamental", "pb_missing_penalty", "PB缺失惩罚",         10, "PB数据缺失或为0时扣分"),
+            # 资金面
+            ("money_flow", "flow_very_high_score","强流入加分(>5%)",    30, "主力净流入占流通市值>5%"),
+            ("money_flow", "flow_high_score",     "中流入加分(>3%)",    20, "主力净流入占流通市值>3%"),
+            ("money_flow", "flow_mid_score",      "低流入加分(>1%)",    10, "主力净流入占流通市值>1%"),
+            ("money_flow", "flow_high_penalty",   "强流出惩罚(<-3%)",   25, "主力净流出占流通市值>3%"),
+            ("money_flow", "flow_mid_penalty",    "低流出惩罚(<-1%)",   15, "主力净流出占流通市值>1%"),
+            # 情绪面
+            ("sentiment", "turnover_high_score",  "高换手加分(>10%)",   15, "换手率高于10%加分"),
+            ("sentiment", "turnover_mid_score",   "中换手加分(>5%)",    8,  "换手率高于5%加分"),
+            ("sentiment", "turnover_low_penalty", "低换手惩罚(<1%)",    10, "换手率低于1%扣分"),
+            ("sentiment", "vol_high_score",       "高量比加分(>2)",     15, "量比高于2加分"),
+            ("sentiment", "vol_mid_score",        "中量比加分(>1.5)",   8,  "量比高于1.5加分"),
+            ("sentiment", "vol_low_penalty",      "低量比惩罚(<0.5)",   10, "量比低于0.5扣分"),
+            ("sentiment", "change_high_score",    "大涨跌幅加分(>5%)",  10, "涨跌幅绝对值超过5%加分"),
+            ("sentiment", "change_mid_score",     "中涨跌幅加分(>3%)",  5,  "涨跌幅绝对值超过3%加分"),
+            # 筹码面
+            ("chip", "converging_score",          "筹码收敛信号加分",   20, "近15天筹码持续收敛"),
+            ("chip", "tight_low_profit_score",    "极紧集中低获利加分", 20, "70%筹码集中+低获利比例"),
+            ("chip", "wide_low_profit_score",     "大范围低获利加分",   15, "大范围套牢盘有解套动力"),
+            ("chip", "low_profit_bonus",          "超低获利奖励(<10%)", 5,  "获利比例低于10%额外加分"),
+            ("chip", "narrow_width_bonus",        "极窄宽度奖励(<5%)",  5,  "筹码宽度低于5%额外加分"),
+        ]
+        for fk, pk, pn, pv, pd in sub_defaults:
+            conn.execute(
+                "INSERT INTO factor_sub_params(factor_key,param_key,param_name,param_value,description) VALUES(?,?,?,?,?)",
+                (fk, pk, pn, pv, pd),
+            )
+
     conn.commit()
     conn.close()
 
@@ -232,11 +328,15 @@ def chart_page(request: Request):
     conn.close()
     return templates.TemplateResponse("chart.html", {"request": request, "charts": charts})
 
+@app.get("/quant-params", response_class=HTMLResponse)
+def quant_params_page(request: Request):
+    return templates.TemplateResponse("quant_params.html", {"request": request})
+
 
 # ── 股票分析 API ──────────────────────────────────────────
 
 QUANT_DIR  = Path.home() / "Desktop" / "quant_trading"
-QUANT_VENV = Path("/Users/chengyu/PycharmProjects/PythonProject/.venv/bin/python")
+QUANT_VENV = QUANT_DIR / "venv" / "bin" / "python"
 
 def _do_refresh():
     """后台执行股神计划，更新全局状态"""
@@ -288,6 +388,157 @@ async def start_refresh():
 def get_refresh_status():
     """查询刷新进度"""
     return refresh_task_status
+
+
+analyze_task_status: dict = {"running": False, "code": None, "name": None, "done": False, "error": None, "result": None}
+
+def _do_analyze_single(code: str, name: str):
+    global analyze_task_status
+    analyze_task_status = {"running": True, "code": code, "name": name, "done": False, "error": None, "result": None}
+    try:
+        result = subprocess.run(
+            [str(QUANT_VENV), "main.py", "--stock", code],
+            cwd=str(QUANT_DIR),
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            analyze_task_status.update({"running": False, "done": True, "error": result.stderr[-500:] or "分析失败"})
+            return
+        # 从最新 JSON 报告里取该股票的结果
+        json_files = sorted(REPORT_DIR.glob("*_report.json"), reverse=True) if REPORT_DIR.exists() else []
+        stock_data = None
+        if json_files:
+            with open(json_files[0], "r", encoding="utf-8") as f:
+                stocks = json.load(f)
+            stock_data = next((s for s in stocks if s.get("code") == code), None)
+        analyze_task_status.update({"running": False, "done": True, "result": stock_data})
+    except subprocess.TimeoutExpired:
+        analyze_task_status.update({"running": False, "done": True, "error": "分析超时（>120s）"})
+    except Exception as e:
+        analyze_task_status.update({"running": False, "done": True, "error": str(e)})
+
+@app.post("/api/stock/analyze")
+async def start_analyze_single(request: Request):
+    global analyze_task_status
+    if analyze_task_status["running"]:
+        return JSONResponse({"error": "已有分析任务在运行，请稍后"}, status_code=409)
+    body = await request.json()
+    code = body.get("code", "").strip()
+    name = body.get("name", code)
+    if not code:
+        return JSONResponse({"error": "code 不能为空"}, status_code=400)
+    import threading
+    threading.Thread(target=_do_analyze_single, args=(code, name), daemon=True).start()
+    return {"ok": True, "message": f"开始分析 {name}({code})"}
+
+@app.get("/api/stock/analyze/status")
+def get_analyze_status():
+    return analyze_task_status
+
+
+# ── 历史数据下载 ──────────────────────────────────────────────────────────────
+download_task_status: dict = {
+    "running": False, "done": False, "error": None,
+    "current_code": None, "current_name": None,
+    "progress": [],          # [{code, name, msg}] 滚动日志
+    "results": [],           # 最终每只股票的结果
+    "summary": [],           # hist_daily 数据库统计（各股行数范围）
+}
+
+def _do_download_history(stocks: list):
+    global download_task_status
+    download_task_status = {
+        "running": True, "done": False, "error": None,
+        "current_code": None, "current_name": None,
+        "progress": [], "results": [], "summary": [],
+    }
+
+    import sys
+    sys.path.insert(0, str(QUANT_DIR / "src"))
+    try:
+        from history_downloader import HistoryDownloader
+
+        def on_progress(code, msg):
+            download_task_status["current_code"] = code
+            log_entry = {"code": code, "msg": msg}
+            download_task_status["progress"].append(log_entry)
+            # 只保留最近 200 条日志，防止内存无限增长
+            if len(download_task_status["progress"]) > 200:
+                download_task_status["progress"] = download_task_status["progress"][-200:]
+
+        dl = HistoryDownloader(progress_cb=on_progress)
+        results = dl.download_all(stocks, years=3)
+        summary = HistoryDownloader.get_stock_summary()
+
+        download_task_status.update({
+            "running": False, "done": True,
+            "results": results, "summary": summary,
+        })
+    except Exception as e:
+        import traceback
+        download_task_status.update({
+            "running": False, "done": True,
+            "error": str(e) + "\n" + traceback.format_exc()[-300:],
+        })
+
+@app.post("/api/stock/download-history")
+async def start_download_history(request: Request):
+    """触发历史数据增量下载（整个 watchlist）"""
+    global download_task_status
+    if download_task_status["running"]:
+        return JSONResponse({"error": "下载任务正在进行，请稍后"}, status_code=409)
+    stocks = _read_watchlist()
+    if not stocks:
+        return JSONResponse({"error": "监控列表为空"}, status_code=400)
+    import threading
+    threading.Thread(target=_do_download_history, args=(stocks,), daemon=True).start()
+    return {"ok": True, "message": f"开始下载 {len(stocks)} 只股票近3年历史数据"}
+
+@app.post("/api/stock/download-history/single")
+async def start_download_history_single(request: Request):
+    """触发单只股票历史数据增量下载"""
+    global download_task_status
+    if download_task_status["running"]:
+        return JSONResponse({"error": "下载任务正在进行，请稍后"}, status_code=409)
+    body = await request.json()
+    code = body.get("code", "").strip()
+    name = body.get("name", code)
+    if not code:
+        return JSONResponse({"error": "code 不能为空"}, status_code=400)
+    import threading
+    threading.Thread(target=_do_download_history, args=([(code, name)],), daemon=True).start()
+    return {"ok": True, "message": f"开始下载 {name}({code}) 近3年历史数据"}
+
+@app.get("/api/stock/download-history/status")
+def get_download_status():
+    return download_task_status
+
+@app.get("/api/stock/download-history/summary")
+def get_download_summary():
+    """返回各股票在本地数据库中的数据量统计"""
+    import sys
+    sys.path.insert(0, str(QUANT_DIR / "src"))
+    try:
+        from history_downloader import HistoryDownloader
+        return {"summary": HistoryDownloader.get_stock_summary()}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/results")
+def get_stock_results():
+    """读取最新的股神计划分析结果 JSON（供前端展示用）"""
+    json_files = sorted(REPORT_DIR.glob("*_report.json"), reverse=True) if REPORT_DIR.exists() else []
+    if not json_files:
+        return JSONResponse({"error": "暂无分析结果，请先点击「刷新分析」"}, status_code=404)
+    latest = json_files[0]
+    date_str = latest.stem.replace("_report", "")
+    date_fmt = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+    with open(latest, "r", encoding="utf-8") as f:
+        stocks = json.load(f)
+    import os
+    updated_ts = int(os.path.getmtime(latest))
+    return {"date": date_fmt, "stocks": stocks, "updated_at": updated_ts}
 
 
 @app.get("/api/stock/report")
@@ -1037,3 +1288,150 @@ def save_product_chart(pid: int, body: dict):
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+# ── 量化参数 API（因子权重配置）────────────────────────────
+
+class FactorWeightCreate(BaseModel):
+    factor_key:   str
+    factor_name:  str
+    weight:       float
+    description:  Optional[str] = None
+    is_active:    Optional[int] = 1
+
+class FactorWeightUpdate(BaseModel):
+    factor_name:  Optional[str] = None
+    weight:       Optional[float] = None
+    description:  Optional[str] = None
+    is_active:    Optional[int] = None
+
+@app.get("/api/factor-weights")
+def list_factor_weights():
+    """获取所有因子权重列表"""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM factor_weights ORDER BY id").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/factor-weights")
+def create_factor_weight(f: FactorWeightCreate):
+    """新建因子权重"""
+    now_ts = datetime.now().isoformat()
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO factor_weights(factor_key,factor_name,weight,description,is_active,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+            (f.factor_key, f.factor_name, f.weight, f.description, f.is_active, now_ts, now_ts)
+        )
+        conn.commit()
+        return {"ok": True, "id": cur.lastrowid}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.put("/api/factor-weights/{fid}")
+def update_factor_weight(fid: int, f: FactorWeightUpdate):
+    """更新因子权重"""
+    conn = get_db()
+    try:
+        fields = []
+        values = []
+        if f.factor_name is not None:
+            fields.append("factor_name=?"); values.append(f.factor_name)
+        if f.weight is not None:
+            fields.append("weight=?"); values.append(f.weight)
+        if f.description is not None:
+            fields.append("description=?"); values.append(f.description)
+        if f.is_active is not None:
+            fields.append("is_active=?"); values.append(f.is_active)
+        fields.append("updated_at=?"); values.append(datetime.now().isoformat())
+        values.append(fid)
+        conn.execute(f"UPDATE factor_weights SET {','.join(fields)} WHERE id=?", values)
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.delete("/api/factor-weights/{fid}")
+def delete_factor_weight(fid: int):
+    """删除因子权重"""
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM factor_weights WHERE id=?", (fid,))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+# ── 因子细项参数 API ──────────────────────────────────────
+
+class SubParamUpdate(BaseModel):
+    param_value: float
+
+@app.get("/api/factor-sub-params")
+def list_sub_params():
+    """获取所有细项参数（按 factor_key 分组）"""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM factor_sub_params ORDER BY factor_key, id"
+    ).fetchall()
+    conn.close()
+    result: dict = {}
+    for r in rows:
+        d = dict(r)
+        fk = d["factor_key"]
+        result.setdefault(fk, []).append(d)
+    return result
+
+@app.put("/api/factor-sub-params/{pid}")
+def update_sub_param(pid: int, body: SubParamUpdate):
+    """更新单个细项参数值"""
+    conn = get_db()
+    try:
+        conn.execute("UPDATE factor_sub_params SET param_value=? WHERE id=?",
+                     (body.param_value, pid))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.post("/api/factor-sub-params/sync")
+def sync_sub_params_to_quant():
+    """将细项参数导出为 JSON 供股神计划使用"""
+    import json
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM factor_sub_params ORDER BY factor_key, id").fetchall()
+    conn.close()
+
+    config: dict = {}
+    for r in rows:
+        d = dict(r)
+        config.setdefault(d["factor_key"], {})[d["param_key"]] = d["param_value"]
+
+    # 同时写入因子主权重
+    conn2 = get_db()
+    fw_rows = conn2.execute("SELECT factor_key, weight, is_active FROM factor_weights").fetchall()
+    conn2.close()
+    weights = {r["factor_key"]: {"weight": r["weight"], "is_active": bool(r["is_active"])} for r in fw_rows}
+    config["_weights"] = weights
+
+    out_path = Path.home() / "Desktop" / "quant_trading" / "config" / "scorer_params.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "path": str(out_path)}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True)
