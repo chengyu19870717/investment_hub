@@ -263,6 +263,38 @@ def init_db():
                 (fk, pk, pn, pv, pd),
             )
 
+    # 每只股票的因子权重覆盖表（不覆盖则继承全局）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stock_factor_overrides (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            code        TEXT NOT NULL,
+            factor_key  TEXT NOT NULL,
+            weight      REAL NOT NULL,
+            updated_at  TEXT,
+            UNIQUE(code, factor_key)
+        )
+    """)
+
+    # 每只股票的专属评分模型（存储特征名+权重+阈值）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stock_custom_models (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            code        TEXT UNIQUE NOT NULL,
+            name        TEXT NOT NULL,
+            features    TEXT NOT NULL,   -- JSON: ["feat1","feat2",...]
+            weights     TEXT NOT NULL,   -- JSON: [w1, w2, ...]
+            threshold   REAL NOT NULL DEFAULT 0.25,
+            ic          REAL,
+            icir        REAL,
+            accuracy    REAL,
+            up_win_rate REAL,
+            sample_days INTEGER,
+            description TEXT,
+            created_at  TEXT,
+            updated_at  TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -445,35 +477,55 @@ download_task_status: dict = {
     "summary": [],           # hist_daily 数据库统计（各股行数范围）
 }
 
-def _do_download_history(stocks: list):
+def _do_download_history(cmd_args: list):
+    """
+    用 quant_trading venv 的 Python 运行 download_history.py，
+    逐行读取 JSON 进度输出，实时写入 download_task_status。
+    与 _do_analyze_single 的模式一致，避免 investment_hub 直接依赖 quant_trading 的包。
+    """
     global download_task_status
     download_task_status = {
         "running": True, "done": False, "error": None,
-        "current_code": None, "current_name": None,
-        "progress": [], "results": [], "summary": [],
+        "current_code": None, "progress": [], "results": [], "summary": [],
     }
-
-    import sys
-    sys.path.insert(0, str(QUANT_DIR / "src"))
     try:
-        from history_downloader import HistoryDownloader
+        import subprocess
+        proc = subprocess.Popen(
+            [str(QUANT_VENV), "download_history.py"] + cmd_args,
+            cwd=str(QUANT_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for raw_line in proc.stdout:
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
 
-        def on_progress(code, msg):
-            download_task_status["current_code"] = code
-            log_entry = {"code": code, "msg": msg}
-            download_task_status["progress"].append(log_entry)
-            # 只保留最近 200 条日志，防止内存无限增长
-            if len(download_task_status["progress"]) > 200:
-                download_task_status["progress"] = download_task_status["progress"][-200:]
+            if obj.get("__RESULT__"):
+                # 最后一行：汇总结果
+                download_task_status["results"] = obj.get("results", [])
+                download_task_status["summary"] = obj.get("summary", [])
+            else:
+                # 进度行
+                download_task_status["current_code"] = obj.get("code")
+                download_task_status["progress"].append(obj)
+                if len(download_task_status["progress"]) > 200:
+                    download_task_status["progress"] = download_task_status["progress"][-200:]
 
-        dl = HistoryDownloader(progress_cb=on_progress)
-        results = dl.download_all(stocks, years=3)
-        summary = HistoryDownloader.get_stock_summary()
-
-        download_task_status.update({
-            "running": False, "done": True,
-            "results": results, "summary": summary,
-        })
+        proc.wait()
+        if proc.returncode != 0:
+            stderr = proc.stderr.read()[-400:]
+            download_task_status.update({
+                "running": False, "done": True,
+                "error": f"进程退出码 {proc.returncode}：{stderr}",
+            })
+        else:
+            download_task_status.update({"running": False, "done": True})
     except Exception as e:
         import traceback
         download_task_status.update({
@@ -491,7 +543,7 @@ async def start_download_history(request: Request):
     if not stocks:
         return JSONResponse({"error": "监控列表为空"}, status_code=400)
     import threading
-    threading.Thread(target=_do_download_history, args=(stocks,), daemon=True).start()
+    threading.Thread(target=_do_download_history, args=([],), daemon=True).start()
     return {"ok": True, "message": f"开始下载 {len(stocks)} 只股票近3年历史数据"}
 
 @app.post("/api/stock/download-history/single")
@@ -506,21 +558,190 @@ async def start_download_history_single(request: Request):
     if not code:
         return JSONResponse({"error": "code 不能为空"}, status_code=400)
     import threading
-    threading.Thread(target=_do_download_history, args=([(code, name)],), daemon=True).start()
+    threading.Thread(
+        target=_do_download_history,
+        args=(["--code", code, "--name", name],),
+        daemon=True,
+    ).start()
     return {"ok": True, "message": f"开始下载 {name}({code}) 近3年历史数据"}
 
 @app.get("/api/stock/download-history/status")
 def get_download_status():
     return download_task_status
 
+# ── 回测 ──────────────────────────────────────────────────────────────────────
+
+backtest_task_status: dict = {
+    "running": False, "done": False, "error": None,
+    "current_code": None, "progress": [], "results": [],
+}
+
+def _do_backtest(cmd_args: list):
+    global backtest_task_status
+    backtest_task_status = {
+        "running": True, "done": False, "error": None,
+        "current_code": None, "progress": [], "results": [],
+    }
+    try:
+        import subprocess
+        proc = subprocess.Popen(
+            [str(QUANT_VENV), "backtest_web.py"] + cmd_args,
+            cwd=str(QUANT_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for raw_line in proc.stdout:
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("__RESULT__"):
+                backtest_task_status["results"] = obj.get("results", [])
+            else:
+                backtest_task_status["current_code"] = obj.get("code")
+                backtest_task_status["progress"].append(obj)
+                if len(backtest_task_status["progress"]) > 300:
+                    backtest_task_status["progress"] = backtest_task_status["progress"][-300:]
+        proc.wait()
+        if proc.returncode != 0:
+            stderr = proc.stderr.read()[-400:]
+            backtest_task_status.update({"running": False, "done": True, "error": f"进程退出码 {proc.returncode}：{stderr}"})
+        else:
+            backtest_task_status.update({"running": False, "done": True})
+    except Exception as e:
+        import traceback
+        backtest_task_status.update({"running": False, "done": True, "error": str(e) + "\n" + traceback.format_exc()[-300:]})
+
+VALID_BACKTEST_DAYS = {0, 60, 180, 360, 720}
+
+@app.post("/api/stock/backtest")
+async def start_backtest(request: Request):
+    global backtest_task_status
+    if backtest_task_status["running"]:
+        return JSONResponse({"error": "回测任务正在进行，请稍后"}, status_code=409)
+    stocks = _read_watchlist()
+    if not stocks:
+        return JSONResponse({"error": "监控列表为空"}, status_code=400)
+    body = await request.json()
+    days = int(body.get("days", 0))
+    if days not in VALID_BACKTEST_DAYS:
+        return JSONResponse({"error": f"days 只能是 {sorted(VALID_BACKTEST_DAYS)}"}, status_code=400)
+    cmd_args = ["--days", str(days)] if days > 0 else []
+    import threading
+    threading.Thread(target=_do_backtest, args=(cmd_args,), daemon=True).start()
+    return {"ok": True, "message": f"开始回测 {len(stocks)} 只股票"}
+
+@app.post("/api/stock/backtest/single")
+async def start_backtest_single(request: Request):
+    global backtest_task_status
+    if backtest_task_status["running"]:
+        return JSONResponse({"error": "回测任务正在进行，请稍后"}, status_code=409)
+    body = await request.json()
+    code = body.get("code", "").strip()
+    if not code:
+        return JSONResponse({"error": "code 不能为空"}, status_code=400)
+    days = int(body.get("days", 0))
+    if days not in VALID_BACKTEST_DAYS:
+        return JSONResponse({"error": f"days 只能是 {sorted(VALID_BACKTEST_DAYS)}"}, status_code=400)
+    cmd_args = ["--code", code] + (["--days", str(days)] if days > 0 else [])
+    import threading
+    threading.Thread(target=_do_backtest, args=(cmd_args,), daemon=True).start()
+    return {"ok": True, "message": f"开始回测 {code}"}
+
+@app.get("/api/stock/backtest/status")
+def get_backtest_status():
+    return backtest_task_status
+
+@app.get("/api/stock/backtest/results")
+def get_backtest_results():
+    return {"results": backtest_task_status.get("results", [])}
+
+# ── 每只股票因子权重覆盖 ───────────────────────────────────────────────────────
+
+FACTOR_KEYS = ["technical", "fundamental", "money_flow", "sentiment", "chip"]
+FACTOR_NAMES = {"technical": "技术面", "fundamental": "基本面",
+                "money_flow": "资金面", "sentiment": "情绪面", "chip": "筹码面"}
+DEFAULT_WEIGHTS = {"technical": 0.30, "fundamental": 0.20, "money_flow": 0.20, "sentiment": 0.15, "chip": 0.15}
+
+@app.get("/api/stock-factors/{code}")
+def get_stock_factors(code: str):
+    """获取某只股票的因子权重（覆盖值 + 全局默认值）"""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT factor_key, weight FROM stock_factor_overrides WHERE code=?", (code,)
+    ).fetchall()
+    conn.close()
+    overrides = {r["factor_key"]: r["weight"] for r in rows}
+    result = []
+    for fk in FACTOR_KEYS:
+        result.append({
+            "factor_key":   fk,
+            "factor_name":  FACTOR_NAMES[fk],
+            "weight":       overrides.get(fk, DEFAULT_WEIGHTS[fk]),
+            "is_override":  fk in overrides,
+            "default":      DEFAULT_WEIGHTS[fk],
+        })
+    return result
+
+@app.put("/api/stock-factors/{code}")
+async def update_stock_factors(code: str, request: Request):
+    """批量更新某只股票的因子权重覆盖"""
+    body = await request.json()  # {"technical": 0.4, "fundamental": 0.15, ...}
+    weights = {k: float(v) for k, v in body.items() if k in FACTOR_KEYS}
+    if not weights:
+        return JSONResponse({"error": "无有效因子数据"}, status_code=400)
+    total = sum(weights.values())
+    if abs(total - 1.0) > 0.01:
+        return JSONResponse({"error": f"权重之和必须等于1，当前为 {total:.2f}"}, status_code=400)
+    now = datetime.now().isoformat()
+    conn = get_db()
+    try:
+        for fk, w in weights.items():
+            conn.execute(
+                "INSERT INTO stock_factor_overrides(code,factor_key,weight,updated_at) VALUES(?,?,?,?) "
+                "ON CONFLICT(code,factor_key) DO UPDATE SET weight=excluded.weight, updated_at=excluded.updated_at",
+                (code, fk, w, now),
+            )
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.delete("/api/stock-factors/{code}")
+def reset_stock_factors(code: str):
+    """重置某只股票的因子权重（删除所有覆盖，恢复全局默认）"""
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM stock_factor_overrides WHERE code=?", (code,))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
 @app.get("/api/stock/download-history/summary")
 def get_download_summary():
-    """返回各股票在本地数据库中的数据量统计"""
-    import sys
-    sys.path.insert(0, str(QUANT_DIR / "src"))
+    """返回各股票在本地数据库中的数据量统计（直接读 SQLite，无需 quant 包）"""
+    import sqlite3
+    db_path = QUANT_DIR / "data" / "hist_daily.db"
+    if not db_path.exists():
+        return {"summary": []}
     try:
-        from history_downloader import HistoryDownloader
-        return {"summary": HistoryDownloader.get_stock_summary()}
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute(
+            "SELECT code, COUNT(*) as cnt, MIN(date), MAX(date) FROM hist_daily GROUP BY code"
+        ).fetchall()
+        conn.close()
+        return {"summary": [{"code": r[0], "count": r[1], "from": r[2], "to": r[3]} for r in rows]}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -1289,6 +1510,115 @@ def save_product_chart(pid: int, body: dict):
     conn.close()
     return {"ok": True}
 
+
+# ── 股票专属评分模型 API ─────────────────────────────────────────────────────
+
+@app.get("/api/stock-models")
+def list_stock_models():
+    """列出所有已注册的专属模型"""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT code,name,threshold,ic,icir,accuracy,up_win_rate,sample_days,description,updated_at "
+        "FROM stock_custom_models ORDER BY updated_at DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.get("/api/stock-models/{code}")
+def get_stock_model(code: str):
+    """获取某只股票的专属模型（含权重）"""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM stock_custom_models WHERE code=?", (code,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return JSONResponse({"error": f"{code} 暂无专属模型"}, status_code=404)
+    d = dict(row)
+    d["features"] = json.loads(d["features"])
+    d["weights"]  = json.loads(d["weights"])
+    return d
+
+@app.put("/api/stock-models/{code}")
+async def upsert_stock_model(code: str, request: Request):
+    """注册或更新某只股票的专属评分模型"""
+    body = await request.json()
+    required = ["name","features","weights","threshold","ic","icir","accuracy","up_win_rate"]
+    for f in required:
+        if f not in body:
+            return JSONResponse({"error": f"缺少字段 {f}"}, status_code=400)
+    now = datetime.now().isoformat()
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO stock_custom_models
+                (code,name,features,weights,threshold,ic,icir,accuracy,up_win_rate,
+                 sample_days,description,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(code) DO UPDATE SET
+                name=excluded.name, features=excluded.features, weights=excluded.weights,
+                threshold=excluded.threshold, ic=excluded.ic, icir=excluded.icir,
+                accuracy=excluded.accuracy, up_win_rate=excluded.up_win_rate,
+                sample_days=excluded.sample_days, description=excluded.description,
+                updated_at=excluded.updated_at
+        """, (
+            code,
+            body["name"],
+            json.dumps(body["features"], ensure_ascii=False),
+            json.dumps(body["weights"]),
+            float(body["threshold"]),
+            float(body["ic"]),
+            float(body["icir"]),
+            float(body["accuracy"]),
+            float(body["up_win_rate"]),
+            body.get("sample_days"),
+            body.get("description",""),
+            now, now,
+        ))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.delete("/api/stock-models/{code}")
+def delete_stock_model(code: str):
+    """删除某只股票的专属模型"""
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM stock_custom_models WHERE code=?", (code,))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+@app.post("/api/stock-models/{code}/export")
+def export_model_to_quant(code: str):
+    """将专属模型导出为 quant_trading/config/custom_models.json"""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM stock_custom_models").fetchall()
+    conn.close()
+    models = {}
+    for r in rows:
+        d = dict(r)
+        models[d["code"]] = {
+            "name":      d["name"],
+            "features":  json.loads(d["features"]),
+            "weights":   json.loads(d["weights"]),
+            "threshold": d["threshold"],
+            "metrics":   {"ic": d["ic"], "icir": d["icir"],
+                          "accuracy": d["accuracy"], "up_win_rate": d["up_win_rate"]},
+        }
+    out = QUANT_DIR / "config" / "custom_models.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(models, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "path": str(out), "count": len(models)}
 
 # ── 量化参数 API（因子权重配置）────────────────────────────
 

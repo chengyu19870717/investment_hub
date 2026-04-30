@@ -106,6 +106,100 @@
 .dl-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
 .dl-badge.ok  { background: rgba(52,199,89,.15); color: #34c759; }
 .dl-badge.none { background: rgba(255,149,0,.15); color: #ff9500; }
+
+/* ── 回测面板 ── */
+.bt-panel {
+    margin: 8px 20px; padding: 12px 16px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    display: none;
+}
+.bt-panel.open { display: block; }
+.bt-panel .dl-header { margin-bottom: 8px; }
+.bt-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.btn-bt-all {
+    padding: 6px 14px; border: none; border-radius: 7px;
+    background: #5856d6; color: #fff; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: opacity .15s;
+}
+.btn-bt-all:disabled { opacity: .5; cursor: not-allowed; }
+.bt-log {
+    max-height: 140px; overflow-y: auto;
+    background: var(--bg-page); border-radius: 6px;
+    padding: 8px 10px; font-size: 11px; font-family: monospace;
+    color: var(--text-muted); line-height: 1.6; display: none;
+}
+.bt-result-wrap { margin-top: 10px; }
+.bt-result-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.bt-result-table th {
+    text-align: left; color: var(--text-muted); font-weight: 500;
+    padding: 4px 6px; border-bottom: 1px solid var(--border);
+}
+.bt-result-table td { padding: 4px 6px; border-top: 1px solid var(--border); }
+.bt-best { background: rgba(88,86,214,.08); font-weight: 600; }
+.bt-imp-pos { color: #34c759; font-weight: 600; }
+.bt-imp-neg { color: var(--text-muted); }
+.bt-custom-row { background: rgba(255,193,7,.1); font-weight: 700; }
+.bt-custom-row td:first-child { color: #b8860b; }
+.bt-custom-badge { display:inline-block; background:#ffb300; color:#fff; border-radius:4px; font-size:9px; padding:1px 5px; margin-left:4px; vertical-align:middle; }
+.bt-metric-good { color: #34c759; font-weight: 700; }
+.bt-metric-ok { color: #ff9f0a; font-weight: 600; }
+.bt-metric-bad { color: #ff3b30; }
+
+/* ── 因子维护 Modal ── */
+.factor-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    z-index: 600; display: none; align-items: center; justify-content: center;
+}
+.factor-modal-overlay.open { display: flex; }
+.factor-modal {
+    background: var(--bg-card); border-radius: 14px;
+    width: 400px; max-width: 95vw; max-height: 90vh;
+    box-shadow: 0 8px 40px rgba(0,0,0,.25); overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.factor-modal-hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.factor-modal-title { font-size: 15px; font-weight: 700; flex: 1; }
+.factor-modal-close {
+    border: none; background: none; font-size: 18px;
+    color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.factor-modal-close:hover { background: var(--badge-bg); }
+.factor-modal-body { flex: 1; overflow-y: auto; padding: 18px; }
+.factor-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.factor-lbl { font-size: 13px; min-width: 52px; }
+.factor-slider { flex: 1; accent-color: #5856d6; }
+.factor-val {
+    font-size: 12px; font-weight: 600; min-width: 36px; text-align: right;
+    color: #5856d6;
+}
+.factor-total {
+    font-size: 12px; margin-top: 6px; padding: 6px 10px;
+    border-radius: 6px; background: var(--bg-page); text-align: right;
+}
+.factor-total.ok   { color: #34c759; }
+.factor-total.warn { color: #ff3b30; }
+.factor-override-badge {
+    font-size: 10px; padding: 1px 5px; border-radius: 3px;
+    background: rgba(88,86,214,.15); color: #5856d6; margin-left: 4px;
+}
+.factor-modal-ftr {
+    padding: 12px 18px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0;
+}
+.btn-factor-save {
+    padding: 7px 18px; border: none; border-radius: 8px;
+    background: #5856d6; color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: opacity .15s;
+}
+.btn-factor-save:disabled { opacity: .5; cursor: not-allowed; }
+.btn-factor-reset {
+    padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: none; color: var(--text-muted); font-size: 12px; cursor: pointer;
+}
+.btn-factor-reset:hover { background: var(--badge-bg); }
 .wl-add-row { display: flex; gap: 8px; }
 .wl-search-wrap { flex: 1; position: relative; }
 .wl-input {
@@ -303,6 +397,7 @@
         </div>
         <button class="btn-wl" onclick="toggleWl()">📋 监控列表</button>
         <button class="btn-wl" onclick="toggleDlPanel()" title="增量下载近3年历史数据，供回测使用">📥 下载历史数据</button>
+        <button class="btn-wl" onclick="toggleBtPanel()" title="对监控股票进行因子权重回测">📊 回测</button>
         <button class="btn-refresh" id="btn-refresh" onclick="doRefresh()">
             <span id="refresh-icon">↻</span> 刷新分析
         </button>
@@ -348,6 +443,25 @@
             <div class="dl-log" id="dl-log" style="display:none;"></div>
         </div>
 
+        <!-- 回测面板 -->
+        <div class="bt-panel" id="bt-panel">
+            <div class="dl-header">
+                <span class="dl-title">📊 因子权重回测</span>
+                <span class="dl-subtitle">基于本地历史数据，对比 6 种权重方案的预测准确率</span>
+            </div>
+            <div class="bt-actions">
+                <select class="sort-select" id="bt-days-sel" style="font-size:12px;">
+                    <option value="60">近 60 天</option>
+                    <option value="180">近 180 天</option>
+                    <option value="360" selected>近 360 天</option>
+                    <option value="720">近 720 天</option>
+                </select>
+                <button class="btn-bt-all" id="btn-bt-all" onclick="backtestAll()">回测全部监控股票</button>
+            </div>
+            <div class="bt-log" id="bt-log"></div>
+            <div class="bt-result-wrap" id="bt-result-wrap"></div>
+        </div>
+
         <!-- 分析结果 -->
         <div class="results-section">
             <div class="results-hdr">
@@ -385,6 +499,23 @@
         <button class="detail-close" onclick="closeDetail()">✕</button>
     </div>
     <div class="detail-body" id="detail-body"></div>
+</div>
+
+<!-- 因子维护 Modal -->
+<div class="factor-modal-overlay" id="factor-modal-overlay" onclick="closeFactorModal(event)">
+    <div class="factor-modal" onclick="event.stopPropagation()">
+        <div class="factor-modal-hdr">
+            <div class="factor-modal-title" id="factor-modal-title">因子权重配置</div>
+            <button class="factor-modal-close" onclick="closeFactorModal()">✕</button>
+        </div>
+        <div class="factor-modal-body" id="factor-modal-body">
+            <!-- 由 JS 渲染 -->
+        </div>
+        <div class="factor-modal-ftr">
+            <button class="btn-factor-reset" onclick="resetFactors()">恢复全局默认</button>
+            <button class="btn-factor-save" id="btn-factor-save" onclick="saveFactors()">保存</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -489,6 +620,13 @@ function buildCard(s, rank) {
 
     // 判断依据
     if (s.reason) card.appendChild(text('div', 'card-reason', s.reason));
+
+    // 因子维护按钮
+    const factorBtn = el('button', 'btn-wl', 'margin-top:8px;font-size:11px;width:100%;');
+    factorBtn.textContent = '⚖️ 因子配置';
+    factorBtn.title = `配置 ${s.name} 的因子权重`;
+    factorBtn.addEventListener('click', ev => { ev.stopPropagation(); openFactorModal(s.code, s.name); });
+    card.appendChild(factorBtn);
 
     return card;
 }
@@ -847,9 +985,12 @@ function renderWlTags() {
         const dlb = el('button', 'wl-dl'); dlb.textContent = '📥';
         dlb.title = `下载 ${name}(${code}) 近3年历史数据`;
         dlb.addEventListener('click', () => downloadSingleHistory(code, name));
+        const fct = el('button', 'wl-dl'); fct.textContent = '⚖️';
+        fct.title = `配置 ${name}(${code}) 因子权重`;
+        fct.addEventListener('click', () => openFactorModal(code, name));
         const del = el('button', 'wl-del'); del.textContent = '×';
         del.addEventListener('click', () => delStock(code));
-        tag.appendChild(ana); tag.appendChild(dlb); tag.appendChild(del); c.appendChild(tag);
+        tag.appendChild(ana); tag.appendChild(dlb); tag.appendChild(fct); tag.appendChild(del); c.appendChild(tag);
     });
 }
 
@@ -1109,6 +1250,235 @@ async function _pollDownload() {
             }
         }
     } catch(e) {}
+}
+
+// ── 回测 ─────────────────────────────────────────────────
+let btTimer = null;
+
+function toggleBtPanel() {
+    const p = document.getElementById('bt-panel');
+    p.classList.toggle('open');
+}
+
+async function backtestAll() {
+    const btn = document.getElementById('btn-bt-all');
+    const log = document.getElementById('bt-log');
+    btn.disabled = true;
+    log.style.display = 'block';
+    log.textContent = '启动回测…\n';
+    clearInterval(btTimer);
+    try {
+        const days = parseInt(document.getElementById('bt-days-sel').value);
+        const r = await fetch('/api/stock/backtest', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({days})
+        });
+        if (!r.ok) {
+            const j = await r.json();
+            log.textContent += '❌ ' + j.error + '\n';
+            btn.disabled = false;
+            return;
+        }
+        btTimer = setInterval(_pollBacktest, 1800);
+    } catch(e) {
+        log.textContent += '❌ ' + e.message + '\n';
+        btn.disabled = false;
+    }
+}
+
+async function _pollBacktest() {
+    try {
+        const st = await (await fetch('/api/stock/backtest/status')).json();
+        const log = document.getElementById('bt-log');
+        const recent = (st.progress || []).slice(-8);
+        log.textContent = recent.map(e => '[' + e.code + '] ' + e.msg).join('\n') + '\n';
+        log.scrollTop = log.scrollHeight;
+        if (!st.running) {
+            clearInterval(btTimer);
+            document.getElementById('btn-bt-all').disabled = false;
+            if (st.error) { log.textContent += '❌ ' + st.error; }
+            else { log.textContent += '✅ 回测完成'; renderBtResults(st.results || []); }
+        }
+    } catch(e) {}
+}
+
+const BT_SCHEMES = ['当前配置','技术面 50%','技术面 60%','技术面 70%','均衡配置','资金主导'];
+
+function renderBtResults(results) {
+    const wrap = document.getElementById('bt-result-wrap');
+    wrap.replaceChildren();
+    results.forEach(r => {
+        const section = document.createElement('div');
+        section.style.cssText = 'margin-bottom:16px;';
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px;display:flex;align-items:center;gap:6px;';
+        const hdrText = document.createElement('span');
+        hdrText.textContent = r.name + '(' + r.code + ')  ' + r.date_range + '  共' + r.data_days + '天';
+        hdr.appendChild(hdrText);
+        if (r.has_custom_model) {
+            const badge = document.createElement('span');
+            badge.className = 'bt-custom-badge';
+            badge.textContent = '专属模型';
+            hdr.appendChild(badge);
+        }
+        section.appendChild(hdr);
+
+        const tbl = document.createElement('table');
+        tbl.className = 'bt-result-table';
+        const thead = tbl.createTHead();
+        const hrow = thead.insertRow();
+        ['方案','准确率','上涨胜率','IC','ICIR','夏普','最大回撤'].forEach(h => {
+            const th = document.createElement('th'); th.textContent = h; hrow.appendChild(th);
+        });
+        const tbody = tbl.createTBody();
+
+        // custom model row first
+        if (r.has_custom_model && r.custom) {
+            const cm = r.custom;
+            const row = tbody.insertRow();
+            row.className = 'bt-custom-row';
+            const m = cm.metrics || {};
+            const vals = [
+                cm.model_name + ' ★',
+                m.accuracy != null ? m.accuracy.toFixed(1) + '%' : '—',
+                m.up_win_rate != null ? m.up_win_rate.toFixed(1) + '%' : '—',
+                m.ic != null ? m.ic.toFixed(4) : '—',
+                m.icir != null ? m.icir.toFixed(4) : '—',
+                '—', '—'
+            ];
+            vals.forEach((v, i) => {
+                const td = row.insertCell();
+                td.textContent = v;
+                // color IC/ICIR/Acc/UpWR cells
+                if (i === 1 && m.accuracy != null) td.className = m.accuracy >= 60 ? 'bt-metric-good' : m.accuracy >= 55 ? 'bt-metric-ok' : 'bt-metric-bad';
+                if (i === 2 && m.up_win_rate != null) td.className = m.up_win_rate >= 60 ? 'bt-metric-good' : m.up_win_rate >= 55 ? 'bt-metric-ok' : 'bt-metric-bad';
+                if (i === 3 && m.ic != null) td.className = m.ic >= 0.1 ? 'bt-metric-good' : m.ic >= 0.04 ? 'bt-metric-ok' : 'bt-metric-bad';
+                if (i === 4 && m.icir != null) td.className = m.icir >= 0.6 ? 'bt-metric-good' : m.icir >= 0.3 ? 'bt-metric-ok' : 'bt-metric-bad';
+            });
+        }
+
+        BT_SCHEMES.forEach(sname => {
+            const s = r.schemes && r.schemes[sname];
+            if (!s) return;
+            const m = s.metrics;
+            const isBest = sname === r.best_scheme;
+            const row = tbody.insertRow();
+            if (isBest) row.className = 'bt-best';
+            [
+                sname + (isBest ? ' ★' : ''),
+                m.accuracy.toFixed(1) + '%',
+                m.up_win_rate.toFixed(1) + '%',
+                m.ic.toFixed(4),
+                '—',
+                m.sharpe.toFixed(2),
+                m.max_drawdown.toFixed(1) + '%'
+            ].forEach((v, i) => {
+                const td = row.insertCell();
+                td.textContent = v;
+            });
+        });
+        section.appendChild(tbl);
+        wrap.appendChild(section);
+    });
+}
+
+// ── 因子维护 Modal ────────────────────────────────────────
+let factorModalCode = '';
+let factorModalWeights = {};
+
+async function openFactorModal(code, name) {
+    factorModalCode = code;
+    document.getElementById('factor-modal-title').textContent = '⚖️ ' + name + '(' + code + ') 因子配置';
+    const loadDiv = document.createElement('div');
+    loadDiv.style.cssText = 'text-align:center;padding:20px;color:var(--text-muted);';
+    loadDiv.textContent = '加载中…';
+    document.getElementById('factor-modal-body').replaceChildren(loadDiv);
+    document.getElementById('factor-modal-overlay').classList.add('open');
+
+    const factors = await (await fetch('/api/stock-factors/' + code)).json();
+    factorModalWeights = {};
+    factors.forEach(f => { factorModalWeights[f.factor_key] = f.weight; });
+    renderFactorModal(factors);
+}
+
+function renderFactorModal(factors) {
+    const body = document.getElementById('factor-modal-body');
+    body.replaceChildren();
+
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11px;color:var(--text-muted);margin-bottom:14px;';
+    hint.textContent = '调整各因子权重比例，权重之和必须等于 100%。';
+    body.appendChild(hint);
+
+    factors.forEach(f => {
+        const row = el('div', 'factor-row');
+        const lbl = el('span', 'factor-lbl');
+        lbl.appendChild(document.createTextNode(f.factor_name));
+        if (f.is_override) {
+            const badge = el('span', 'factor-override-badge');
+            badge.textContent = '已覆盖';
+            lbl.appendChild(badge);
+        }
+        const slider = document.createElement('input');
+        slider.type = 'range'; slider.className = 'factor-slider';
+        slider.min = 0; slider.max = 100; slider.step = 1;
+        slider.value = Math.round(f.weight * 100);
+        slider.dataset.key = f.factor_key;
+
+        const val = el('span', 'factor-val');
+        val.id = 'fv-' + f.factor_key;
+        val.textContent = slider.value + '%';
+
+        slider.addEventListener('input', () => {
+            factorModalWeights[f.factor_key] = parseInt(slider.value) / 100;
+            val.textContent = slider.value + '%';
+            updateFactorTotal();
+        });
+        row.appendChild(lbl); row.appendChild(slider); row.appendChild(val);
+        body.appendChild(row);
+    });
+
+    const totalDiv = el('div', 'factor-total');
+    totalDiv.id = 'factor-total';
+    body.appendChild(totalDiv);
+    updateFactorTotal();
+}
+
+function updateFactorTotal() {
+    const total = Object.values(factorModalWeights).reduce((a, b) => a + b, 0);
+    const div = document.getElementById('factor-total');
+    const pct = Math.round(total * 100);
+    div.textContent = '当前合计：' + pct + '%（需等于 100%）';
+    div.className = 'factor-total ' + (pct === 100 ? 'ok' : 'warn');
+    document.getElementById('btn-factor-save').disabled = pct !== 100;
+}
+
+async function saveFactors() {
+    const btn = document.getElementById('btn-factor-save');
+    btn.disabled = true; btn.textContent = '保存中…';
+    try {
+        const body = {};
+        Object.entries(factorModalWeights).forEach(([k, v]) => { body[k] = Math.round(v * 100) / 100; });
+        const r = await fetch('/api/stock-factors/' + factorModalCode, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+        });
+        if (!r.ok) { const j = await r.json(); alert('保存失败：' + j.error); }
+        else { document.getElementById('factor-modal-overlay').classList.remove('open'); }
+    } catch(e) { alert('请求失败：' + e.message); }
+    finally { btn.textContent = '保存'; btn.disabled = false; }
+}
+
+async function resetFactors() {
+    if (!confirm('确认恢复 ' + factorModalCode + ' 的因子权重为全局默认？')) return;
+    await fetch('/api/stock-factors/' + factorModalCode, { method: 'DELETE' });
+    const factors = await (await fetch('/api/stock-factors/' + factorModalCode)).json();
+    factorModalWeights = {};
+    factors.forEach(f => { factorModalWeights[f.factor_key] = f.weight; });
+    renderFactorModal(factors);
+}
+
+function closeFactorModal(ev) {
+    if (ev && ev.target !== document.getElementById('factor-modal-overlay')) return;
+    document.getElementById('factor-modal-overlay').classList.remove('open');
 }
 
 // ── 初始化 ────────────────────────────────────────────────
