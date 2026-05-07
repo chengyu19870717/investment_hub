@@ -13,7 +13,7 @@ app = FastAPI()
 
 BASE_DIR     = Path(__file__).parent
 DB_PATH      = Path.home() / ".baibao" / "baibao.db"
-REPORT_DIR   = Path.home() / "Desktop" / "quant_trading" / "reports"
+REPORT_DIR   = Path.home() / "project" / "quant_trading" / "reports"
 UPLOAD_DIR   = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -367,8 +367,8 @@ def quant_params_page(request: Request):
 
 # ── 股票分析 API ──────────────────────────────────────────
 
-QUANT_DIR  = Path.home() / "Desktop" / "quant_trading"
-QUANT_VENV = QUANT_DIR / "venv" / "bin" / "python"
+QUANT_DIR  = Path.home() / "project" / "quant_trading"
+QUANT_VENV = QUANT_DIR / ".venv" / "bin" / "python3.14"
 
 def _do_refresh():
     """后台执行股神计划，更新全局状态"""
@@ -833,7 +833,7 @@ def _parse_report(md: str) -> list:
 
 # ── Watchlist 管理 API ───────────────────────────────────
 
-WATCHLIST_PATH = Path.home() / "Desktop" / "quant_trading" / "config" / "watchlist.json"
+WATCHLIST_PATH = Path.home() / "project" / "quant_trading" / "config" / "watchlist.json"
 
 def _read_watchlist() -> list:
     if WATCHLIST_PATH.exists():
@@ -880,7 +880,7 @@ def search_stock(q: str = ""):
     if not q.strip():
         return []
     import sys
-    quant_src = Path.home() / "Desktop" / "quant_trading" / "src"
+    quant_src = Path.home() / "project" / "quant_trading" / "src"
     if str(quant_src) not in sys.path:
         sys.path.insert(0, str(quant_src))
     try:
@@ -1756,7 +1756,7 @@ def sync_sub_params_to_quant():
     weights = {r["factor_key"]: {"weight": r["weight"], "is_active": bool(r["is_active"])} for r in fw_rows}
     config["_weights"] = weights
 
-    out_path = Path.home() / "Desktop" / "quant_trading" / "config" / "scorer_params.json"
+    out_path = Path.home() / "project" / "quant_trading" / "config" / "scorer_params.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"ok": True, "path": str(out_path)}
