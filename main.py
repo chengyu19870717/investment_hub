@@ -2824,6 +2824,47 @@ def get_investment_analysis_dimensions():
             dimensions[key] = dims
     return {"date": date_fmt, "dimensions": dimensions}
 
+@app.get("/api/investment-analysis/history")
+def get_investment_analysis_history(limit: int = 30):
+    """
+    读取 stock_dimension_snapshots 的历史快照（launchd 每日任务写入），按股票代码分组返回，
+    供前端画三维评分趋势。limit 是每只股票最多返回的天数。
+    """
+    conn = get_db()
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS stock_dimension_snapshots ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, snapshot_date TEXT NOT NULL, code TEXT NOT NULL, "
+            "name TEXT, probability REAL, score REAL, price REAL, risk_label TEXT, "
+            "supply REAL, demand REAL, profit REAL, spread REAL, divergent INTEGER, "
+            "exposures_count INTEGER, created_at TEXT NOT NULL, UNIQUE(snapshot_date, code))"
+        )
+        rows = conn.execute(
+            "SELECT snapshot_date, code, name, probability, price, supply, demand, profit, spread, divergent "
+            "FROM stock_dimension_snapshots ORDER BY code, snapshot_date DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    by_code = {}
+    for row in rows:
+        bucket = by_code.setdefault(row["code"], [])
+        if len(bucket) >= max(1, min(limit, 365)):
+            continue
+        bucket.append({
+            "date": row["snapshot_date"],
+            "probability": row["probability"],
+            "price": row["price"],
+            "supply": row["supply"],
+            "demand": row["demand"],
+            "profit": row["profit"],
+            "spread": row["spread"],
+            "divergent": bool(row["divergent"]),
+        })
+    for code in by_code:
+        by_code[code].reverse()  # 按日期升序，方便前端画趋势线
+    return {"history": by_code}
+
 @app.get("/api/stock/report")
 def get_stock_report(date: str):
     path = REPORT_DIR / f"{date}_report.md"

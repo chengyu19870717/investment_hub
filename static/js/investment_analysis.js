@@ -8,6 +8,7 @@ const state = {
     industryData: {},
     exposuresByCode: {},
     dimensionsByCode: {},
+    dimensionHistoryByCode: {},
     selectedCode: '',
     watchSearchSelected: null,
 };
@@ -831,6 +832,54 @@ function renderDim(name, value, reasons = []) {
     `;
 }
 
+function dimensionHistory(code) {
+    return codeKeys(code).map(key => state.dimensionHistoryByCode[key]).find(Boolean) || [];
+}
+
+function sparklinePath(values, w = 180, h = 40) {
+    if (values.length < 2) return '';
+    const step = w / (values.length - 1);
+    return values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(i * step).toFixed(1)},${(h - clamp(v) / 100 * h).toFixed(1)}`).join(' ');
+}
+
+function renderDimTrendRow(label, values, color) {
+    const latest = values[values.length - 1];
+    return `
+        <div class="bar-row" style="grid-template-columns: minmax(72px, 92px) minmax(0, 1fr) minmax(42px, 48px); align-items: center;">
+            <div class="bar-name">${escapeHtml(label)}</div>
+            <svg width="100%" height="32" viewBox="0 0 180 40" preserveAspectRatio="none" style="display:block;">
+                <path d="${sparklinePath(values)}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"></path>
+            </svg>
+            <div class="bar-value">${fmtNum(latest, 0)}</div>
+        </div>
+    `;
+}
+
+function renderDimTrendCard(stock, watch) {
+    const code = stock?.code || watch?.code;
+    const hist = dimensionHistory(code);
+    if (hist.length < 2) {
+        return `
+            <div class="model-item">
+                <div class="model-title">三维评分历史走势</div>
+                <div class="model-desc">${hist.length === 1 ? `已积累 1 天快照（${escapeHtml(hist[0].date)}），需要至少 2 天数据才能画出趋势线。` : '暂无历史快照，每日 16:00 自动积累（investment_snapshot.py + launchd）。'}</div>
+            </div>
+        `;
+    }
+    const supply = hist.map(h => h.supply);
+    const demand = hist.map(h => h.demand);
+    const profit = hist.map(h => h.profit);
+    return `
+        <div class="model-item">
+            <div class="model-title">三维评分历史走势</div>
+            <div class="model-desc">${escapeHtml(hist[0].date)} 至 ${escapeHtml(hist[hist.length - 1].date)}，共 ${hist.length} 个快照点。</div>
+            ${renderDimTrendRow('供给侧', supply, '#64748b')}
+            ${renderDimTrendRow('需求侧', demand, '#3b82f6')}
+            ${renderDimTrendRow('盈利侧', profit, '#22c55e')}
+        </div>
+    `;
+}
+
 function renderTracking(ctx) {
     const stock = ctx.stock;
     const dims = stockDimensions(stock);
@@ -865,6 +914,7 @@ function renderTracking(ctx) {
                         <div class="summary-title">${dims.divergent ? '三维背离' : '三维同步'}</div>
                         <div class="summary-desc">供需盈最大分差 ${fmtNum(dims.spread, 0)}。任一维度明显背离都应进入观察或复核队列。</div>
                     </div>
+                    ${renderDimTrendCard(ctx.stock, ctx.watch)}
                 </div>
             </div>
         </section>
@@ -1100,7 +1150,7 @@ function renderAll() {
 async function loadAll() {
     setProgress('正在读取投资分析数据...');
     try {
-        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult] = await Promise.all([
+        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult] = await Promise.all([
             safeJson('/api/stock/results'),
             safeJson('/api/stock/results/history?limit=5'),
             safeJson('/api/watchlist'),
@@ -1108,6 +1158,7 @@ async function loadAll() {
             safeJson('/api/factor-weights'),
             loadIndustryData(),
             safeJson('/api/investment-analysis/dimensions'),
+            safeJson('/api/investment-analysis/history?limit=30'),
         ]);
         state.stockResult = stockResult || null;
         state.stocks = stockResult?.stocks || [];
@@ -1117,6 +1168,7 @@ async function loadAll() {
         state.factors = Array.isArray(factors) ? factors : [];
         state.industryData = industryData || {};
         state.dimensionsByCode = dimensionsResult?.dimensions || {};
+        state.dimensionHistoryByCode = dimHistoryResult?.history || {};
         renderAll();
         setProgress('');
     } catch (e) {
