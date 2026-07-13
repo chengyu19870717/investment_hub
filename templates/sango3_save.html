@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国立志传3 存档修改器 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        .drop-zone {
+            border:2px dashed var(--border,#d0d0d0); border-radius:12px;
+            padding:24px 20px; text-align:center; cursor:pointer;
+            transition:border-color .2s, background .2s;
+        }
+        .drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent,#4f8ef7);background:#f0f5ff;}
+        .drop-icon{font-size:28px;margin-bottom:5px;}
+        .drop-text{font-size:14px;color:var(--text-primary);}
+        .drop-hint{font-size:12px;color:var(--text-muted);margin-top:3px;}
+        .status-bar{padding:9px 14px;border-radius:8px;font-size:13px;margin-top:8px;}
+        .status-bar.info {background:#e8f0fe;color:#1a56db;}
+        .status-bar.ok   {background:#e3fcec;color:#166534;}
+        .status-bar.error{background:#fde8e8;color:#991b1b;}
+        .status-bar.warn {background:#fffbeb;color:#92400e;}
+
+        /* 阵营 */
+        .faction-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;}
+        .faction-shu   {background:#fff1e6;color:#b94000;border:1px solid #fca26b;}
+        .faction-han   {background:#e8f0fe;color:#1a56db;border:1px solid #93b4fb;}
+        .faction-wu    {background:#f0fdf4;color:#166534;border:1px solid #6ee7b7;}
+        .faction-wei   {background:#f5f3ff;color:#5b21b6;border:1px solid #c4b5fd;}
+        .faction-other {background:#f3f4f6;color:#374151;border:1px solid #d1d5db;}
+
+        /* 武将卡片 */
+        .hero-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+        @media(max-width:560px){.hero-grid{grid-template-columns:1fr;}}
+
+        .hero-card{background:#fff;border:1.5px solid var(--border,#e0e0e0);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s,box-shadow .2s;}
+        .hero-card.modified{border-color:#f59e0b;box-shadow:0 0 0 3px #fef3c740;}
+        .hero-card.discovered-card{border-style:dashed;}
+        .hero-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+        .hero-name-block{flex:1;min-width:0;}
+        .hero-name{font-size:17px;font-weight:800;color:var(--text-primary);line-height:1.2;}
+        .hero-title{font-size:11px;color:var(--text-muted);margin-top:2px;}
+        .hero-level-badge{font-size:11px;font-weight:600;padding:2px 8px;background:var(--bg-main,#f5f5f5);border-radius:6px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
+        .hero-desc{font-size:12px;color:var(--text-muted);line-height:1.5;}
+        .hero-points-row{display:flex;align-items:center;gap:10px;}
+        .pts-label{font-size:12px;color:var(--text-muted);flex-shrink:0;font-weight:500;}
+        .pts-input{width:68px;padding:6px 0;font-size:19px;font-weight:800;text-align:center;border:1.5px solid var(--border,#e0e0e0);border-radius:8px;background:var(--bg-main,#f8f8f8);color:var(--text-primary);box-sizing:border-box;transition:border-color .15s,background .15s;}
+        .pts-input:focus{outline:none;border-color:var(--accent,#4f8ef7);background:#fff;}
+        .pts-input.changed{border-color:#f59e0b;background:#fffbea;}
+        .pts-hint{font-size:11px;color:var(--text-muted);}
+        .pts-bar-wrap{flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;}
+        .pts-bar{height:100%;border-radius:3px;background:linear-gradient(90deg,#4f8ef7,#7cb3ff);transition:width .3s;}
+
+        /* 全局字段 */
+        .global-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+        @media(max-width:480px){.global-grid{grid-template-columns:1fr 1fr;}}
+        .field-row{display:flex;flex-direction:column;gap:4px;}
+        .field-label{font-size:12px;color:var(--text-muted);font-weight:500;}
+        .field-label em{font-style:normal;font-size:10px;color:var(--accent,#4f8ef7);margin-left:4px;}
+        .field-input{padding:7px 10px;background:#fff;border:1.5px solid var(--border,#e0e0e0);border-radius:8px;font-size:14px;color:var(--text-primary);width:100%;box-sizing:border-box;}
+        .field-input:focus{outline:none;border-color:var(--accent,#4f8ef7);}
+        .field-input.changed{border-color:#f59e0b;background:#fffbea;}
+
+        /* 发现新武将面板 */
+        .discover-panel{background:var(--bg-main,#f8f8f8);border:1.5px solid var(--border,#e0e0e0);border-radius:12px;padding:16px;}
+        .discover-title{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+        .discover-steps{display:flex;flex-direction:column;gap:10px;}
+        .discover-step{display:flex;align-items:flex-start;gap:10px;}
+        .step-num{width:22px;height:22px;border-radius:50%;background:var(--accent,#4f8ef7);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+        .step-body{flex:1;}
+        .step-label{font-size:12px;font-weight:600;color:var(--text-primary);}
+        .step-hint{font-size:11px;color:var(--text-muted);margin-top:2px;}
+        .file-pick{display:flex;align-items:center;gap:8px;margin-top:6px;}
+        .file-pick label{font-size:12px;padding:5px 12px;background:#fff;border:1.5px solid var(--border,#e0e0e0);border-radius:7px;cursor:pointer;color:var(--text-primary);white-space:nowrap;}
+        .file-pick label:hover{border-color:var(--accent,#4f8ef7);}
+        .file-pick .fname{font-size:11px;color:var(--text-muted);}
+        .pts-small{width:56px;padding:5px 0;font-size:14px;font-weight:700;text-align:center;border:1.5px solid var(--border,#e0e0e0);border-radius:7px;background:#fff;color:var(--text-primary);}
+        .pts-small:focus{outline:none;border-color:var(--accent,#4f8ef7);}
+
+        /* 候选列表 */
+        .candidate-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+        .candidate-item{background:#fff;border:1.5px solid var(--border,#e0e0e0);border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;}
+        .candidate-item .offset{font-family:monospace;font-size:12px;color:var(--accent,#4f8ef7);flex-shrink:0;}
+        .candidate-meta{flex:1;display:flex;flex-direction:column;gap:4px;}
+        .hero-name-input{width:80px;padding:4px 8px;border:1.5px solid var(--border,#e0e0e0);border-radius:6px;font-size:13px;font-weight:600;}
+        .hero-name-input:focus{outline:none;border-color:var(--accent,#4f8ef7);}
+        select.faction-sel{padding:4px 8px;border:1.5px solid var(--border,#e0e0e0);border-radius:6px;font-size:12px;background:#fff;}
+
+        .btn-row{display:flex;gap:10px;margin-top:16px;}
+        .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:18px 0 8px;}
+        .modified-count{display:inline-block;font-size:11px;padding:1px 7px;background:#fef3c7;color:#92400e;border-radius:10px;margin-left:8px;font-weight:normal;}
+        .tag-new{display:inline-block;font-size:10px;padding:1px 6px;background:#dbeafe;color:#1e40af;border-radius:8px;margin-left:4px;vertical-align:middle;}
+
+        .collapsible-header{cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;}
+        .collapsible-arrow{font-size:10px;transition:transform .2s;}
+        .collapsible-arrow.open{transform:rotate(90deg);}
+        .collapsible-body{overflow:hidden;transition:max-height .3s;}
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">⚔️</span>
+                    <span class="logo-text">三国立志传3 存档修改器</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- 上传 -->
+        <div class="section-label">第一步：选择 save0.dat</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <div id="drop-zone" class="drop-zone">
+                    <div class="drop-icon">💾</div>
+                    <div class="drop-text">拖拽 save0.dat 到此处，或点击选择</div>
+                    <div class="drop-hint">存档路径：AppData\LocalLow\ttime\三国立志传3\SAVEDATA\</div>
+                    <input type="file" id="dat-file" accept=".dat" style="display:none;">
+                </div>
+                <div id="upload-status"></div>
+            </div>
+        </div>
+
+        <!-- 编辑区 -->
+        <div id="edit-section" style="display:none;">
+
+            <!-- 武将点数 -->
+            <div class="section-label">
+                武将技能点
+                <span id="hero-modified-badge" class="modified-count" style="display:none;"></span>
+            </div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div class="hero-grid" id="hero-grid"></div>
+                    <div id="no-heroes-hint" style="display:none;font-size:13px;color:var(--text-muted);padding:8px 0;">
+                        当前存档未检测到队内武将。如武将均已满足激活条件，可尝试「发现新武将」功能。
+                    </div>
+                </div>
+            </div>
+
+            <!-- 发现新武将 -->
+            <div class="section-label">
+                <span class="collapsible-header" id="discover-toggle">
+                    <span class="collapsible-arrow" id="discover-arrow">▶</span>
+                    发现新武将
+                    <span class="tag-new">诸葛亮/马超/关平等</span>
+                </span>
+            </div>
+            <div class="collapsible-body" id="discover-body" style="max-height:0;">
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div class="discover-panel">
+                        <div class="discover-title">🔍 差分分析：自动识别新加入武将的数据槽位</div>
+                        <div class="discover-steps">
+
+                            <div class="discover-step">
+                                <div class="step-num">1</div>
+                                <div class="step-body">
+                                    <div class="step-label">上传「加入前」存档</div>
+                                    <div class="step-hint">目标武将尚未加入队伍时的 save0.dat</div>
+                                    <div class="file-pick">
+                                        <label for="before-file">📁 选择文件
+                                            <input type="file" id="before-file" accept=".dat" style="display:none;">
+                                        </label>
+                                        <span class="fname" id="before-name">未选择</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="discover-step">
+                                <div class="step-num">2</div>
+                                <div class="step-body">
+                                    <div class="step-label">上传「加入后」存档</div>
+                                    <div class="step-hint">目标武将刚加入队伍后的 save0.dat</div>
+                                    <div class="file-pick">
+                                        <label for="after-file">📁 选择文件
+                                            <input type="file" id="after-file" accept=".dat" style="display:none;">
+                                        </label>
+                                        <span class="fname" id="after-name">未选择</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="discover-step">
+                                <div class="step-num">3</div>
+                                <div class="step-body">
+                                    <div class="step-label">填写加入后的点数</div>
+                                    <div class="step-hint">在「加入后」存档中，该武将当前有几点技能点？</div>
+                                    <div style="margin-top:6px;display:flex;align-items:center;gap:8px;">
+                                        <input type="number" id="discover-points" class="pts-small"
+                                               min="0" max="100" value="3" placeholder="3">
+                                        <span style="font-size:12px;color:var(--text-muted);">点</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="discover-step">
+                                <div class="step-num">4</div>
+                                <div class="step-body">
+                                    <div class="step-label">开始分析</div>
+                                    <button id="discover-btn" class="btn-primary" style="margin-top:6px;padding:7px 16px;">
+                                        🔍 分析差异
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="discover-status"></div>
+                        <div id="candidate-list" class="candidate-list"></div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- 全局字段 -->
+            <div class="section-label" style="margin-top:20px;">全局状态</div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div class="global-grid">
+                        <div class="field-row">
+                            <label class="field-label" for="f-scene_days">场景天数 <em>0x1578</em></label>
+                            <input class="field-input" type="number" id="f-scene_days" min="0" max="9999">
+                        </div>
+                        <div class="field-row">
+                            <label class="field-label" for="f-map_x">地图 X <em>0x4D4B0</em></label>
+                            <input class="field-input" type="number" id="f-map_x" min="0" max="9999">
+                        </div>
+                        <div class="field-row">
+                            <label class="field-label" for="f-map_y">地图 Y <em>0x4D4B4</em></label>
+                            <input class="field-input" type="number" id="f-map_y" min="0" max="9999">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作 -->
+            <div class="btn-row">
+                <button id="save-btn" class="btn-primary" style="flex:1;">💾 生成修改后的存档并下载</button>
+                <button id="reset-btn" class="btn-secondary">重置全部</button>
+            </div>
+            <div id="save-status"></div>
+
+        </div>
+
+    </main>
+</div>
+
+<script>
+// ── 常量 ──────────────────────────────────────
+const FACTION_CLASS = {
+    "桃园义勇":"faction-shu","汉廷官军":"faction-han",
+    "蜀汉":"faction-shu","东吴":"faction-wu",
+    "曹魏":"faction-wei","未知":"faction-other",
+};
+const FACTION_ICON  = {"蜀":"⚔","汉":"☆","吴":"◎","魏":"◆","?":"◇"};
+
+let tmpPath  = null;
+let heroData = [];
+
+// ── 工具 ──────────────────────────────────────
+function setStatus(id, msg, type) {
+    document.getElementById(id).innerHTML = msg
+        ? `<div class="status-bar ${type}">${msg}</div>` : '';
+}
+
+// ── 武将卡片 ──────────────────────────────────
+function renderHeroes(heroes) {
+    heroData = heroes;
+    const grid = document.getElementById('hero-grid');
+    const hint = document.getElementById('no-heroes-hint');
+    grid.innerHTML = '';
+
+    if (!heroes.length) { hint.style.display = ''; return; }
+    hint.style.display = 'none';
+
+    heroes.forEach(h => {
+        const fCls  = FACTION_CLASS[h.faction] || 'faction-other';
+        const fIcon = FACTION_ICON[h.faction_tag] || '◇';
+        const lvTxt = h.level ? `Lv.${h.level}` : '';
+        const isNew = h.discovered;
+
+        const card = document.createElement('div');
+        card.className = 'hero-card' + (isNew ? ' discovered-card' : '');
+        card.id = `hero-card-${h.id}`;
+        card.innerHTML = `
+          <div class="hero-card-header">
+            <div class="hero-name-block">
+              <div class="hero-name">${h.name}${isNew ? '<span class="tag-new">新发现</span>' : ''}</div>
+              <div class="hero-title">${h.title || ''}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+              <span class="faction-badge ${fCls}">${fIcon} ${h.faction}</span>
+              ${lvTxt ? `<span class="hero-level-badge">${lvTxt}</span>` : ''}
+            </div>
+          </div>
+          ${h.desc ? `<div class="hero-desc">${h.desc}</div>` : ''}
+          <div class="hero-points-row">
+            <span class="pts-label">技能点</span>
+            <input class="pts-input" type="number" id="pts-${h.id}"
+                   min="0" max="200" value="${h.points}"
+                   data-orig="${h.points}" data-id="${h.id}">
+            <div class="pts-bar-wrap">
+              <div class="pts-bar" id="bar-${h.id}"
+                   style="width:${Math.min(100,(h.points/Math.max(h.points,20))*100)}%"></div>
+            </div>
+            <span class="pts-hint" id="pts-hint-${h.id}">${h.points} 点</span>
+          </div>`;
+        grid.appendChild(card);
+
+        card.querySelector(`#pts-${h.id}`)
+            .addEventListener('input', e => onPtsChange(h.id, e.target));
+    });
+}
+
+function onPtsChange(id, inp) {
+    const orig = parseInt(inp.dataset.orig, 10);
+    const val  = parseInt(inp.value, 10) || 0;
+    inp.classList.toggle('changed', val !== orig);
+    document.getElementById(`hero-card-${id}`)?.classList.toggle('modified', val !== orig);
+    const bar = document.getElementById(`bar-${id}`);
+    const hero = heroData.find(h => h.id === id);
+    if (bar) bar.style.width = Math.min(100, val / Math.max(val, hero?.points || 1, 1) * 100) + '%';
+    const hint = document.getElementById(`pts-hint-${id}`);
+    if (hint) hint.textContent = val + ' 点';
+    updateBadge();
+}
+
+function updateBadge() {
+    const cnt = document.querySelectorAll('.hero-card.modified,.field-input.changed').length;
+    const b   = document.getElementById('hero-modified-badge');
+    b.textContent    = `已修改 ${cnt} 项`;
+    b.style.display  = cnt ? 'inline-block' : 'none';
+}
+
+// ── 全局字段 ──────────────────────────────────
+const GLOBAL_FIELDS = ['scene_days','map_x','map_y'];
+
+function populateGlobal(fields) {
+    GLOBAL_FIELDS.forEach(k => {
+        const el = document.getElementById('f-'+k);
+        if (el && fields[k] !== undefined) {
+            el.value = fields[k];
+            el.dataset.orig = fields[k];
+            el.classList.remove('changed');
+            el.addEventListener('input', () => {
+                el.classList.toggle('changed', String(el.value) !== String(el.dataset.orig));
+                updateBadge();
+            });
+        }
+    });
+}
+
+// ── 上传主存档 ────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInp  = document.getElementById('dat-file');
+
+dropZone.addEventListener('click', () => fileInp.click());
+['dragover','dragenter'].forEach(e => dropZone.addEventListener(e, ev => {
+    ev.preventDefault(); dropZone.classList.add('drag-over');
+}));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => {
+    ev.preventDefault(); dropZone.classList.remove('drag-over');
+    if (e === 'drop' && ev.dataTransfer.files[0]) upload(ev.dataTransfer.files[0]);
+}));
+fileInp.addEventListener('change', () => fileInp.files[0] && upload(fileInp.files[0]));
+
+async function upload(file) {
+    setStatus('upload-status','⏳ 解析中…','info');
+    const fd = new FormData(); fd.append('file', file);
+    try {
+        const r = await fetch('/api/sango3-save/parse', {method:'POST',body:fd});
+        const d = await r.json();
+        if (!d.ok) { setStatus('upload-status','❌ '+d.error,'error'); return; }
+        tmpPath = d.tmp;
+        populateGlobal(d.fields);
+        renderHeroes(d.heroes);
+        document.getElementById('edit-section').style.display = '';
+        setStatus('upload-status', `✅ 解析成功：${file.name}（检测到 ${d.heroes.length} 位队内武将）`, 'ok');
+    } catch(e) {
+        setStatus('upload-status','❌ '+e.message,'error');
+    }
+}
+
+// ── 保存 ──────────────────────────────────────
+document.getElementById('save-btn').addEventListener('click', async () => {
+    if (!tmpPath) return;
+    const patch = {};
+    GLOBAL_FIELDS.forEach(k => {
+        const el = document.getElementById('f-'+k);
+        if (el) patch[k] = parseInt(el.value,10)||0;
+    });
+    heroData.forEach(h => {
+        const el = document.getElementById(`pts-${h.id}`);
+        if (el) patch[h.id+'_points'] = parseInt(el.value,10)||0;
+    });
+    setStatus('save-status','⏳ 写入中…','info');
+    try {
+        const r = await fetch('/api/sango3-save/save',{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({tmp:tmpPath, fields:patch}),
+        });
+        const d = await r.json();
+        if (!d.ok) { setStatus('save-status','❌ '+(d.error||'失败'),'error'); return; }
+        const a = document.createElement('a');
+        a.href = d.download; a.download = 'save0.dat'; a.click();
+        setStatus('save-status',`✅ 下载完成（${d.size} bytes）`,'ok');
+        heroData.forEach(h => {
+            const el = document.getElementById(`pts-${h.id}`);
+            if (el){el.dataset.orig=el.value;el.classList.remove('changed');}
+            document.getElementById(`hero-card-${h.id}`)?.classList.remove('modified');
+        });
+        GLOBAL_FIELDS.forEach(k=>{const el=document.getElementById('f-'+k);if(el){el.dataset.orig=el.value;el.classList.remove('changed');}});
+        updateBadge();
+    } catch(e) { setStatus('save-status','❌ '+e.message,'error'); }
+});
+
+// ── 重置 ──────────────────────────────────────
+document.getElementById('reset-btn').addEventListener('click', () => {
+    heroData.forEach(h => {
+        const el = document.getElementById(`pts-${h.id}`);
+        if (el) { el.value=el.dataset.orig; el.classList.remove('changed'); onPtsChange(h.id,el); }
+    });
+    GLOBAL_FIELDS.forEach(k=>{const el=document.getElementById('f-'+k);if(el){el.value=el.dataset.orig;el.classList.remove('changed');}});
+    updateBadge();
+    setStatus('save-status','','');
+});
+
+// ── 折叠/展开「发现新武将」 ───────────────────
+document.getElementById('discover-toggle').addEventListener('click', () => {
+    const body  = document.getElementById('discover-body');
+    const arrow = document.getElementById('discover-arrow');
+    const open  = arrow.classList.toggle('open');
+    body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+    // 动态内容更新时重新计算
+    if (open) setTimeout(() => body.style.maxHeight = 'none', 350);
+});
+
+// ── 文件选择显示名称 ──────────────────────────
+['before','after'].forEach(tag => {
+    document.getElementById(`${tag}-file`).addEventListener('change', e => {
+        document.getElementById(`${tag}-name`).textContent =
+            e.target.files[0]?.name || '未选择';
+    });
+});
+
+// ── 差分分析 ──────────────────────────────────
+document.getElementById('discover-btn').addEventListener('click', async () => {
+    const bf = document.getElementById('before-file').files[0];
+    const af = document.getElementById('after-file').files[0];
+    const pts = parseInt(document.getElementById('discover-points').value,10)||0;
+
+    if (!bf || !af) {
+        setStatus('discover-status','⚠️ 请先选择「加入前」和「加入后」两个存档文件','warn');
+        return;
+    }
+    setStatus('discover-status','⏳ 分析中…','info');
+    document.getElementById('candidate-list').innerHTML = '';
+
+    const fd = new FormData();
+    fd.append('before', bf);
+    fd.append('after',  af);
+    fd.append('points', pts);
+
+    try {
+        const r = await fetch('/api/sango3-save/discover', {method:'POST', body:fd});
+        const d = await r.json();
+        if (!d.ok) { setStatus('discover-status','❌ '+d.error,'error'); return; }
+
+        const cands = d.candidates;
+        if (!cands.length) {
+            setStatus('discover-status','⚠️ 未找到候选槽位。请确认两个存档确实对应武将加入前后，且点数填写正确。','warn');
+            return;
+        }
+        setStatus('discover-status',
+            `✅ 找到 ${cands.length} 个候选槽位，请填写武将名称并保存`,
+            'ok');
+        renderCandidates(cands);
+
+        // 重新展开
+        const body = document.getElementById('discover-body');
+        body.style.maxHeight = 'none';
+    } catch(e) {
+        setStatus('discover-status','❌ '+e.message,'error');
+    }
+});
+
+function renderCandidates(cands) {
+    const list = document.getElementById('candidate-list');
+    list.innerHTML = cands.map((c,i) => `
+      <div class="candidate-item" id="cand-${i}">
+        <div class="offset">0x${c.ptr_off.toString(16).toUpperCase().padStart(5,'0')}</div>
+        <div class="candidate-meta">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input class="hero-name-input" id="cname-${i}" type="text"
+                   placeholder="武将名" maxlength="8">
+            <select class="faction-sel" id="cfac-${i}">
+              <option value="蜀" data-tag="蜀">桃园义勇（蜀）</option>
+              <option value="汉" data-tag="汉">汉廷官军（汉）</option>
+              <option value="吴" data-tag="吴">东吴（吴）</option>
+              <option value="魏" data-tag="魏">曹魏（魏）</option>
+              <option value="?" data-tag="?">其他/未知</option>
+            </select>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">
+            当前点数 ${c.points}，C常数 ${c.ptr_C}，指针 0x${(0xCA521F00|c.ptr_low).toString(16).toUpperCase()}
+          </div>
+        </div>
+        <button class="btn-primary" style="padding:5px 12px;font-size:12px;"
+                onclick="saveCandidate(${i},${JSON.stringify(c)})">
+          保存
+        </button>
+      </div>`
+    ).join('');
+}
+
+async function saveCandidate(i, c) {
+    const name = document.getElementById(`cname-${i}`).value.trim();
+    if (!name) { alert('请输入武将名称'); return; }
+    const selEl  = document.getElementById(`cfac-${i}`);
+    const facTag = selEl.options[selEl.selectedIndex].dataset.tag;
+    const facMap = {"蜀":"桃园义勇","汉":"汉廷官军","吴":"东吴","魏":"曹魏","?":"未知"};
+
+    const hero = {
+        id:          `discovered_${c.ptr_off.toString(16)}`,
+        name,
+        title:       "",
+        faction:     facMap[facTag] || "未知",
+        faction_tag: facTag,
+        desc:        "（用户发现）",
+        ptr_off:     c.ptr_off,
+        ptr_C:       c.ptr_C,
+        level_off:   null,
+        discovered:  true,
+    };
+    try {
+        const r = await fetch('/api/sango3-save/add-hero',{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(hero),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            document.getElementById(`cand-${i}`).style.background='#f0fdf4';
+            document.getElementById(`cand-${i}`).querySelector('button').textContent='✅ 已保存';
+            document.getElementById(`cand-${i}`).querySelector('button').disabled=true;
+        }
+    } catch(e) { alert('保存失败: '+e.message); }
+}
+</script>
+</body>
+</html>

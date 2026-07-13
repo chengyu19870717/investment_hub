@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量化参数 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <link rel="stylesheet" href="/static/css/data_standard.css">
+    <style>
+    .qp-layout { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+    .qp-header { display: flex; align-items: center; justify-content: space-between; }
+    .qp-summary {
+        background: var(--bg-card); border-radius: var(--radius); padding: 16px;
+        box-shadow: var(--shadow); display: flex; align-items: center; gap: 24px;
+    }
+    .qp-summary-item { text-align: center; }
+    .qp-summary-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .qp-summary-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .qp-weight-bar {
+        height: 8px; border-radius: 4px; background: var(--border);
+        overflow: hidden; margin-top: 8px; position: relative;
+    }
+    .qp-table-wrap { overflow-x: auto; }
+    .qp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .qp-table th, .qp-table td {
+        padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .qp-table th { background: var(--bg-page); font-weight: 600; color: var(--text-muted); font-size: 12px; }
+    .qp-table tbody tr.factor-row:hover { background: var(--bg-card-hover); }
+    .qp-actions { display: flex; gap: 4px; }
+    .qp-btn {
+        padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+        background: var(--bg-card); color: var(--text-secondary); font-size: 12px;
+        cursor: pointer; transition: background 0.15s, color 0.15s;
+    }
+    .qp-btn:hover { background: var(--bg-card-hover); }
+    .qp-btn--primary { color: var(--accent); border-color: var(--accent); }
+    .qp-btn--danger { color: #ff3b30; }
+    .qp-btn--danger:hover { background: #fff0ef; }
+    .qp-btn--expand { font-size: 11px; color: var(--text-muted); }
+    .qp-btn--expand.expanded { color: var(--accent); }
+    .qp-badge {
+        display: inline-block; padding: 2px 8px; border-radius: 4px;
+        font-size: 11px; font-weight: 600;
+    }
+    .qp-badge--active { background: #e8f5e9; color: #2e7d32; }
+    .qp-badge--inactive { background: #fce4ec; color: #c62828; }
+    .qp-total-warn { color: #ff3b30; font-size: 12px; font-weight: 600; }
+    .qp-total-ok { color: #34c759; font-size: 12px; font-weight: 600; }
+
+    /* 细项参数面板 */
+    .sub-row { display: none; }
+    .sub-row.open { display: table-row; }
+    .sub-panel-td { padding: 0 !important; border-bottom: 2px solid var(--accent) !important; }
+    .sub-panel-inner { padding: 8px 14px 14px 32px; background: var(--bg-page); }
+    .sub-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .sub-table th {
+        padding: 6px 10px; text-align: left; color: var(--text-muted);
+        font-weight: 600; font-size: 11px; border-bottom: 1px solid var(--border);
+    }
+    .sub-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+    .sub-table tr:last-child td { border-bottom: none; }
+    .sub-value-input {
+        width: 72px; padding: 3px 6px; border: 1px solid var(--border);
+        border-radius: 4px; font-size: 12px; text-align: center;
+        background: var(--bg-card); color: var(--text-primary);
+    }
+    .sub-value-input:focus { outline: none; border-color: var(--accent); }
+    .sub-save-btn {
+        padding: 3px 8px; border: 1px solid var(--accent); border-radius: 4px;
+        background: transparent; color: var(--accent); font-size: 11px;
+        cursor: pointer; transition: background 0.15s;
+    }
+    .sub-save-btn:hover { background: var(--accent); color: #fff; }
+    .sub-save-btn.saved { border-color: #34c759; color: #34c759; }
+    .sub-save-btn.error-state { border-color: #ff3b30; color: #ff3b30; }
+    .sync-bar {
+        background: var(--bg-card); border-radius: var(--radius); padding: 12px 16px;
+        box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px;
+    }
+    .sync-status { font-size: 12px; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+<div class="page page--wide">
+    <header class="header">
+        <div class="header-inner" style="display:flex;align-items:center;justify-content:space-between;">
+            {% if not embedded %}
+            <a href="/" class="back-btn">←</a>
+            {% else %}
+            <span style="width:28px;"></span>
+            {% endif %}
+            <span style="font-size:17px;font-weight:600;">量化参数</span>
+            <span style="width:28px;"></span>
+        </div>
+    </header>
+
+    <main class="main" style="padding:0;">
+        <div class="qp-layout">
+            <!-- Summary Cards -->
+            <div class="qp-summary">
+                <div class="qp-summary-item">
+                    <div class="qp-summary-value" id="totalWeight">0%</div>
+                    <div class="qp-summary-label">权重总和</div>
+                </div>
+                <div class="qp-summary-item">
+                    <div class="qp-summary-value" id="factorCount">0</div>
+                    <div class="qp-summary-label">因子数量</div>
+                </div>
+                <div class="qp-summary-item">
+                    <div class="qp-summary-value" id="activeCount">0</div>
+                    <div class="qp-summary-label">启用中</div>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">权重分配</div>
+                    <div class="qp-weight-bar" id="weightBar"></div>
+                </div>
+            </div>
+
+            <!-- 同步栏 -->
+            <div class="sync-bar">
+                <button class="btn-primary" id="btnSync" style="font-size:13px;">⇧ 同步到股神计划</button>
+                <span class="sync-status" id="syncStatus">将当前权重和细项参数写入 ~/Desktop/quant_trading/config/scorer_params.json</span>
+            </div>
+
+            <!-- Table -->
+            <div class="qp-header">
+                <button class="btn-primary" id="btnAddFactor">＋ 新增因子</button>
+                <span id="totalStatus"></span>
+            </div>
+            <div class="qp-table-wrap">
+                <table class="qp-table" id="factorTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>因子Key</th><th>因子名称</th><th>权重</th><th>描述</th><th>状态</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="factorTbody"></tbody>
+                </table>
+            </div>
+            <div id="emptyMsg" style="text-align:center;color:var(--text-muted);padding:48px 0;">暂无因子配置</div>
+        </div>
+    </main>
+</div>
+
+<!-- Modal: 因子编辑 -->
+<div class="ds-modal" id="factorModal">
+    <div class="ds-modal-backdrop"></div>
+    <div class="ds-modal-content">
+        <div class="ds-modal-header">
+            <h3 id="factorModalTitle">新增因子</h3>
+            <button class="ds-modal-close" data-close="factorModal">×</button>
+        </div>
+        <div class="ds-modal-body">
+            <input type="hidden" id="factorEditId">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:var(--text-muted);">因子Key *</label>
+                    <input type="text" id="factorKey" placeholder="如：technical" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-page);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:var(--text-muted);">因子名称 *</label>
+                    <input type="text" id="factorName" placeholder="如：技术面" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-page);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:var(--text-muted);">权重 (0~1) *</label>
+                    <input type="number" id="factorWeight" step="0.01" min="0" max="1" placeholder="0.30" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-page);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:var(--text-muted);">描述</label>
+                    <textarea id="factorDesc" rows="2" placeholder="因子说明" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg-page);color:var(--text-primary);resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:var(--text-muted);">
+                        <input type="checkbox" id="factorActive" checked> 启用
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 20px;border-top:1px solid var(--border);">
+            <button class="btn-secondary" data-close="factorModal">取消</button>
+            <button class="btn-primary" id="btnSaveFactor">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── 工具函数 ──────────────────────────────────────────────
+function qs(s) { return document.querySelector(s); }
+
+// 安全文本节点设置（避免 XSS）
+function setText(el, text) { if (el) el.textContent = text; }
+
+// 创建带 textContent 的元素
+function el(tag, props, text) {
+    const e = document.createElement(tag);
+    if (props) Object.assign(e, props);
+    if (text !== undefined) e.textContent = text;
+    return e;
+}
+
+// ── Modal 工具 ────────────────────────────────────────────
+function openModal(id) { const m = document.getElementById(id); if (m) m.classList.add('ds-modal--open'); }
+function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('ds-modal--open'); }
+
+qs('.ds-modal-backdrop')?.addEventListener('click', () => closeModal('factorModal'));
+document.querySelectorAll('[data-close]').forEach(btn =>
+    btn.addEventListener('click', () => closeModal(btn.dataset.close)));
+
+// ── 数据 ──────────────────────────────────────────────────
+let factors = [];
+let subParams = {};   // { factor_key: [{id, param_key, param_name, param_value, description}] }
+const COLORS = ['#007aff', '#ff9500', '#34c759', '#af52de', '#ff2d55', '#5ac8fa'];
+
+async function loadAll() {
+    const [fRes, spRes] = await Promise.all([
+        fetch('/api/factor-weights'),
+        fetch('/api/factor-sub-params'),
+    ]);
+    factors = await fRes.json();
+    subParams = await spRes.json();
+    renderTable();
+    updateSummary();
+}
+
+// ── 渲染主表 ──────────────────────────────────────────────
+function renderTable() {
+    const tbody = document.getElementById('factorTbody');
+    const emptyEl = document.getElementById('emptyMsg');
+    const table = document.getElementById('factorTable');
+
+    tbody.textContent = '';   // 清空
+
+    if (!factors.length) {
+        emptyEl.style.display = 'block';
+        table.style.display = 'none';
+        return;
+    }
+    emptyEl.style.display = 'none';
+    table.style.display = '';
+
+    factors.forEach((f, i) => {
+        const color = COLORS[i % COLORS.length];
+        const hasSub = (subParams[f.factor_key] || []).length > 0;
+
+        // 主数据行
+        const tr = document.createElement('tr');
+        tr.className = 'factor-row';
+
+        // 因子Key
+        const tdKey = document.createElement('td');
+        const code = el('code', {style: `color:${color}`}, f.factor_key);
+        tdKey.appendChild(code);
+        tr.appendChild(tdKey);
+
+        // 因子名称
+        const tdName = document.createElement('td');
+        tdName.appendChild(el('strong', null, f.factor_name));
+        tr.appendChild(tdName);
+
+        // 权重
+        const tdW = document.createElement('td');
+        const wSpan = el('span', {
+            style: 'font-size:14px;font-weight:600;color:var(--accent)'
+        }, (f.weight * 100).toFixed(0) + '%');
+        tdW.appendChild(wSpan);
+        tr.appendChild(tdW);
+
+        // 描述
+        const tdDesc = document.createElement('td');
+        tdDesc.style.cssText = 'max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        tdDesc.title = f.description || '';
+        tdDesc.textContent = f.description || '—';
+        tr.appendChild(tdDesc);
+
+        // 状态
+        const tdStatus = document.createElement('td');
+        const badge = el('span', {
+            className: 'qp-badge ' + (f.is_active ? 'qp-badge--active' : 'qp-badge--inactive')
+        }, f.is_active ? '启用' : '停用');
+        tdStatus.appendChild(badge);
+        tr.appendChild(tdStatus);
+
+        // 操作
+        const tdAct = document.createElement('td');
+        tdAct.className = 'qp-actions';
+
+        if (hasSub) {
+            const expandBtn = el('button', {
+                className: 'qp-btn qp-btn--expand',
+                id: `expand-btn-${f.id}`,
+            }, '▶ 细项');
+            expandBtn.addEventListener('click', () => toggleSub(f.id, f.factor_key));
+            tdAct.appendChild(expandBtn);
+        }
+
+        const editBtn = el('button', { className: 'qp-btn qp-btn--primary' }, '编辑');
+        editBtn.addEventListener('click', () => openFactorModal(f.id));
+        tdAct.appendChild(editBtn);
+
+        const delBtn = el('button', { className: 'qp-btn qp-btn--danger' }, '删除');
+        delBtn.addEventListener('click', () => deleteFactor(f.id));
+        tdAct.appendChild(delBtn);
+
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+
+        // 细项展开行
+        if (hasSub) {
+            const subTr = document.createElement('tr');
+            subTr.className = 'sub-row';
+            subTr.id = `sub-${f.id}`;
+
+            const subTd = document.createElement('td');
+            subTd.className = 'sub-panel-td';
+            subTd.colSpan = 6;
+
+            const inner = document.createElement('div');
+            inner.className = 'sub-panel-inner';
+            buildSubTable(inner, f.factor_key, color);
+            subTd.appendChild(inner);
+            subTr.appendChild(subTd);
+            tbody.appendChild(subTr);
+        }
+    });
+}
+
+function buildSubTable(container, factorKey, color) {
+    const items = subParams[factorKey] || [];
+    if (!items.length) {
+        container.appendChild(el('span', {style: 'color:var(--text-muted);font-size:12px;'}, '暂无细项参数'));
+        return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'sub-table';
+
+    // 表头
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+    ['参数Key', '名称', '说明', '当前值', ''].forEach((h, idx) => {
+        const th = el('th', null, h);
+        if (idx === 0) th.style.color = color;
+        htr.appendChild(th);
+    });
+    thead.appendChild(htr);
+    table.appendChild(thead);
+
+    // 表体
+    const tbody = document.createElement('tbody');
+    items.forEach(p => {
+        const tr = document.createElement('tr');
+
+        const tdPk = document.createElement('td');
+        tdPk.style.cssText = 'color:var(--text-muted);font-family:monospace;';
+        tdPk.textContent = p.param_key;
+        tr.appendChild(tdPk);
+
+        tr.appendChild(el('td', null, p.param_name));
+
+        const tdDesc = document.createElement('td');
+        tdDesc.style.cssText = 'color:var(--text-muted);font-size:11px;max-width:200px;';
+        tdDesc.textContent = p.description || '';
+        tr.appendChild(tdDesc);
+
+        const tdVal = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'sub-value-input';
+        input.id = `sp-${p.id}`;
+        input.value = p.param_value;
+        input.step = '1';
+        input.min = '0';
+        tdVal.appendChild(input);
+        tr.appendChild(tdVal);
+
+        const tdBtn = document.createElement('td');
+        const btn = el('button', {className: 'sub-save-btn', id: `sp-btn-${p.id}`}, '保存');
+        btn.addEventListener('click', () => saveSubParam(p.id));
+        tdBtn.appendChild(btn);
+        tr.appendChild(tdBtn);
+
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+function toggleSub(factorId, factorKey) {
+    const panel = document.getElementById(`sub-${factorId}`);
+    const btn = document.getElementById(`expand-btn-${factorId}`);
+    const isOpen = panel.classList.contains('open');
+
+    // 关闭所有
+    document.querySelectorAll('.sub-row.open').forEach(r => r.classList.remove('open'));
+    document.querySelectorAll('.qp-btn--expand.expanded').forEach(b => {
+        b.classList.remove('expanded');
+        b.textContent = '▶ 细项';
+    });
+
+    if (!isOpen) {
+        panel.classList.add('open');
+        btn.classList.add('expanded');
+        btn.textContent = '▼ 细项';
+    }
+}
+
+// ── 细项保存 ──────────────────────────────────────────────
+async function saveSubParam(pid) {
+    const input = document.getElementById(`sp-${pid}`);
+    const btn = document.getElementById(`sp-btn-${pid}`);
+    const val = parseFloat(input.value);
+    if (isNaN(val) || val < 0) { input.style.borderColor = '#ff3b30'; return; }
+    input.style.borderColor = '';
+    btn.textContent = '保存中…';
+    btn.disabled = true;
+    try {
+        const res = await fetch(`/api/factor-sub-params/${pid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ param_value: val }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || '失败');
+        btn.textContent = '✓ 已保存';
+        btn.className = 'sub-save-btn saved';
+        // 更新本地缓存
+        for (const items of Object.values(subParams)) {
+            const item = items.find(x => x.id === pid);
+            if (item) { item.param_value = val; break; }
+        }
+        setTimeout(() => { btn.textContent = '保存'; btn.className = 'sub-save-btn'; btn.disabled = false; }, 1500);
+    } catch (e) {
+        btn.textContent = '✗ 失败';
+        btn.className = 'sub-save-btn error-state';
+        setTimeout(() => { btn.textContent = '保存'; btn.className = 'sub-save-btn'; btn.disabled = false; }, 1500);
+    }
+}
+
+// ── Summary ───────────────────────────────────────────────
+function updateSummary() {
+    const total = factors.reduce((s, f) => s + (f.weight || 0), 0);
+    const totalPct = (total * 100).toFixed(0);
+    setText(document.getElementById('totalWeight'), totalPct + '%');
+    setText(document.getElementById('factorCount'), factors.length);
+    setText(document.getElementById('activeCount'), factors.filter(f => f.is_active).length);
+
+    // 权重条（纯色块，无用户内容）
+    const bar = document.getElementById('weightBar');
+    bar.textContent = '';
+    let offset = 0;
+    factors.forEach((f, i) => {
+        const w = (f.weight || 0) * 100;
+        if (w > 0) {
+            const div = document.createElement('div');
+            div.style.cssText = `position:absolute;left:${offset}%;width:${w}%;height:100%;background:${COLORS[i % COLORS.length]};`;
+            bar.appendChild(div);
+            offset += w;
+        }
+    });
+
+    const statusEl = document.getElementById('totalStatus');
+    if (Math.abs(total - 1.0) < 0.001) {
+        const span = el('span', {className: 'qp-total-ok'}, '✅ 权重总和 = 100%');
+        statusEl.textContent = '';
+        statusEl.appendChild(span);
+    } else {
+        const span = el('span', {className: 'qp-total-warn'}, `⚠️ 权重总和 ${totalPct}%（应为 100%）`);
+        statusEl.textContent = '';
+        statusEl.appendChild(span);
+    }
+}
+
+// ── 因子编辑 ──────────────────────────────────────────────
+function openFactorModal(id) {
+    document.getElementById('factorEditId').value = '';
+    document.getElementById('factorKey').value = '';
+    document.getElementById('factorName').value = '';
+    document.getElementById('factorWeight').value = '';
+    document.getElementById('factorDesc').value = '';
+    document.getElementById('factorActive').checked = true;
+    document.getElementById('factorModalTitle').textContent = id ? '编辑因子' : '新增因子';
+    document.getElementById('factorKey').disabled = !!id;
+
+    if (id) {
+        const f = factors.find(x => x.id === id);
+        if (!f) return;
+        document.getElementById('factorEditId').value = f.id;
+        document.getElementById('factorKey').value = f.factor_key;
+        document.getElementById('factorName').value = f.factor_name;
+        document.getElementById('factorWeight').value = f.weight;
+        document.getElementById('factorDesc').value = f.description || '';
+        document.getElementById('factorActive').checked = !!f.is_active;
+    }
+    openModal('factorModal');
+}
+
+document.getElementById('btnSaveFactor').addEventListener('click', async () => {
+    const editId = document.getElementById('factorEditId').value;
+    const factorKey = (document.getElementById('factorKey').value || '').trim();
+    const factorName = (document.getElementById('factorName').value || '').trim();
+    const weight = parseFloat(document.getElementById('factorWeight').value);
+    if (!factorKey || !factorName) { alert('请填写因子Key和名称'); return; }
+    if (isNaN(weight) || weight < 0 || weight > 1) { alert('权重必须在 0~1 之间'); return; }
+
+    const body = {
+        factor_name: factorName,
+        weight: weight,
+        description: (document.getElementById('factorDesc').value || '').trim(),
+        is_active: document.getElementById('factorActive').checked ? 1 : 0,
+    };
+
+    try {
+        let res;
+        if (editId) {
+            res = await fetch('/api/factor-weights/' + editId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+        } else {
+            res = await fetch('/api/factor-weights', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ factor_key: factorKey, ...body }),
+            });
+        }
+        if (!res.ok) {
+            const err = await res.json();
+            alert('保存失败：' + (err.error || '未知错误'));
+            return;
+        }
+        closeModal('factorModal');
+        await loadAll();
+    } catch (e) {
+        alert('请求失败：' + e.message);
+    }
+});
+
+async function deleteFactor(id) {
+    if (!confirm('确认删除该因子？')) return;
+    try {
+        const res = await fetch('/api/factor-weights/' + id, { method: 'DELETE' });
+        if (!res.ok) { const err = await res.json(); alert('删除失败：' + (err.error || '')); return; }
+        await loadAll();
+    } catch (e) { alert('删除失败：' + e.message); }
+}
+
+document.getElementById('btnAddFactor').addEventListener('click', () => openFactorModal(null));
+
+// ── 同步到股神计划 ────────────────────────────────────────
+document.getElementById('btnSync').addEventListener('click', async () => {
+    const btn = document.getElementById('btnSync');
+    const status = document.getElementById('syncStatus');
+    btn.disabled = true;
+    btn.textContent = '同步中…';
+    try {
+        const res = await fetch('/api/factor-sub-params/sync', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || '失败');
+        status.textContent = `✅ 已同步到 ${data.path}`;
+        status.style.color = '#34c759';
+    } catch (e) {
+        status.textContent = '❌ 同步失败：' + e.message;
+        status.style.color = '#ff3b30';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⇧ 同步到股神计划';
+    }
+});
+
+// ── 初始化 ────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>

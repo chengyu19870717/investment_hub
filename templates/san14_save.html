@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国志14 存档修改器 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        /* ── 文件选择器 ── */
+        .pick-panel { border:1px solid var(--border,#e0e0e0); border-radius:8px; background:#fff; padding:14px; }
+        .pick-head { display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:end; }
+        .pick-hint { font-size:12px; color:var(--text-muted); margin-top:8px; }
+        .file-picker { margin-top:14px; border:1px solid var(--border,#e0e0e0); border-radius:8px; overflow:hidden; background:#fff; }
+        .picker-bar { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:10px; background:var(--bg-main,#f7f7f7); border-bottom:1px solid var(--border,#e0e0e0); }
+        .picker-roots { display:flex; flex-wrap:wrap; gap:8px; padding:10px; border-bottom:1px solid var(--border,#f0f0f0); }
+        .picker-root, .picker-nav-btn { border:1px solid var(--border,#d8d8d8); background:#fff; border-radius:6px; padding:7px 10px; font-size:12px; color:var(--text-primary); cursor:pointer; }
+        .picker-root:hover, .picker-nav-btn:hover { background:#f5f8ff; border-color:var(--accent,#4f8ef7); }
+        .picker-list { max-height:320px; overflow:auto; }
+        .picker-entry { display:grid; grid-template-columns:1fr auto; gap:12px; width:100%; border:0; border-bottom:1px solid var(--border,#f0f0f0); background:#fff; padding:10px 12px; text-align:left; cursor:pointer; color:var(--text-primary); }
+        .picker-entry:hover { background:#f5f8ff; }
+        .picker-entry:last-child { border-bottom:0; }
+        .picker-entry.is-file .picker-name { color:var(--accent,#4f8ef7); }
+        .picker-name { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .picker-meta { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+        .picker-empty { padding:24px 12px; text-align:center; color:var(--text-muted); font-size:13px; }
+
+        /* ── 状态条 ── */
+        .status-bar { padding:9px 13px; border-radius:8px; font-size:13px; margin-top:8px; }
+        .status-bar.info  { background:#e8f0fe; color:#1a56db; }
+        .status-bar.ok    { background:#e3fcec; color:#166534; }
+        .status-bar.error { background:#fde8e8; color:#991b1b; }
+        .status-bar.warn  { background:#fef3c7; color:#92400e; }
+
+        /* ── 表单字段 ── */
+        .field-row { display:flex; flex-direction:column; gap:5px; }
+        .field-label { font-size:12px; color:var(--text-muted); font-weight:500; }
+        .field-input { padding:8px 12px; background:var(--bg-main,#f5f5f5); border:1.5px solid var(--border,#e0e0e0); border-radius:8px; font-size:14px; color:var(--text-primary); width:100%; box-sizing:border-box; }
+        .field-input:focus { outline:none; border-color:var(--accent,#4f8ef7); }
+        .field-input[readonly] { color:var(--text-muted); }
+
+        /* ── 城市表格 ── */
+        .section-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:10px; }
+        .city-table-wrap { overflow-x:auto; }
+        table.ct { width:100%; border-collapse:collapse; font-size:13px; }
+        table.ct th { text-align:center; padding:8px 6px; background:var(--bg-main,#f8f8f8); color:var(--text-muted); font-weight:600; font-size:12px; border-bottom:2px solid var(--border,#e0e0e0); white-space:nowrap; }
+        table.ct th.col-name { text-align:left; padding-left:12px; }
+        table.ct td { padding:6px 4px; border-bottom:1px solid var(--border,#f0f0f0); vertical-align:middle; }
+        table.ct tr:last-child td { border-bottom:none; }
+        table.ct tr.modified { background:#fffdf0; }
+        table.ct tr:hover td { background:#f5f8ff; }
+        table.ct tr.modified:hover td { background:#fff9e0; }
+        td.col-city { font-weight:600; padding-left:12px; white-space:nowrap; cursor:text; }
+        .city-name-edit { display:inline-flex; align-items:center; gap:4px; }
+        .city-name-text { }
+        .city-name-inp  { display:none; padding:2px 6px; border:1.5px solid var(--accent,#4f8ef7); border-radius:5px; font-size:13px; font-weight:600; width:80px; }
+        .city-name-edit.editing .city-name-text { display:none; }
+        .city-name-edit.editing .city-name-inp  { display:inline-block; }
+        .edit-name-btn { opacity:0; font-size:10px; color:var(--text-muted); background:none; border:none; cursor:pointer; padding:0 2px; transition:opacity .15s; }
+        tr:hover .edit-name-btn { opacity:1; }
+        td.col-val  { text-align:center; }
+        .num-inp { width:90px; padding:5px 6px; border:1.5px solid transparent; border-radius:6px; font-size:13px; text-align:center; background:transparent; color:var(--text-primary); box-sizing:border-box; transition:border-color .15s, background .15s; }
+        .num-inp:hover  { border-color:var(--border,#e0e0e0); background:#fff; }
+        .num-inp:focus  { outline:none; border-color:var(--accent,#4f8ef7); background:#fff; }
+        .num-inp.changed { border-color:#f59e0b !important; background:#fffbea !important; }
+        td.col-reset { width:44px; text-align:center; }
+        .btn-reset-row { font-size:11px; padding:3px 8px; border:1px solid var(--border,#ddd); border-radius:6px; background:#fff; color:var(--text-muted); cursor:pointer; display:none; }
+        .btn-reset-row:hover { background:#f5f5f5; }
+        tr.modified .btn-reset-row { display:inline-block; }
+
+        /* ── 武将占位区 ── */
+        .warrior-placeholder { padding:32px 16px; text-align:center; color:var(--text-muted); border:2px dashed var(--border,#e0e0e0); border-radius:8px; }
+        .warrior-placeholder strong { display:block; font-size:14px; margin-bottom:6px; color:var(--text-primary); }
+        .warrior-placeholder span { font-size:12px; }
+
+        /* ── 页脚按钮 ── */
+        .modified-badge { display:inline-block; font-size:11px; padding:2px 8px; background:#fef3c7; color:#92400e; border-radius:10px; margin-left:8px; font-weight:normal; }
+        .btn-row { display:flex; gap:10px; margin-top:16px; }
+        .backup-info { font-size:12px; color:var(--text-muted); margin-top:8px; padding:8px 12px; background:var(--bg-main,#f5f5f5); border-radius:6px; }
+
+        /* ── 差分工具（折叠） ── */
+        .advanced-toggle { cursor:pointer; font-size:12px; color:var(--text-muted); margin-top:20px; display:flex; align-items:center; gap:6px; user-select:none; }
+        .advanced-toggle:hover { color:var(--text-primary); }
+        .advanced-body { display:none; margin-top:12px; }
+        .advanced-body.open { display:block; }
+        .diff-inputs { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px; }
+        .diff-input-group { flex:1; min-width:200px; display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--text-muted); }
+        .diff-result { margin-top:10px; font-size:13px; color:var(--text-primary); }
+        .diff-result.is-visible { display:block; }
+        .region-card { border:1px solid var(--border,#e8e8e8); border-radius:6px; margin-bottom:8px; overflow:hidden; }
+        .region-header { display:flex; gap:10px; align-items:center; padding:8px 12px; background:var(--bg-main,#f8f8f8); cursor:pointer; font-size:13px; }
+        .region-offset { font-family:monospace; font-size:11px; color:var(--accent,#4f8ef7); background:#e8f0fe; padding:2px 6px; border-radius:4px; }
+        .region-body { display:none; padding:10px 12px; }
+        .region-body.open { display:block; }
+        .region-hex { font-family:monospace; font-size:11px; color:var(--text-muted); padding:4px 0; }
+        .interp-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+        .interp-table th { text-align:left; padding:4px 6px; background:var(--bg-main,#f5f5f5); color:var(--text-muted); font-weight:600; border-bottom:1px solid var(--border,#e0e0e0); }
+        .interp-table td { padding:4px 6px; border-bottom:1px solid var(--border,#f0f0f0); }
+        .delta-pos { color:#166534; font-weight:600; }
+        .delta-neg { color:#991b1b; font-weight:600; }
+        .diff-summary { font-size:12px; color:var(--text-muted); margin-bottom:8px; }
+
+        @media (max-width:900px) {
+            .pick-head, .picker-bar { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">⚔️</span>
+                    <span class="logo-text">三国志14 存档修改器</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- 第一步：选择存档 -->
+        <div class="section-label">第一步：选择存档文件</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <div class="pick-panel">
+                    <div class="pick-head">
+                        <button id="choose-file-btn" class="btn-primary" type="button">打开目录选择存档</button>
+                        <div class="field-row">
+                            <label class="field-label" for="source-path">当前存档完整路径</label>
+                            <input class="field-input" type="text" id="source-path" readonly placeholder="尚未选择存档文件">
+                        </div>
+                    </div>
+                    <div class="pick-hint">选择 .s14 存档文件后将自动解析；修改后的存档保存到同级 <code>new/</code> 目录，原文件不受影响。</div>
+                    <div id="file-picker" class="file-picker" style="display:none;">
+                        <div class="picker-roots" id="picker-roots"></div>
+                        <div class="picker-bar">
+                            <button id="picker-up-btn" class="picker-nav-btn" type="button">上级目录</button>
+                            <input id="picker-path" class="field-input" type="text" readonly>
+                            <button id="picker-refresh-btn" class="picker-nav-btn" type="button">刷新</button>
+                        </div>
+                        <div id="picker-list" class="picker-list"></div>
+                    </div>
+                </div>
+                <div id="parse-status"></div>
+            </div>
+        </div>
+
+        <!-- 第二步：城市资源 -->
+        <div id="city-section" style="display:none;">
+            <div class="section-label" style="margin-top:24px;">
+                第二步：修改城市资源
+                <span id="city-modified-badge" class="modified-badge" style="display:none;"></span>
+            </div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                        <div class="section-title" style="margin-bottom:0;">城池 · 资金 / 军粮 / 士兵</div>
+                        <input type="text" id="city-search" placeholder="搜索城市名…" autocomplete="off"
+                               style="padding:6px 10px;border:1.5px solid var(--border,#e0e0e0);border-radius:8px;font-size:13px;background:var(--bg-main,#f5f5f5);color:var(--text-primary);width:160px;">
+                        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);cursor:pointer;">
+                            <input type="checkbox" id="show-empty-chk"> 显示空城
+                        </label>
+                        <span id="city-count" style="font-size:12px;color:var(--text-muted);margin-left:auto;"></span>
+                    </div>
+                    <div class="city-table-wrap">
+                        <table class="ct">
+                            <thead>
+                                <tr>
+                                    <th style="width:36px;text-align:center;">#</th>
+                                    <th class="col-name">城池</th>
+                                    <th style="width:36px;text-align:center;font-size:11px;">势力</th>
+                                    <th>资金</th>
+                                    <th>军粮</th>
+                                    <th>士兵</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="city-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三步：武将属性（暂未实现） -->
+        <div id="warrior-section" style="display:none;">
+            <div class="section-label" style="margin-top:24px;">第三步：修改武将属性（开发中）</div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div class="warrior-placeholder">
+                        <strong>武将五维编辑即将上线</strong>
+                        <span>需进一步分析存档格式（训练增量字段定位中）。<br>
+                        如需加速此功能，请准备：游戏内训练某武将 2-3 次后立即保存，提供前后两份存档。</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 保存 -->
+        <div id="save-section" style="display:none; margin-top:4px;">
+            <div class="btn-row">
+                <button id="save-btn" class="btn-primary" style="flex:1;">💾 生成修改后的存档</button>
+                <button id="reset-all-btn" class="btn-secondary">重置全部</button>
+            </div>
+            <div id="save-status"></div>
+            <div id="save-info" class="backup-info" style="display:none;"></div>
+        </div>
+
+        <!-- 高级：差分分析（折叠） -->
+        <div id="advanced-section" style="display:none; margin-top:20px;">
+            <div class="advanced-toggle" id="advanced-toggle">
+                <span id="advanced-arrow">▶</span> 高级工具：差分分析
+            </div>
+            <div class="advanced-body" id="advanced-body">
+                <div class="card" style="display:block;">
+                    <div class="card-body" style="display:block;">
+                        <div class="section-title">对比两份存档，自动定位变化字段</div>
+                        <div class="diff-inputs">
+                            <div class="diff-input-group">
+                                <label>存档 A（改变前）</label>
+                                <input class="field-input" id="diff-file-a" type="text" placeholder="粘贴 .s14 路径">
+                            </div>
+                            <div class="diff-input-group">
+                                <label>存档 B（改变后）</label>
+                                <input class="field-input" id="diff-file-b" type="text" placeholder="粘贴 .s14 路径">
+                            </div>
+                            <button class="btn-primary" id="diff-btn" type="button" style="align-self:flex-end">开始分析</button>
+                        </div>
+                        <div class="diff-result" id="diff-result"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+// ── 状态 ──────────────────────────────────────────────────
+let currentFilePath = '';
+let cityOrigData = null;    // {anchor, cities: [{name,abs,zijin,junliang,shidao}]}
+let cityChanges  = {};      // {abs: {zijin?, junliang?, shidao?}}
+let pickerPath   = '';
+let pickerParent = '';
+
+// ── 工具函数 ──────────────────────────────────────────────
+function formatBytes(n) {
+    n = Number(n || 0);
+    if (n >= 1024*1024) return (n/1024/1024).toFixed(1)+' MB';
+    if (n >= 1024) return (n/1024).toFixed(1)+' KB';
+    return n+' B';
+}
+function formatTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    return d.toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function basename(p) { return String(p||'').split(/[\\/]/).filter(Boolean).pop() || p; }
+
+function showStatus(elId, type, text) {
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    const bar = document.createElement('div');
+    bar.className = 'status-bar ' + type;
+    bar.textContent = text;
+    el.appendChild(bar);
+}
+function clearStatus(elId) { document.getElementById(elId).innerHTML = ''; }
+
+// ── 文件选择器 ────────────────────────────────────────────
+const chooseFileBtn   = document.getElementById('choose-file-btn');
+const sourcePathInput = document.getElementById('source-path');
+const filePicker      = document.getElementById('file-picker');
+const pickerRoots     = document.getElementById('picker-roots');
+const pickerPathInput = document.getElementById('picker-path');
+const pickerListEl    = document.getElementById('picker-list');
+const pickerUpBtn     = document.getElementById('picker-up-btn');
+const pickerRefreshBtn= document.getElementById('picker-refresh-btn');
+
+function renderPicker(data) {
+    pickerPath   = data.path || '';
+    pickerParent = data.parent || '';
+    pickerPathInput.value = pickerPath;
+
+    pickerRoots.innerHTML = '';
+    (data.roots || []).forEach(root => {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'picker-root';
+        btn.textContent = root.name;
+        btn.addEventListener('click', () => loadPicker(root.path));
+        pickerRoots.appendChild(btn);
+    });
+
+    pickerListEl.innerHTML = '';
+    const dirs  = data.dirs  || [];
+    const files = data.files || [];
+    if (!dirs.length && !files.length) {
+        pickerListEl.innerHTML = '<div class="picker-empty">当前目录没有子目录或 .s14 存档</div>';
+        return;
+    }
+    dirs.forEach(dir => {
+        const row = document.createElement('button');
+        row.type = 'button'; row.className = 'picker-entry';
+        row.innerHTML = `<span class="picker-name">📁 ${dir.name}</span><span class="picker-meta">目录</span>`;
+        row.addEventListener('click', () => loadPicker(dir.path));
+        pickerListEl.appendChild(row);
+    });
+    files.forEach(file => {
+        const row = document.createElement('button');
+        row.type = 'button'; row.className = 'picker-entry is-file';
+        row.innerHTML = `<span class="picker-name">📄 ${file.name}</span><span class="picker-meta">${formatBytes(file.size)} · ${formatTime(file.mtime)}</span>`;
+        row.addEventListener('click', () => selectFile(file.path));
+        pickerListEl.appendChild(row);
+    });
+}
+
+async function loadPicker(path) {
+    filePicker.style.display = 'block';
+    pickerListEl.innerHTML = '<div class="picker-empty">正在读取…</div>';
+    try {
+        const qs = path ? '?path=' + encodeURIComponent(path) : '';
+        const res = await fetch('/api/san14/browse' + qs);
+        const data = await res.json();
+        if (!res.ok) { pickerListEl.innerHTML = '<div class="picker-empty">' + (data.error||'读取失败') + '</div>'; return; }
+        renderPicker(data);
+    } catch(e) {
+        pickerListEl.innerHTML = '<div class="picker-empty">网络错误：' + e.message + '</div>';
+    }
+}
+
+chooseFileBtn.addEventListener('click', () => {
+    const dir = currentFilePath ? currentFilePath.replace(/[\\/][^\\/]*$/, '') : '';
+    loadPicker(dir);
+});
+pickerRefreshBtn.addEventListener('click', () => loadPicker(pickerPath));
+pickerUpBtn.addEventListener('click', () => { if (pickerParent) loadPicker(pickerParent); });
+
+// ── 解析存档 ──────────────────────────────────────────────
+async function selectFile(path) {
+    filePicker.style.display = 'none';
+    currentFilePath = path;
+    sourcePathInput.value = path;
+    hideSections();
+    showStatus('parse-status', 'info', '正在解析 ' + basename(path) + '…');
+    try {
+        const res = await fetch('/api/san14/cities?file=' + encodeURIComponent(path));
+        const data = await res.json();
+        if (!res.ok) { showStatus('parse-status','error','❌ ' + (data.error||'解析失败')); return; }
+        cityOrigData = data;
+        cityChanges  = {};
+        renderCityTable(data.cities);
+        showStatus('parse-status','ok',
+            '解析成功：' + basename(path) + '，共找到 ' + data.cities.length + ' 座城池');
+        ['city-section','warrior-section','save-section','advanced-section'].forEach(
+            id => document.getElementById(id).style.display = 'block');
+        updateBadge();
+    } catch(e) {
+        showStatus('parse-status','error','❌ 网络错误：' + e.message);
+    }
+}
+
+function hideSections() {
+    ['city-section','warrior-section','save-section','advanced-section'].forEach(
+        id => document.getElementById(id).style.display = 'none');
+    clearStatus('save-status');
+    document.getElementById('save-info').style.display = 'none';
+}
+
+// ── 城市表格 ──────────────────────────────────────────────
+const cityTbody    = document.getElementById('city-tbody');
+const citySearch   = document.getElementById('city-search');
+const showEmptyChk = document.getElementById('show-empty-chk');
+const cityCountEl  = document.getElementById('city-count');
+
+// 势力颜色（pre 0-15 对应不同颜色）
+const PRE_COLORS = ['#aaa','#e07b54','#c8a020','#5a9a3c','#4f8ef7','#9b5de5','#e04040','#d47f2a','#2ec4b6','#e91e8c','#607d8b','#4caf50','#ff9800','#795548','#009688','#673ab7'];
+
+function renderCityTable(cities) {
+    cityTbody.innerHTML = '';
+    const showEmpty = showEmptyChk.checked;
+    const keyword   = citySearch.value.trim().toLowerCase();
+    let visible = 0;
+
+    cities.forEach(city => {
+        // 过滤：空城默认隐藏
+        if (city.empty && !showEmpty) return;
+        // 过滤：关键字搜索
+        if (keyword && !city.name.toLowerCase().includes(keyword)) return;
+
+        visible++;
+        const tr = document.createElement('tr');
+        tr.id = 'city-row-' + city.abs;
+        tr.dataset.abs = city.abs;
+        if (city.empty) tr.style.opacity = '0.5';
+
+        function makeCell(field, origVal) {
+            const td = document.createElement('td');
+            td.className = 'col-val';
+            const inp = document.createElement('input');
+            inp.type = 'number'; inp.min = 0; inp.max = 9999999;
+            inp.className = 'num-inp'; inp.value = origVal;
+            inp.addEventListener('input', () => {
+                const newVal = parseInt(inp.value) || 0;
+                if (!cityChanges[city.abs]) cityChanges[city.abs] = {};
+                if (newVal === origVal) {
+                    delete cityChanges[city.abs][field];
+                    if (!Object.keys(cityChanges[city.abs]).length) delete cityChanges[city.abs];
+                } else {
+                    cityChanges[city.abs][field] = newVal;
+                }
+                inp.classList.toggle('changed', newVal !== origVal);
+                tr.classList.toggle('modified', !!cityChanges[city.abs]);
+                updateBadge();
+            });
+            td.appendChild(inp);
+            return { td, inp };
+        }
+
+        const tdIdx = document.createElement('td');
+        tdIdx.style.cssText = 'text-align:center;color:var(--text-muted);font-size:11px;';
+        tdIdx.textContent = city.slot;
+
+        const nameCell = document.createElement('td');
+        nameCell.className = 'col-city';
+        const nameWrap = document.createElement('span');
+        nameWrap.className = 'city-name-edit';
+        const nameText = document.createElement('span');
+        nameText.className = 'city-name-text';
+        nameText.textContent = city.name;
+        const nameInp = document.createElement('input');
+        nameInp.className = 'city-name-inp';
+        nameInp.type = 'text'; nameInp.maxLength = 8;
+        nameInp.value = city.name;
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button'; editBtn.className = 'edit-name-btn';
+        editBtn.textContent = '✎'; editBtn.title = '编辑城市名';
+
+        function startEditName() {
+            nameWrap.classList.add('editing');
+            nameInp.value = nameText.textContent;
+            nameInp.focus(); nameInp.select();
+        }
+        function commitEditName() {
+            const newName = nameInp.value.trim() || city.name;
+            nameText.textContent = newName;
+            nameWrap.classList.remove('editing');
+            city.name = newName;
+            const rel = city.abs - cityOrigData.anchor;
+            fetch('/api/san14/city-names', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ updates: { [rel]: newName } })
+            });
+        }
+        editBtn.addEventListener('click', startEditName);
+        nameText.addEventListener('dblclick', startEditName);
+        nameInp.addEventListener('blur', commitEditName);
+        nameInp.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); nameInp.blur(); }
+            if (e.key === 'Escape') { nameWrap.classList.remove('editing'); }
+        });
+        nameWrap.appendChild(nameText); nameWrap.appendChild(nameInp); nameWrap.appendChild(editBtn);
+        nameCell.appendChild(nameWrap);
+
+        const tdPre = document.createElement('td');
+        tdPre.style.cssText = 'text-align:center;';
+        const dot = document.createElement('span');
+        dot.style.cssText = `display:inline-block;width:10px;height:10px;border-radius:50%;background:${PRE_COLORS[city.pre] || '#ccc'};`;
+        dot.title = `势力ID: ${city.pre}`;
+        tdPre.appendChild(dot);
+
+        const { td: tdZ, inp: inpZ } = makeCell('zijin',    city.zijin);
+        const { td: tdJ, inp: inpJ } = makeCell('junliang', city.junliang);
+        const { td: tdS, inp: inpS } = makeCell('shidao',   city.shidao);
+
+        const tdR = document.createElement('td');
+        tdR.className = 'col-reset';
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button'; resetBtn.className = 'btn-reset-row';
+        resetBtn.textContent = '重置';
+        resetBtn.addEventListener('click', () => {
+            inpZ.value = city.zijin;   inpZ.classList.remove('changed');
+            inpJ.value = city.junliang; inpJ.classList.remove('changed');
+            inpS.value = city.shidao;  inpS.classList.remove('changed');
+            delete cityChanges[city.abs]; tr.classList.remove('modified');
+            updateBadge();
+        });
+        tdR.appendChild(resetBtn);
+
+        tr.appendChild(tdIdx); tr.appendChild(nameCell); tr.appendChild(tdPre);
+        tr.appendChild(tdZ); tr.appendChild(tdJ); tr.appendChild(tdS);
+        tr.appendChild(tdR);
+        cityTbody.appendChild(tr);
+    });
+
+    const total = cities.length;
+    const empty = cities.filter(c => c.empty).length;
+    cityCountEl.textContent = `显示 ${visible} / ${total} 城（含空城 ${empty} 座）`;
+}
+
+citySearch.addEventListener('input',   () => cityOrigData && renderCityTable(cityOrigData.cities));
+showEmptyChk.addEventListener('change', () => cityOrigData && renderCityTable(cityOrigData.cities));
+
+function updateBadge() {
+    const count = Object.keys(cityChanges).length;
+    const badge = document.getElementById('city-modified-badge');
+    if (count > 0) { badge.style.display = ''; badge.textContent = count + ' 项已修改'; }
+    else badge.style.display = 'none';
+}
+
+// ── 重置全部 ──────────────────────────────────────────────
+document.getElementById('reset-all-btn').addEventListener('click', () => {
+    if (!cityOrigData) return;
+    cityChanges = {};
+    renderCityTable(cityOrigData.cities);
+    updateBadge();
+    clearStatus('save-status');
+    document.getElementById('save-info').style.display = 'none';
+});
+
+// ── 构建 patches ──────────────────────────────────────────
+function buildPatches() {
+    const patches = [];
+    Object.entries(cityChanges).forEach(([absStr, fields]) => {
+        const abs = parseInt(absStr);
+        const orig = cityOrigData.cities.find(c => c.abs === abs);
+        if (!orig) return;
+        const newZ = fields.zijin    !== undefined ? fields.zijin    : orig.zijin;
+        const newJ = fields.junliang !== undefined ? fields.junliang : orig.junliang;
+        const newS = fields.shidao   !== undefined ? fields.shidao   : orig.shidao;
+        const buf = new ArrayBuffer(12);
+        const view = new DataView(buf);
+        view.setUint32(0, newZ, true);
+        view.setUint32(4, newJ, true);
+        view.setUint32(8, newS, true);
+        patches.push({
+            offset: abs,
+            data_hex: Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join(' ')
+        });
+    });
+    return patches;
+}
+
+// ── 生成存档 ──────────────────────────────────────────────
+document.getElementById('save-btn').addEventListener('click', async () => {
+    if (!currentFilePath) return;
+    const patches = buildPatches();
+    if (!patches.length) {
+        showStatus('save-status','warn','没有发现任何修改，无需生成新存档。');
+        return;
+    }
+
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    showStatus('save-status','info','正在预览修改（dry run）…');
+    try {
+        // 先 dry_run 确认
+        const r1 = await fetch('/api/san14/write', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({file: currentFilePath, patches, dry_run: true})
+        });
+        const d1 = await r1.json();
+        if (!r1.ok) { showStatus('save-status','error','❌ ' + (d1.error||'预览失败')); return; }
+
+        const changeDesc = d1.patches_applied.map(p =>
+            `${p.offset}：${p.before} → ${p.after}`).join('\n');
+        const confirmed = confirm(
+            `即将写入 ${patches.length} 项修改，存档将保存到 new/ 目录。\n\n` +
+            changeDesc + `\n\n新文件大小约 ${formatBytes(d1.new_size)}（比原文件大属正常）。\n\n确认继续？`
+        );
+        if (!confirmed) { clearStatus('save-status'); return; }
+
+        showStatus('save-status','info','正在写入…');
+        const r2 = await fetch('/api/san14/write', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({file: currentFilePath, patches, dry_run: false})
+        });
+        const d2 = await r2.json();
+        if (!r2.ok) { showStatus('save-status','error','❌ ' + (d2.error||'写入失败')); return; }
+
+        showStatus('save-status','ok','✔ 存档已生成：' + d2.path);
+        const info = document.getElementById('save-info');
+        info.style.display = 'block';
+        info.textContent = '原文件：' + formatBytes(d2.old_size) + '  →  新文件：' + formatBytes(d2.new_size) +
+            '（literal-only 重编码，文件偏大属正常，游戏加载时解压内容一致）';
+
+    } catch(e) {
+        showStatus('save-status','error','❌ 网络错误：' + e.message);
+    } finally {
+        saveBtn.disabled = false;
+    }
+});
+
+// ── 高级：差分分析 ────────────────────────────────────────
+document.getElementById('advanced-toggle').addEventListener('click', () => {
+    const body  = document.getElementById('advanced-body');
+    const arrow = document.getElementById('advanced-arrow');
+    const open  = body.classList.toggle('open');
+    arrow.textContent = open ? '▼' : '▶';
+});
+
+const diffFileA  = document.getElementById('diff-file-a');
+const diffFileB  = document.getElementById('diff-file-b');
+const diffBtn    = document.getElementById('diff-btn');
+const diffResult = document.getElementById('diff-result');
+
+function renderDiff(data) {
+    diffResult.innerHTML = '';
+    diffResult.classList.add('is-visible');
+    const summary = document.createElement('div');
+    summary.className = 'diff-summary';
+    summary.textContent = `共发现 ${data.region_count} 个变化区域（${basename(data.file_a)} → ${basename(data.file_b)}）`;
+    diffResult.appendChild(summary);
+    if (!data.regions || !data.regions.length) {
+        diffResult.insertAdjacentHTML('beforeend','<div style="color:var(--text-muted);font-size:13px">两份存档内容完全相同。</div>');
+        return;
+    }
+    data.regions.forEach((region, idx) => {
+        const card = document.createElement('div'); card.className = 'region-card';
+        const header = document.createElement('div'); header.className = 'region-header';
+        header.innerHTML = `<span class="region-offset">${region.region_start}</span>
+            <span>区域 ${idx+1}：${region.changed_bytes} 字节变化</span>
+            <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">${region.interpretations.length} 个候选字段</span>`;
+        const body = document.createElement('div'); body.className = 'region-body';
+        body.innerHTML = `<div class="region-hex">改变前：${region.context_before}</div>
+            <div class="region-hex">改变后：${region.context_after}</div>`;
+        if (region.interpretations && region.interpretations.length) {
+            const tbl = document.createElement('table'); tbl.className = 'interp-table';
+            tbl.innerHTML = '<thead><tr><th>偏移</th><th>类型</th><th>改变前</th><th>改变后</th><th>差值</th></tr></thead>';
+            const tbody = document.createElement('tbody');
+            region.interpretations.forEach(item => {
+                const tr = document.createElement('tr');
+                const cls = item.delta > 0 ? 'delta-pos' : item.delta < 0 ? 'delta-neg' : '';
+                tr.innerHTML = `<td>${item.offset}</td><td>${item.type}</td><td>${item.before}</td><td>${item.after}</td><td class="${cls}">${item.delta > 0 ? '+' : ''}${item.delta}</td>`;
+                tbody.appendChild(tr);
+            });
+            tbl.appendChild(tbody); body.appendChild(tbl);
+        }
+        header.addEventListener('click', () => body.classList.toggle('open'));
+        card.appendChild(header); card.appendChild(body);
+        diffResult.appendChild(card);
+    });
+}
+
+diffBtn.addEventListener('click', async () => {
+    const fileA = diffFileA.value.trim(); const fileB = diffFileB.value.trim();
+    if (!fileA || !fileB) { diffResult.innerHTML = '<div class="status-bar warn">请填写两个存档路径</div>'; diffResult.classList.add('is-visible'); return; }
+    diffBtn.disabled = true;
+    diffResult.innerHTML = '<div class="status-bar info">正在分析差异…</div>'; diffResult.classList.add('is-visible');
+    try {
+        const res = await fetch('/api/san14/diff', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file_a:fileA,file_b:fileB})});
+        const data = await res.json();
+        if (!res.ok) { diffResult.innerHTML = '<div class="status-bar error">❌ ' + (data.error||'差分失败') + '</div>'; return; }
+        renderDiff(data);
+    } catch(e) {
+        diffResult.innerHTML = '<div class="status-bar error">❌ ' + e.message + '</div>';
+    } finally { diffBtn.disabled = false; }
+});
+</script>
+</body>
+</html>

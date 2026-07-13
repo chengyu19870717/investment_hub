@@ -1,0 +1,2776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信公众号运营 - 程钰的百宝箱</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        body { background:#f4f6f8; }
+        .wx-page { max-width:1400px; }
+
+        /* ── header ── */
+        .wx-header { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 24px; }
+        .wx-title { display:flex; align-items:center; gap:12px; min-width:0; }
+        .wx-title-main { font-size:18px; font-weight:850; color:var(--text-primary); }
+        .wx-title-sub { color:var(--text-muted); font-size:12px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+        /* ── layout ── */
+        .wx-main { padding:16px 24px 36px; display:grid; grid-template-columns:320px minmax(0,1fr); gap:16px; align-items:start; }
+
+        /* ── sidebar ── */
+        .wx-sidebar { position:sticky; top:12px; max-height:calc(100vh - 60px); overflow-y:auto !important; overflow-x:hidden; display:flex; flex-direction:column; gap:0; }
+        .wx-sidebar::-webkit-scrollbar { width:4px; } .wx-sidebar::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:2px; }
+        .wx-sidebar-section { border-bottom:1px solid var(--border); padding:14px 14px 12px; }
+        .wx-sidebar-section:last-child { border-bottom:none; }
+        .wx-sidebar-section-title { font-size:11px; font-weight:850; color:#94a3b8; letter-spacing:.06em; text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
+        .wx-sidebar-section-title:hover { color:#64748b; }
+        .wx-sidebar-collapse { overflow:hidden; transition:max-height .25s ease; }
+        .wx-sidebar-collapse.collapsed { max-height:0 !important; }
+
+        /* ── enhancement icon toolbar ── */
+        .wx-enhance-bar { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+        .wx-enhance-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:52px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; cursor:pointer; transition:all .15s; padding:6px 4px; }
+        .wx-enhance-btn:hover { border-color:#99f6e4; background:#f0fdfa; }
+        .wx-enhance-btn.active { border-color:#0f766e; background:#f0fdfa; box-shadow:0 0 0 2px rgba(15,118,110,.12); }
+        .wx-enhance-icon { font-size:17px; line-height:1; }
+        .wx-enhance-label { font-size:10px; color:#64748b; font-weight:750; text-align:center; line-height:1.3; }
+        .wx-enhance-btn:hover .wx-enhance-label, .wx-enhance-btn.active .wx-enhance-label { color:#0f766e; }
+
+        /* ── generate zone ── */
+        .wx-gen-zone { display:flex; flex-direction:column; gap:6px; }
+        .wx-gen-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+
+        /* ── progress bar ── */
+        .wx-progress { display:flex; background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,.06); margin-bottom:14px; }
+        .wx-progress-step { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px 6px; gap:5px; border-right:1px solid var(--border); cursor:default; transition:background .15s; }
+        .wx-progress-step:last-child { border-right:none; }
+        .wx-progress-step.done { background:#f0fdf4; }
+        .wx-progress-step.active { background:#f0fdfa; }
+        .wx-progress-dot { width:24px; height:24px; border-radius:50%; background:#e2e8f0; color:#94a3b8; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:850; transition:all .2s; flex-shrink:0; }
+        .wx-progress-step.done  .wx-progress-dot { background:#16a34a; color:#fff; }
+        .wx-progress-step.active .wx-progress-dot { background:#0f766e; color:#fff; box-shadow:0 0 0 3px rgba(15,118,110,.2); }
+        .wx-progress-label { font-size:11px; color:#94a3b8; text-align:center; line-height:1.3; }
+        .wx-progress-step.done  .wx-progress-label { color:#16a34a; }
+        .wx-progress-step.active .wx-progress-label { color:#0f766e; font-weight:750; }
+
+        /* ── panel ── */
+        .wx-panel { background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 1px 3px rgba(15,23,42,.06); overflow:hidden; }
+        .wx-panel-hd { padding:12px 15px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        .wx-panel-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .wx-panel-title { font-size:14px; font-weight:850; color:var(--text-primary); }
+        .wx-panel-body { padding:14px 15px; display:flex; flex-direction:column; gap:11px; }
+
+        /* ── step labels ── */
+        .wx-step-label { display:flex; align-items:center; gap:8px; }
+        .wx-step-no { width:22px; height:22px; border-radius:50%; background:#0f766e; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:850; flex-shrink:0; }
+
+        /* ── form controls ── */
+        .wx-field { display:flex; flex-direction:column; gap:6px; }
+        .wx-label { font-size:12px; font-weight:750; color:var(--text-secondary); }
+        .wx-input, .wx-textarea, .wx-select { width:100%; border:1px solid var(--border); border-radius:8px; background:#f8fafc; color:var(--text-primary); padding:9px 10px; font-size:13px; font-family:inherit; outline:none; }
+        .wx-textarea { min-height:110px; resize:vertical; line-height:1.65; }
+        .wx-input:focus, .wx-textarea:focus, .wx-select:focus { border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,.12); }
+
+        /* ── buttons ── */
+        .wx-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .wx-btn { min-height:36px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text-secondary); font-size:13px; font-weight:750; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; padding:0 10px; transition:all .15s; }
+        .wx-btn:hover { background:#f8fafc; color:var(--text-primary); }
+        .wx-btn.primary { background:#0f766e; border-color:#0f766e; color:#fff; }
+        .wx-btn.primary:hover { background:#115e59; }
+        .wx-btn.accent { background:#0ea5e9; border-color:#0ea5e9; color:#fff; }
+        .wx-btn.accent:hover { background:#0284c7; }
+        .wx-btn:disabled { opacity:.5; cursor:not-allowed; }
+        .wx-mini-btn { min-height:28px; border:1px solid #dbeafe; border-radius:6px; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:750; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; cursor:pointer; padding:0 8px; }
+        .wx-mini-btn.green { border-color:#bbf7d0; background:#f0fdf4; color:#16a34a; }
+
+        /* ── status ── */
+        .wx-status { min-height:36px; display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:8px; background:#ecfeff; color:#155e75; font-size:12px; line-height:1.55; }
+        .wx-status.bad  { background:#fef2f2; color:#991b1b; }
+        .wx-status.good { background:#f0fdf4; color:#166534; }
+
+        /* ── workspace ── */
+        .wx-workspace { display:flex; flex-direction:column; gap:14px; min-width:0; }
+        .wx-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+        /* ── list / items ── */
+        .wx-list { display:flex; flex-direction:column; gap:8px; padding:12px 14px; }
+        .wx-list.scroll { max-height:480px; overflow:auto; }
+        .wx-item { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 11px; cursor:pointer; transition:all .12s; }
+        .wx-item:hover { border-color:#99f6e4; background:#f8fffd; }
+        .wx-item.selected { border-color:#0f766e; background:#f0fdfa; }
+        .wx-item-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+        .wx-item-name { font-size:13px; font-weight:850; color:#111827; line-height:1.45; }
+        .wx-item-text { font-size:12px; color:#64748b; line-height:1.55; margin-top:4px; word-break:break-word; }
+        .wx-keep { display:inline-flex; align-items:center; gap:4px; color:#64748b; font-size:12px; white-space:nowrap; flex-shrink:0; }
+        .wx-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+        .wx-chip { display:inline-flex; align-items:center; min-height:22px; border-radius:999px; padding:2px 8px; background:#e0f2fe; color:#075985; font-size:11px; }
+        .wx-chip.cached { background:#fef9c3; color:#713f12; }
+
+        /* ── image cards ── */
+        .wx-image-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .wx-image-card { min-width:0; }
+        .wx-image-thumb { height:100px; border-radius:8px; border:1px solid #dbeafe; background:linear-gradient(135deg,rgba(20,184,166,.18),transparent 38%),linear-gradient(35deg,rgba(14,165,233,.16),transparent 42%),#f8fafc; display:flex; align-items:flex-end; padding:8px; color:#0f172a; font-size:12px; font-weight:800; overflow:hidden; }
+        .wx-image-thumb.has-image { padding:0; align-items:stretch; background:#f8fafc; }
+        .wx-image-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+        .wx-image-actions { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:7px; }
+        .wx-error { color:#991b1b; background:#fef2f2; border-radius:6px; padding:6px 8px; font-size:12px; line-height:1.5; margin-top:6px; }
+        .wx-file-list { color:var(--text-muted); font-size:11px; line-height:1.7; word-break:break-all; }
+
+        /* ── diagnostics ── */
+        .wx-diagnostics { display:flex; flex-direction:column; gap:7px; }
+        .wx-diagnostic { border:1px solid #dbeafe; background:#eff6ff; color:#1e3a8a; border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.55; }
+        .wx-diagnostic.good { border-color:#bbf7d0; background:#f0fdf4; color:#166534; }
+        .wx-diagnostic.bad  { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
+        .wx-diagnostic-name { font-weight:850; margin-bottom:2px; }
+
+        /* ── quality diagnosis ── */
+        .wx-quality { border:1px solid #dbeafe; border-radius:8px; background:#eff6ff; padding:12px 14px; display:none; }
+        .wx-quality-hd { font-size:13px; font-weight:850; color:#1e3a8a; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+        .wx-quality-items { display:flex; flex-direction:column; gap:5px; }
+        .wx-quality-item { font-size:12px; line-height:1.55; display:flex; align-items:baseline; gap:6px; }
+        .wx-quality-item.ok   { color:#166534; }
+        .wx-quality-item.warn { color:#92400e; }
+        .wx-quality-dot { font-size:14px; flex-shrink:0; }
+
+        /* ── tabs ── */
+        .wx-tabs { display:flex; border-bottom:1px solid var(--border); background:#fafafa; }
+        .wx-tab { padding:9px 16px; font-size:13px; font-weight:750; cursor:pointer; border:none; background:none; color:var(--text-secondary); border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; }
+        .wx-tab.active { color:#0f766e; border-bottom-color:#0f766e; background:#fff; }
+        .wx-tab-pane { display:none; }
+        .wx-tab-pane.active { display:block; }
+
+        /* ── text output ── */
+        .wx-output { width:100%; min-height:340px; border:0; background:#fff; color:#1f2937; padding:14px 15px; resize:vertical; font-size:14px; line-height:1.72; font-family:inherit; }
+        .wx-publish-output { min-height:400px; }
+
+        /* ── rich preview ── */
+        .wx-rich-preview { min-height:340px; padding:14px 15px; overflow-y:auto; font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif; }
+        .wx-rich-preview-empty { color:#94a3b8; font-size:13px; padding:14px 15px; min-height:100px; display:flex; align-items:center; justify-content:center; }
+
+        /* ── article mode selector ── */
+        .wx-mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+        .wx-mode-card {
+            border:2px solid var(--border); border-radius:9px; background:#f8fafc;
+            padding:9px 10px; cursor:pointer; transition:all .15s; text-align:left;
+            display:flex; flex-direction:column; gap:3px;
+        }
+        .wx-mode-card:hover { border-color:#99f6e4; background:#f0fdfa; }
+        .wx-mode-card.selected { border-color:#0f766e; background:#f0fdfa; box-shadow:0 0 0 2px rgba(15,118,110,.15); }
+        .wx-mode-name { font-size:13px; font-weight:850; color:#111827; display:flex; align-items:center; gap:5px; }
+        .wx-mode-card.selected .wx-mode-name { color:#0f766e; }
+        .wx-mode-count { font-size:11px; color:#0f766e; font-weight:750; }
+        .wx-mode-desc { font-size:11px; color:#64748b; line-height:1.45; }
+
+        /* ── title score badge ── */
+        .wx-title-row { display:flex; align-items:flex-start; gap:7px; }
+        .wx-score-badge {
+            flex-shrink:0; width:26px; height:20px; border-radius:5px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:11px; font-weight:850; margin-top:2px;
+        }
+        .wx-score-high { background:#dcfce7; color:#15803d; }
+        .wx-score-mid  { background:#fef9c3; color:#92400e; }
+        .wx-score-low  { background:#f3f4f6; color:#6b7280; }
+        .wx-title-type { font-size:11px; color:#64748b; background:#f1f5f9; border-radius:4px; padding:1px 5px; white-space:nowrap; flex-shrink:0; }
+
+        /* ── paragraph rewrite panel ── */
+        .wx-rewrite-panel { border:1px solid #dbeafe; border-radius:8px; background:#f8fbff; padding:12px 14px; display:none; }
+        .wx-rewrite-hd { font-size:13px; font-weight:850; color:#1e3a8a; margin-bottom:8px; }
+        .wx-rewrite-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:start; }
+
+        /* ── excerpt panel ── */
+        .wx-excerpt-panel { border:1px solid #d1fae5; border-radius:8px; background:#f0fdf4; padding:12px 14px; display:none; }
+        .wx-excerpt-hd { font-size:13px; font-weight:850; color:#166534; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+        .wx-excerpt-text { font-size:13px; line-height:1.75; color:#1f2937; border:1px solid #bbf7d0; border-radius:6px; background:#fff; padding:9px 11px; min-height:48px; word-break:break-all; }
+        .wx-char-count { font-size:11px; color:#6b7280; }
+
+        /* ── cover image section ── */
+        .wx-cover-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .wx-cover-thumb { height:80px; border-radius:7px; border:1px solid #e2e8f0; background:linear-gradient(135deg,rgba(14,165,233,.12),transparent 40%),#f8fafc; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8; }
+        .wx-cover-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+
+        /* ── publish timing tip ── */
+        .wx-timing-tip { font-size:12px; color:#0369a1; background:#e0f2fe; border-radius:6px; padding:7px 10px; margin-top:8px; line-height:1.5; }
+        .wx-timing-tip.ok { background:#dcfce7; color:#15803d; }
+
+        /* ── hook / ending / quote cards ── */
+        .wx-hook-card { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
+        .wx-hook-card:hover { border-color:#99f6e4; background:#f8fffd; }
+        .wx-hook-type { display:inline-flex; align-items:center; min-height:20px; border-radius:999px; padding:2px 9px; background:#f0fdfa; color:#0f766e; font-size:11px; font-weight:850; width:fit-content; }
+        .wx-hook-text { font-size:13px; line-height:1.72; color:#1f2937; }
+        .wx-hook-reason { font-size:11px; color:#64748b; }
+        .wx-hook-actions { display:flex; gap:7px; margin-top:4px; }
+        .wx-quote-card { border:2px solid #f0fdfa; border-radius:8px; padding:12px 14px; background:#fafffe; display:flex; flex-direction:column; gap:5px; }
+        .wx-quote-text { font-size:15px; font-weight:850; color:#0f766e; line-height:1.6; letter-spacing:0.01em; }
+        .wx-quote-why { font-size:11px; color:#64748b; }
+        .wx-ending-card { border:1px solid #dbeafe; border-radius:8px; background:#eff6ff; padding:11px 13px; display:flex; flex-direction:column; gap:6px; }
+        /* knowledge extraction */
+        .wx-knowledge-card { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:11px 13px; display:flex; flex-direction:column; gap:6px; transition:border-color .15s,background .15s; }
+        .wx-knowledge-card:hover { border-color:#a5f3fc; background:#f0fdff; }
+        .wx-knowledge-card.saved { border-color:#bbf7d0; background:#f0fdf4; opacity:.7; }
+        .wx-kn-header { display:flex; align-items:center; gap:7px; }
+        .wx-kn-type { font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 7px; border-radius:20px; background:#e0f2fe; color:#0369a1; }
+        .wx-kn-type.观点 { background:#fef3c7; color:#92400e; }
+        .wx-kn-type.数据 { background:#dbeafe; color:#1e40af; }
+        .wx-kn-type.案例 { background:#d1fae5; color:#065f46; }
+        .wx-kn-type.名言 { background:#f3e8ff; color:#6b21a8; }
+        .wx-kn-type.行业洞察 { background:#fce7f3; color:#9d174d; }
+        .wx-kn-title { font-size:13px; font-weight:700; color:#1e293b; flex:1; }
+        .wx-kn-content { font-size:13px; color:#334155; line-height:1.7; }
+        .wx-kn-tags { display:flex; gap:4px; flex-wrap:wrap; }
+        .wx-kn-tag { font-size:10px; padding:1px 6px; border-radius:10px; background:#f1f5f9; color:#64748b; }
+        .wx-kn-saved-badge { font-size:11px; color:#16a34a; font-weight:700; }
+        .wx-knowledge-summary { font-size:12px; color:#64748b; padding:8px 12px; background:#f8fafc; border-radius:6px; border-left:3px solid #0ea5e9; line-height:1.6; }
+        .wx-ending-type { display:inline-flex; align-items:center; min-height:20px; border-radius:999px; padding:2px 9px; background:#dbeafe; color:#1d4ed8; font-size:11px; font-weight:850; width:fit-content; }
+        .wx-ending-text { font-size:13px; line-height:1.72; color:#1e3a8a; }
+        .wx-ending-goal { font-size:11px; color:#6b7280; }
+        /* ── series plan ── */
+        .wx-series-ep { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 13px; display:flex; gap:11px; align-items:flex-start; }
+        .wx-series-ep:hover { border-color:#bfdbfe; background:#f0f7ff; }
+        .wx-ep-no { width:26px; height:26px; border-radius:50%; background:#0f766e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:850; flex-shrink:0; margin-top:2px; }
+        .wx-ep-body { flex:1; min-width:0; }
+        .wx-ep-title { font-size:13px; font-weight:850; color:#111827; }
+        .wx-ep-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
+        .wx-ep-angle { font-size:12px; color:#374151; line-height:1.5; margin-top:3px; }
+        /* ── history ── */
+        .wx-history-item { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 13px; }
+        .wx-history-title { font-size:13px; font-weight:850; color:#111827; }
+        .wx-history-meta { font-size:11px; color:#6b7280; margin-top:3px; }
+        .wx-history-stats { display:flex; gap:10px; margin-top:5px; font-size:12px; color:#0f766e; }
+        /* ── positioning result ── */
+        .wx-positioning-result { border-radius:8px; padding:11px 13px; margin:0 14px 12px; font-size:13px; line-height:1.6; display:none; }
+        .wx-positioning-result.ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
+        .wx-positioning-result.warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+
+        /* ── platform distribution ── */
+        .wx-platform-tabs { display:flex; gap:6px; flex-wrap:wrap; padding:12px 14px 0; }
+        .wx-platform-btn { min-height:32px; border:2px solid var(--border); border-radius:8px; background:#fff;
+            color:var(--text-secondary); font-size:12px; font-weight:850; cursor:pointer; padding:0 12px;
+            transition:all .15s; display:flex; align-items:center; gap:5px; }
+        .wx-platform-btn:hover  { border-color:#99f6e4; background:#f0fdfa; color:#0f766e; }
+        .wx-platform-btn.active { border-color:#0f766e; background:#f0fdfa; color:#0f766e; }
+        .wx-platform-icon { font-size:14px; }
+        .wx-platform-content { padding:12px 14px; }
+        .wx-platform-output { width:100%; min-height:220px; border:1px solid var(--border); border-radius:8px;
+            background:#f8fafc; color:#1f2937; padding:12px 14px; font-size:13px; line-height:1.75;
+            font-family:inherit; resize:vertical; }
+        /* ── compliance ── */
+        .wx-compliance-item { border-radius:7px; padding:9px 12px; margin-bottom:6px; font-size:12px; line-height:1.6; }
+        .wx-compliance-item.warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+        .wx-compliance-item.high { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+        .wx-compliance-item.ok   { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
+        .wx-compliance-matched { font-size:11px; background:rgba(0,0,0,.06); border-radius:4px; padding:1px 5px; margin:2px; display:inline-block; }
+        /* ── materials ── */
+        .wx-material-card { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 13px; }
+        .wx-material-card:hover { border-color:#bfdbfe; background:#f0f7ff; }
+        .wx-material-title { font-size:13px; font-weight:850; color:#111827; }
+        .wx-material-cat { font-size:11px; background:#e0f2fe; color:#075985; border-radius:999px; padding:1px 7px; margin-left:6px; }
+        .wx-material-content { font-size:12px; color:#374151; margin-top:4px; line-height:1.6; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .wx-material-actions { display:flex; gap:6px; margin-top:6px; }
+        /* ── lifecycle badge ── */
+        .wx-lifecycle-badge { display:inline-flex; align-items:center; gap:3px; border-radius:999px; padding:2px 7px; font-size:10px; font-weight:850; }
+        .wx-lifecycle-event { background:#fee2e2; color:#991b1b; }
+        .wx-lifecycle-trend { background:#fef9c3; color:#92400e; }
+        .wx-lifecycle-ever  { background:#dcfce7; color:#15803d; }
+
+        /* ── streaming cursor ── */
+        .wx-streaming-cursor::after { content:'▍'; animation:blink .7s step-end infinite; }
+        @keyframes blink { 50%{opacity:0;} }
+
+        /* ── task log panel ── */
+        .wx-tasklog { background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 1px 3px rgba(15,23,42,.06); overflow:hidden; }
+        .wx-tasklog-hd { padding:9px 14px; border-bottom:1px solid var(--border); background:#fafafa; display:flex; align-items:center; justify-content:space-between; }
+        .wx-tasklog-title { font-size:12px; font-weight:850; color:#64748b; letter-spacing:.04em; }
+        .wx-tasklog-clear { font-size:11px; color:#94a3b8; cursor:pointer; border:none; background:none; padding:0; }
+        .wx-tasklog-clear:hover { color:#64748b; }
+        .wx-tasklog-list { padding:6px 0; max-height:200px; overflow-y:auto; }
+        .wx-tasklog-list::-webkit-scrollbar { width:4px; } .wx-tasklog-list::-webkit-scrollbar-thumb { background:#e2e8f0; border-radius:2px; }
+        .wx-task-row { display:flex; align-items:center; gap:10px; padding:6px 14px; border-bottom:1px solid #f1f5f9; transition:background .1s; }
+        .wx-task-row:last-child { border-bottom:none; }
+        .wx-task-row.running { background:#f0fdfa; }
+        .wx-task-row.done    { background:#fff; }
+        .wx-task-row.error   { background:#fef2f2; }
+        .wx-task-icon { width:20px; height:20px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; }
+        .wx-task-spinner { width:16px; height:16px; border:2px solid #e2e8f0; border-top-color:#0f766e; border-radius:50%; animation:wx-spin .7s linear infinite; }
+        @keyframes wx-spin { to { transform:rotate(360deg); } }
+        .wx-task-label { flex:1; min-width:0; font-size:12px; color:#374151; font-weight:750; }
+        .wx-task-detail { font-size:11px; color:#94a3b8; white-space:nowrap; flex-shrink:0; }
+        .wx-task-row.running .wx-task-label { color:#0f766e; }
+        .wx-task-row.error   .wx-task-label { color:#991b1b; }
+        .wx-task-time { font-size:10px; color:#cbd5e1; margin-left:4px; }
+        .wx-tasklog-empty { font-size:12px; color:#cbd5e1; text-align:center; padding:14px 0; }
+
+        /* ── inline toolbar above article ── */
+        .wx-article-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px; border-bottom:1px solid var(--border); background:#fafafa; }
+        .wx-toolbar-btn { min-height:30px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-secondary); font-size:12px; font-weight:750; cursor:pointer; display:inline-flex; align-items:center; gap:4px; padding:0 10px; transition:all .15s; white-space:nowrap; }
+        .wx-toolbar-btn:hover { border-color:#99f6e4; background:#f0fdfa; color:#0f766e; }
+        .wx-toolbar-btn.primary { background:#0f766e; border-color:#0f766e; color:#fff; }
+        .wx-toolbar-sep { width:1px; background:var(--border); align-self:stretch; margin:4px 0; }
+
+        /* ── article params panel (Step 2) ── */
+        .wx-params-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px 14px 8px; }
+        .wx-params-full { grid-column:1/-1; }
+        .wx-params-section-label { grid-column:1/-1; font-size:11px; font-weight:850; color:#94a3b8; letter-spacing:.06em; text-transform:uppercase; padding-bottom:2px; border-bottom:1px solid var(--border); margin-bottom:2px; }
+
+        /* ── responsive ── */
+        @media(max-width:1120px){ .wx-main{grid-template-columns:1fr;} .wx-grid,.wx-image-grid{grid-template-columns:1fr;} .wx-sidebar{position:static;max-height:none;} }
+        @media(max-width:680px){ .wx-header{flex-direction:column;align-items:flex-start;padding:12px 14px;} .wx-main{padding:12px;} .wx-actions{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+<div class="page wx-page">
+    <header class="header">
+        <div class="wx-header">
+            <div class="wx-title">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo"><span class="logo-icon">📰</span></div>
+                <div>
+                    <div class="wx-title-main">微信公众号运营</div>
+                    <div class="wx-title-sub" id="modelStatus">读取配置中...</div>
+                </div>
+            </div>
+            <button class="wx-btn" type="button" onclick="loadStatus()">刷新状态</button>
+        </div>
+    </header>
+
+    <main class="wx-main">
+
+        <!-- ══════════════════════════════════════════
+             左侧控制台（精简 · 粘性）
+        ══════════════════════════════════════════ -->
+        <section class="wx-panel wx-sidebar">
+
+            <!-- 状态栏 -->
+            <div class="wx-sidebar-section" style="padding:10px 14px;">
+                <div id="statusBox" class="wx-status" style="margin:0;">等待输入</div>
+            </div>
+
+            <!-- ⚙️ 模型配置（折叠） -->
+            <div class="wx-sidebar-section">
+                <div class="wx-sidebar-section-title" onclick="toggleSidebarSection('modelConfigBody',this)">
+                    <span>⚙️ 模型配置</span>
+                    <span style="margin-left:auto;font-size:12px;color:#94a3b8;" id="modelConfigCaret">▾</span>
+                </div>
+                <div class="wx-sidebar-collapse" id="modelConfigBody" style="max-height:600px;">
+                    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+                        <select class="wx-select" id="providerSelect" onchange="onProviderChanged()" style="flex:1;">
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="qwen">Qwen</option>
+                        </select>
+                        <a class="wx-btn" href="/settings" style="flex-shrink:0;min-height:34px;font-size:12px;padding:0 8px;">设置</a>
+                    </div>
+                    <input class="wx-input" id="modelInput" placeholder="模型（留空用默认）" oninput="onModelInputChanged()" style="margin-bottom:8px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+                        <button class="wx-btn" id="btnProbeCurrent" type="button" onclick="probeModel(false)" style="font-size:12px;">检测当前</button>
+                        <button class="wx-btn" id="btnProbeAll"    type="button" onclick="probeModel(true)"  style="font-size:12px;">检测全部</button>
+                    </div>
+                    <button class="wx-btn" type="button" onclick="resetModelToDefault()" style="width:100%;font-size:12px;margin-bottom:6px;">恢复默认模型</button>
+                    <div class="wx-diagnostics" id="diagnosticList"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+                        <button class="wx-btn" id="btnComfyStatus" type="button" onclick="checkComfyUI()" style="font-size:12px;">检测ComfyUI</button>
+                        <button class="wx-btn" id="btnComfyStart"  type="button" onclick="startComfyUI()" style="font-size:12px;">启动ComfyUI</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 1：选题 -->
+            <div class="wx-sidebar-section">
+                <div class="wx-step-label" style="margin-bottom:10px;">
+                    <span class="wx-step-no">1</span>
+                    <div class="wx-panel-title">选题方向</div>
+                </div>
+                <div class="wx-field" style="margin-bottom:8px;">
+                    <label class="wx-label">已选话题</label>
+                    <input class="wx-input" id="selectedTopicInput" placeholder="点击热点列表或输入自定义话题">
+                </div>
+                <div class="wx-field" style="margin-bottom:8px;">
+                    <label class="wx-label">自定义话题</label>
+                    <input class="wx-input" id="customTopicInput" placeholder="不追热点时可直接输入" oninput="saveForm()">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                    <button class="wx-btn primary" id="btnHotTopics" type="button" onclick="fetchHotTopics()">获取热点 50</button>
+                    <button class="wx-btn" type="button" onclick="useCustomTopic()">使用自定义</button>
+                </div>
+            </div>
+
+            <!-- Step 2：核心构思 -->
+            <div class="wx-sidebar-section">
+                <div class="wx-step-label" style="margin-bottom:10px;">
+                    <span class="wx-step-no">2</span>
+                    <div class="wx-panel-title">核心构思</div>
+                </div>
+                <div class="wx-field" style="margin-bottom:8px;">
+                    <label class="wx-label">核心观点 <span style="color:#dc2626;font-size:10px;">必填</span></label>
+                    <textarea class="wx-textarea" id="coreViewpoint" placeholder="写下你对这个话题真正想表达的判断" style="min-height:80px;" oninput="saveForm();updateProgress()"></textarea>
+                </div>
+                <div class="wx-field" style="margin-bottom:8px;">
+                    <label class="wx-label">内容素材 <span style="color:#94a3b8;font-size:10px;">可选</span></label>
+                    <textarea class="wx-textarea" id="contentNotesInput" placeholder="案例、论据、数据、想强调/避免的内容" style="min-height:60px;" oninput="saveForm()"></textarea>
+                </div>
+                <div class="wx-field">
+                    <label class="wx-label">已选标题</label>
+                    <input class="wx-input" id="selectedTitleInput" placeholder="点击右侧标题后自动填入">
+                </div>
+            </div>
+
+            <!-- Step 3：生成操作 -->
+            <div class="wx-sidebar-section">
+                <div class="wx-step-label" style="margin-bottom:10px;">
+                    <span class="wx-step-no">3</span>
+                    <div class="wx-panel-title">生成</div>
+                </div>
+                <div class="wx-gen-zone">
+                    <div class="wx-gen-row">
+                        <button class="wx-btn" id="btnTitles"  type="button" onclick="refreshTitles()">生成标题</button>
+                        <button class="wx-btn" id="btnImages"  type="button" onclick="refreshImages()">生成配图</button>
+                    </div>
+                    <button class="wx-btn" id="btnArticle" type="button" onclick="writeArticle()" style="width:100%;">生成正文</button>
+                    <button class="wx-btn primary" id="btnPackage" type="button" onclick="generatePackage()" style="width:100%;font-size:14px;min-height:42px;">⚡ 一键全部生成</button>
+                    <button class="wx-btn primary" id="btnPublish" type="button" onclick="generatePublish()" style="width:100%;background:#0369a1;border-color:#0369a1;">📤 生成发布成稿</button>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <button class="wx-btn" type="button" onclick="clearContent()" style="font-size:12px;">清空内容</button>
+                        <button class="wx-btn" type="button" onclick="clearAll()" style="font-size:12px;">全部清空</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 增强工具 -->
+            <div class="wx-sidebar-section">
+                <div class="wx-sidebar-section-title" style="cursor:default;">
+                    ✨ 增强工具
+                </div>
+                <div class="wx-enhance-bar">
+                    <button class="wx-enhance-btn" id="btnHooks"   type="button" onclick="generateHooks();scrollToPanel('hookPanel')">
+                        <span class="wx-enhance-icon">🎣</span><span class="wx-enhance-label">开篇 Hook</span>
+                    </button>
+                    <button class="wx-enhance-btn" id="btnQuotes"  type="button" onclick="extractQuotes();scrollToPanel('quotesPanel')">
+                        <span class="wx-enhance-icon">💬</span><span class="wx-enhance-label">提炼金句</span>
+                    </button>
+                    <button class="wx-enhance-btn" id="btnEnding"  type="button" onclick="generateEnding();scrollToPanel('endingPanel')">
+                        <span class="wx-enhance-icon">💡</span><span class="wx-enhance-label">互动结尾</span>
+                    </button>
+                    <button class="wx-enhance-btn" id="btnSeries"  type="button" onclick="planSeries();scrollToPanel('seriesPanel')">
+                        <span class="wx-enhance-icon">📅</span><span class="wx-enhance-label">系列规划</span>
+                    </button>
+                    <button class="wx-enhance-btn" id="btnPositioning" type="button" onclick="checkPositioning()">
+                        <span class="wx-enhance-icon">🎯</span><span class="wx-enhance-label">定位检查</span>
+                    </button>
+                    <button class="wx-enhance-btn" id="btnCompliance" type="button" onclick="runCompliance(false);scrollToPanel('compliancePanel')">
+                        <span class="wx-enhance-icon">🔍</span><span class="wx-enhance-label">合规预检</span>
+                    </button>
+                    <button class="wx-enhance-btn" type="button" onclick="togglePlatformPanel();scrollToPanel('platformPanel')">
+                        <span class="wx-enhance-icon">🌐</span><span class="wx-enhance-label">多平台分发</span>
+                    </button>
+                    <button class="wx-enhance-btn" type="button" onclick="toggleMaterialsPanel();scrollToPanel('materialsPanel')">
+                        <span class="wx-enhance-icon">🗂</span><span class="wx-enhance-label">素材库</span>
+                    </button>
+                    <button class="wx-enhance-btn" id="btnKnowledge" type="button" onclick="extractKnowledge();scrollToPanel('knowledgePanel')">
+                        <span class="wx-enhance-icon">🧠</span><span class="wx-enhance-label">提炼知识</span>
+                    </button>
+                    <button class="wx-enhance-btn" type="button" onclick="toggleHistoryPanel();scrollToPanel('historyPanel')">
+                        <span class="wx-enhance-icon">📊</span><span class="wx-enhance-label">发布记录</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 生成文件 -->
+            <div class="wx-sidebar-section" id="fileListSection" style="display:none;">
+                <div class="wx-sidebar-section-title" style="cursor:default;">📁 生成文件</div>
+                <div class="wx-file-list" id="fileList"></div>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════
+             右侧工作区
+        ══════════════════════════════════════════ -->
+        <section class="wx-workspace">
+
+            <!-- 进度条 -->
+            <div class="wx-progress" id="progressBar">
+                <div class="wx-progress-step" id="ps1"><div class="wx-progress-dot" id="pd1">1</div><div class="wx-progress-label">选话题</div></div>
+                <div class="wx-progress-step" id="ps2"><div class="wx-progress-dot" id="pd2">2</div><div class="wx-progress-label">填观点</div></div>
+                <div class="wx-progress-step" id="ps3"><div class="wx-progress-dot" id="pd3">3</div><div class="wx-progress-label">选标题</div></div>
+                <div class="wx-progress-step" id="ps4"><div class="wx-progress-dot" id="pd4">4</div><div class="wx-progress-label">生成正文</div></div>
+                <div class="wx-progress-step" id="ps5"><div class="wx-progress-dot" id="pd5">5</div><div class="wx-progress-label">发布成稿</div></div>
+            </div>
+
+            <!-- ── 任务执行日志 ── -->
+            <div class="wx-tasklog" id="taskLogPanel">
+                <div class="wx-tasklog-hd">
+                    <span class="wx-tasklog-title">⚡ 执行进度</span>
+                    <button class="wx-tasklog-clear" onclick="clearTaskLog()" title="清空已完成记录">清空</button>
+                </div>
+                <div class="wx-tasklog-list" id="taskLogList">
+                    <div class="wx-tasklog-empty" id="taskLogEmpty">暂无任务，点击左侧按钮开始工作</div>
+                </div>
+            </div>
+
+            <!-- ── Step 1：热点话题 ── -->
+            <section class="wx-panel">
+                <div class="wx-panel-hd">
+                    <div class="wx-step-label">
+                        <span class="wx-step-no">1</span>
+                        <div class="wx-panel-title">热点话题 / 自定义方向</div>
+                    </div>
+                    <span class="wx-file-list" id="hotTopicMeta"></span>
+                </div>
+                <div class="wx-list scroll" id="hotTopicList">
+                    <div style="color:#94a3b8;font-size:13px;text-align:center;padding:24px 0;">点击左侧「获取热点 50」加载当前热榜</div>
+                </div>
+            </section>
+
+            <!-- ── Step 2：文章参数 ── -->
+            <section class="wx-panel">
+                <div class="wx-panel-hd">
+                    <div class="wx-step-label">
+                        <span class="wx-step-no">2</span>
+                        <div class="wx-panel-title">文章参数</div>
+                    </div>
+                    <span style="font-size:12px;color:#94a3b8;">设置后生成时自动应用</span>
+                </div>
+                <div class="wx-params-grid">
+                    <!-- 字数模式 -->
+                    <div class="wx-params-section-label">📝 字数模式</div>
+                    <div class="wx-params-full">
+                        <div class="wx-mode-grid" id="modeGrid">
+                            <button class="wx-mode-card" data-mode="minimal" onclick="selectMode('minimal')" type="button">
+                                <div class="wx-mode-name">⚡ 极简</div>
+                                <div class="wx-mode-count">≤ 300字</div>
+                                <div class="wx-mode-desc">核心要点突出，观点鲜明</div>
+                            </button>
+                            <button class="wx-mode-card" data-mode="standard" onclick="selectMode('standard')" type="button">
+                                <div class="wx-mode-name">📝 标准</div>
+                                <div class="wx-mode-count">≤ 600字</div>
+                                <div class="wx-mode-desc">观点清晰，有理有据</div>
+                            </button>
+                            <button class="wx-mode-card selected" data-mode="rich" onclick="selectMode('rich')" type="button">
+                                <div class="wx-mode-name">📚 丰富</div>
+                                <div class="wx-mode-count">≤ 1500字</div>
+                                <div class="wx-mode-desc">案例丰富，内容生动有趣</div>
+                            </button>
+                            <button class="wx-mode-card" data-mode="novel" onclick="selectMode('novel')" type="button">
+                                <div class="wx-mode-name">✍️ 小说</div>
+                                <div class="wx-mode-count">不限字数</div>
+                                <div class="wx-mode-desc">散文或小说风格，文学性强</div>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 读者与风格 -->
+                    <div class="wx-params-section-label" style="margin-top:4px;">👤 读者与风格</div>
+                    <div class="wx-field">
+                        <label class="wx-label">目标读者</label>
+                        <input class="wx-input" id="audienceInput" placeholder="如：职场新人、中层管理者" oninput="saveForm()">
+                    </div>
+                    <div class="wx-field">
+                        <label class="wx-label">内容气质</label>
+                        <input class="wx-input" id="toneInput" placeholder="如：理性温暖、犀利直接" oninput="saveForm()">
+                    </div>
+                    <!-- 排版与定位 -->
+                    <div class="wx-params-section-label" style="margin-top:4px;">⚙️ 排版与账号定位</div>
+                    <div class="wx-field">
+                        <label class="wx-label">配图插入位置</label>
+                        <select class="wx-select" id="imagePositionSelect" onchange="saveForm()">
+                            <option value="after_intro">开头段落后</option>
+                            <option value="after_first_heading">第一个小标题后</option>
+                            <option value="before_end">结尾前</option>
+                            <option value="cover">正文最前</option>
+                        </select>
+                    </div>
+                    <div class="wx-field">
+                        <label class="wx-label">账号定位 <span style="color:#94a3b8;font-size:10px;">用于定位检查</span></label>
+                        <textarea class="wx-textarea" id="accountPositioning" placeholder="例：面向25-35岁职场人，专注职场成长，风格理性温暖，每周2篇" style="min-height:52px;" oninput="saveForm()"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Step 3a：标题 ── -->
+            <section class="wx-panel">
+                <div class="wx-panel-hd">
+                    <div class="wx-step-label">
+                        <span class="wx-step-no">3</span>
+                        <div class="wx-panel-title">标题方案</div>
+                    </div>
+                    <div class="wx-panel-actions">
+                        <span class="wx-char-count" id="titleSortHint"></span>
+                        <button class="wx-btn" type="button" onclick="copySelectedTitle()">复制已选</button>
+                        <button class="wx-btn primary" id="btnTitles2" type="button" onclick="refreshTitles()">生成标题</button>
+                    </div>
+                </div>
+                <div class="wx-list" id="titleList">
+                    <div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px 0;">选择话题并填写核心观点后点击「生成标题」</div>
+                </div>
+            </section>
+
+            <!-- ── Step 3b：配图 ── -->
+            <section class="wx-panel">
+                <div class="wx-panel-hd">
+                    <div class="wx-step-label">
+                        <span class="wx-step-no" style="background:#0ea5e9;">图</span>
+                        <div class="wx-panel-title">配图方案</div>
+                    </div>
+                    <div class="wx-panel-actions">
+                        <button class="wx-btn" id="btnCoverIdea"    type="button" onclick="generateCoverIdea()">封面图方案</button>
+                        <button class="wx-btn" id="btnRenderImages" type="button" onclick="renderImagesWithComfy(false)">ComfyUI 生图</button>
+                        <button class="wx-btn" type="button" onclick="copySelectedImagePrompt()">复制提示词</button>
+                        <button class="wx-btn primary" id="btnImages2" type="button" onclick="refreshImages()">生成配图</button>
+                    </div>
+                </div>
+                <div class="wx-list" id="coverImageSection" style="display:none;">
+                    <div style="font-size:12px;font-weight:850;color:#0369a1;margin-bottom:6px;">🖼 封面图（9:5，文章列表封面）</div>
+                    <div class="wx-cover-grid" id="coverImageList"></div>
+                </div>
+                <div class="wx-list">
+                    <div class="wx-image-grid" id="imageList">
+                        <div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px 0;grid-column:1/-1;">生成正文后点击「生成配图」</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Step 4：Markdown 正文 ── -->
+            <section class="wx-panel">
+                <!-- 工具栏 -->
+                <div class="wx-panel-hd">
+                    <div class="wx-step-label">
+                        <span class="wx-step-no">4</span>
+                        <div class="wx-panel-title">Markdown 正文</div>
+                    </div>
+                    <div class="wx-panel-actions">
+                        <button class="wx-toolbar-btn" type="button" onclick="runDiagnose()">📊 内容诊断</button>
+                        <button class="wx-toolbar-btn" type="button" onclick="copyText('markdownOutput')">📋 复制 MD</button>
+                        <button class="wx-btn primary" id="btnArticle2" type="button" onclick="writeArticle()">生成正文</button>
+                    </div>
+                </div>
+                <!-- 内容增强快捷工具栏 -->
+                <div class="wx-article-toolbar">
+                    <span style="font-size:11px;color:#94a3b8;align-self:center;margin-right:2px;">增强</span>
+                    <div class="wx-toolbar-sep"></div>
+                    <button class="wx-toolbar-btn" id="btnHooks2"      type="button" onclick="generateHooks();scrollToPanel('hookPanel')">🎣 Hook</button>
+                    <button class="wx-toolbar-btn" id="btnQuotes2"     type="button" onclick="extractQuotes();scrollToPanel('quotesPanel')">💬 金句</button>
+                    <button class="wx-toolbar-btn" id="btnEnding2"     type="button" onclick="generateEnding();scrollToPanel('endingPanel')">💡 结尾</button>
+                    <button class="wx-toolbar-btn" id="btnSeries2"     type="button" onclick="planSeries();scrollToPanel('seriesPanel')">📅 系列</button>
+                    <div class="wx-toolbar-sep"></div>
+                    <button class="wx-toolbar-btn" type="button" onclick="toggleRewritePanel()">✏️ 段落重写</button>
+                    <button class="wx-toolbar-btn" id="btnCompliance2" type="button" onclick="runCompliance(false);scrollToPanel('compliancePanel')">🔍 合规</button>
+                    <button class="wx-toolbar-btn" id="btnKnowledge2" type="button" onclick="extractKnowledge();scrollToPanel('knowledgePanel')" style="color:#0369a1;">🧠 提炼知识</button>
+                    <button class="wx-toolbar-btn" type="button" onclick="togglePlatformPanel();scrollToPanel('platformPanel')">🌐 多平台</button>
+                </div>
+                <div id="articleErrorTip" style="display:none;background:#fef2f2;color:#991b1b;font-size:13px;padding:10px 14px;border-bottom:1px solid #fecaca;"></div>
+                <textarea class="wx-output" id="markdownOutput" placeholder="① 在左侧填写已选话题和核心观点&#10;② 点击右上角「生成正文」按钮" oninput="updateProgress()"></textarea>
+                <!-- 质量诊断 -->
+                <div class="wx-quality" id="qualityPanel">
+                    <div class="wx-quality-hd">📊 内容诊断 <span class="wx-char-count" id="readingTimeLabel"></span></div>
+                    <div class="wx-quality-items" id="qualityItems"></div>
+                </div>
+                <!-- 段落重写面板 -->
+                <div class="wx-rewrite-panel" id="rewritePanel" style="margin:0 14px 14px;">
+                    <div class="wx-rewrite-hd">✏️ 段落重写</div>
+                    <div class="wx-field" style="margin-bottom:8px;">
+                        <label class="wx-label">要重写的段落（粘贴后修改）</label>
+                        <textarea class="wx-textarea" id="rewriteInput" placeholder="把要重写的段落粘贴到这里" style="min-height:80px;"></textarea>
+                    </div>
+                    <div class="wx-rewrite-row">
+                        <div class="wx-field">
+                            <label class="wx-label">重写要求</label>
+                            <input class="wx-input" id="rewriteInstruction" placeholder="如：更生动有画面感、更简练、换个角度">
+                        </div>
+                        <button class="wx-btn primary" id="btnRewrite" type="button" onclick="doRewrite()" style="margin-top:20px;">重写</button>
+                    </div>
+                    <div id="rewriteResult" style="display:none; margin-top:10px;">
+                        <label class="wx-label">重写结果</label>
+                        <textarea class="wx-textarea" id="rewriteOutput" style="min-height:80px;background:#fff;" readonly></textarea>
+                        <div style="display:flex;gap:8px;margin-top:6px;">
+                            <button class="wx-btn" type="button" onclick="applyRewrite()">替换正文中对应段落</button>
+                            <button class="wx-btn" type="button" onclick="copyValue(document.getElementById('rewriteOutput').value)">复制重写结果</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Step 5：发布成稿 ── -->
+            <section class="wx-panel">
+                <div class="wx-panel-hd">
+                    <div class="wx-step-label">
+                        <span class="wx-step-no">5</span>
+                        <div class="wx-panel-title">公众号发布成稿</div>
+                    </div>
+                    <div class="wx-panel-actions">
+                        <button class="wx-btn" type="button" id="btnExcerpt" onclick="generateExcerpt()">生成摘要</button>
+                        <button class="wx-btn primary" type="button" id="btnCopyPublish" onclick="copyPublish()">一键复制富文本</button>
+                        <button class="wx-btn primary" id="btnPublish2" type="button" onclick="generatePublish()" style="background:#0369a1;border-color:#0369a1;">生成发布成稿</button>
+                    </div>
+                </div>
+                <div class="wx-excerpt-panel" id="excerptPanel" style="margin:0 14px 2px;">
+                    <div class="wx-excerpt-hd">
+                        <span>📋 文章摘要（微信必填，≤ 120字）</span>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <span class="wx-char-count" id="excerptCharCount"></span>
+                            <button class="wx-mini-btn" type="button" onclick="copyValue(document.getElementById('excerptText').textContent)">复制</button>
+                        </div>
+                    </div>
+                    <div class="wx-excerpt-text" id="excerptText"></div>
+                </div>
+                <div id="timingTip" style="margin:0 14px 0;"></div>
+                <div class="wx-tabs">
+                    <button class="wx-tab active" id="tabPlain" onclick="switchTab('plain')">纯文本</button>
+                    <button class="wx-tab"        id="tabRich"  onclick="switchTab('rich')">富文本（含格式）</button>
+                </div>
+                <div class="wx-tab-pane active" id="panePublishPlain">
+                    <textarea class="wx-output wx-publish-output" id="publishOutput" placeholder="生成后可复制粘贴到微信公众号发布文本框"></textarea>
+                </div>
+                <div class="wx-tab-pane" id="panePublishRich">
+                    <div id="richPreview" class="wx-rich-preview"></div>
+                    <div id="richEmpty"   class="wx-rich-preview-empty">点击「生成发布成稿」后此处显示富文本预览，可直接复制粘贴保留格式</div>
+                </div>
+            </section>
+
+            <!-- 账号定位检查结果 -->
+            <div class="wx-positioning-result" id="positioningResult"></div>
+
+            <!-- 开篇 Hook -->
+            <section class="wx-panel" id="hookPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">🎣 开篇 Hook 方案</div>
+                    <span class="wx-file-list">选择一种风格替换文章开篇</span>
+                </div>
+                <div class="wx-list" id="hookList"></div>
+            </section>
+
+            <!-- 金句提炼 -->
+            <section class="wx-panel" id="quotesPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">💬 可截图传播的金句</div>
+                    <button class="wx-btn" type="button" onclick="copyAllQuotes()">复制全部金句</button>
+                </div>
+                <div class="wx-list" id="quotesList"></div>
+            </section>
+
+            <!-- 互动引导结尾 -->
+            <section class="wx-panel" id="endingPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">💡 互动引导结尾</div>
+                    <span class="wx-file-list">选择一种风格追加到正文结尾</span>
+                </div>
+                <div class="wx-list" id="endingList"></div>
+            </section>
+
+            <!-- 系列规划 -->
+            <section class="wx-panel" id="seriesPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">📅 内容系列规划</div>
+                    <div class="wx-panel-actions">
+                        <span class="wx-file-list" id="seriesName"></span>
+                        <button class="wx-btn" type="button" onclick="copySeriesPlan()">复制系列计划</button>
+                    </div>
+                </div>
+                <div class="wx-list" id="seriesEpisodeList"></div>
+            </section>
+
+            <!-- 发布历史 & 复盘 -->
+            <section class="wx-panel" id="historyPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">📊 发布记录与复盘</div>
+                    <div class="wx-panel-actions">
+                        <button class="wx-btn" type="button" onclick="savePublishRecord()">保存本篇记录</button>
+                        <button class="wx-btn" type="button" onclick="clearHistory()">清空历史</button>
+                    </div>
+                </div>
+                <div class="wx-panel-body" id="recordForm" style="display:none;">
+                    <div style="font-size:12px;font-weight:850;color:#64748b;margin-bottom:4px;">录入发布后数据（可选）</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                        <div class="wx-field"><label class="wx-label">阅读量</label><input class="wx-input" id="metaReads" type="number" placeholder="0"></div>
+                        <div class="wx-field"><label class="wx-label">在看数</label><input class="wx-input" id="metaLikes" type="number" placeholder="0"></div>
+                        <div class="wx-field"><label class="wx-label">留言数</label><input class="wx-input" id="metaComments" type="number" placeholder="0"></div>
+                    </div>
+                    <input class="wx-input" id="metaNote" placeholder="备注（哪种写法效果好、踩了什么坑等）" style="margin-top:6px;">
+                    <button class="wx-btn primary" type="button" onclick="confirmSaveRecord()" style="margin-top:8px;width:100%;">确认保存</button>
+                </div>
+                <div class="wx-list scroll" id="historyList" style="max-height:320px;"></div>
+            </section>
+
+            <!-- 合规预检 -->
+            <section class="wx-panel" id="compliancePanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">🔍 内容合规预检</div>
+                    <div class="wx-panel-actions">
+                        <button class="wx-btn" id="btnDeepCheck" type="button" onclick="runCompliance(true)">深度检查（AI）</button>
+                    </div>
+                </div>
+                <div class="wx-list" id="complianceList"></div>
+            </section>
+
+            <!-- 多平台分发 -->
+            <section class="wx-panel" id="platformPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">🌐 多平台分发</div>
+                    <div class="wx-panel-actions">
+                        <span class="wx-file-list" id="platformStatus"></span>
+                        <button class="wx-btn" type="button" onclick="copyPlatformContent()">复制内容</button>
+                    </div>
+                </div>
+                <div class="wx-platform-tabs" id="platformTabs">
+                    <button class="wx-platform-btn" data-platform="zhihu"       onclick="switchPlatform('zhihu')"><span class="wx-platform-icon">📝</span>知乎</button>
+                    <button class="wx-platform-btn" data-platform="xiaohongshu" onclick="switchPlatform('xiaohongshu')"><span class="wx-platform-icon">📕</span>小红书</button>
+                    <button class="wx-platform-btn" data-platform="weibo"       onclick="switchPlatform('weibo')"><span class="wx-platform-icon">🔷</span>微博</button>
+                    <button class="wx-platform-btn" data-platform="bilibili"    onclick="switchPlatform('bilibili')"><span class="wx-platform-icon">📺</span>B站脚本</button>
+                </div>
+                <div class="wx-platform-content">
+                    <div id="platformEmpty" style="color:#94a3b8;font-size:13px;padding:12px 0;">选择平台后自动生成对应格式</div>
+                    <textarea class="wx-platform-output" id="platformOutput" style="display:none;" readonly></textarea>
+                </div>
+            </section>
+
+            <!-- 素材知识库 -->
+            <section class="wx-panel" id="materialsPanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">🗂 素材知识库</div>
+                    <div class="wx-panel-actions">
+                        <input class="wx-input" id="materialSearchInput" placeholder="搜索素材…" style="width:120px;min-height:30px;font-size:12px;" oninput="searchMaterials()">
+                        <button class="wx-btn primary" type="button" onclick="toggleAddMaterial()">+ 添加素材</button>
+                    </div>
+                </div>
+                <div id="addMaterialForm" style="display:none;padding:12px 14px;border-bottom:1px solid var(--border);">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                        <div class="wx-field"><label class="wx-label">素材标题</label><input class="wx-input" id="newMaterialTitle" placeholder="便于检索的标题"></div>
+                        <div class="wx-field"><label class="wx-label">分类</label>
+                            <select class="wx-select" id="newMaterialCategory">
+                                <option>案例</option><option>数据</option><option>观点</option><option>名言</option><option>行业报告</option><option>通用</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="wx-field" style="margin-bottom:8px;"><label class="wx-label">素材内容</label><textarea class="wx-textarea" id="newMaterialContent" placeholder="事实、数据、案例、金句等" style="min-height:80px;"></textarea></div>
+                    <div class="wx-field" style="margin-bottom:8px;"><label class="wx-label">标签（逗号分隔）</label><input class="wx-input" id="newMaterialTags" placeholder="如：AI,职场,效率"></div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="wx-btn primary" type="button" onclick="saveMaterial()">保存</button>
+                        <button class="wx-btn" type="button" onclick="toggleAddMaterial()">取消</button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;padding:10px 14px 4px;flex-wrap:wrap;" id="materialCatFilter">
+                    <button class="wx-mini-btn" data-cat="" onclick="filterMaterials('')">全部</button>
+                    <button class="wx-mini-btn" data-cat="案例" onclick="filterMaterials('案例')">案例</button>
+                    <button class="wx-mini-btn" data-cat="数据" onclick="filterMaterials('数据')">数据</button>
+                    <button class="wx-mini-btn" data-cat="观点" onclick="filterMaterials('观点')">观点</button>
+                    <button class="wx-mini-btn" data-cat="名言" onclick="filterMaterials('名言')">名言</button>
+                </div>
+                <div class="wx-list scroll" id="materialList" style="max-height:380px;"></div>
+            </section>
+
+            <!-- 🧠 知识提炼结果 -->
+            <section class="wx-panel" id="knowledgePanel" style="display:none;">
+                <div class="wx-panel-hd">
+                    <div class="wx-panel-title">🧠 知识提炼</div>
+                    <div class="wx-panel-actions">
+                        <span id="knowledgeSummaryBadge" style="font-size:12px;color:#64748b;"></span>
+                        <button class="wx-btn primary" type="button" id="btnSaveAllKnowledge" onclick="saveAllKnowledge()" style="display:none;">全部存入素材库</button>
+                    </div>
+                </div>
+                <div id="knowledgeSummaryBox" style="display:none;padding:10px 14px 0;"></div>
+                <div class="wx-list scroll" id="knowledgeList" style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;max-height:520px;overflow-y:auto;"></div>
+            </section>
+
+        </section><!-- /workspace -->
+    </main>
+</div>
+
+<script>
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const statusBox         = document.getElementById('statusBox');
+const modelStatus       = document.getElementById('modelStatus');
+const hotTopicList      = document.getElementById('hotTopicList');
+const hotTopicMeta      = document.getElementById('hotTopicMeta');
+const titleList         = document.getElementById('titleList');
+const imageList         = document.getElementById('imageList');
+const fileList          = document.getElementById('fileList');
+const markdownOutput    = document.getElementById('markdownOutput');
+const publishOutput     = document.getElementById('publishOutput');
+const richPreview       = document.getElementById('richPreview');
+const richEmpty         = document.getElementById('richEmpty');
+const providerSelect    = document.getElementById('providerSelect');
+const modelInput        = document.getElementById('modelInput');
+const diagnosticList    = document.getElementById('diagnosticList');
+const selectedTitleInput = document.getElementById('selectedTitleInput');
+const selectedTopicInput = document.getElementById('selectedTopicInput');
+const qualityPanel      = document.getElementById('qualityPanel');
+const qualityItems      = document.getElementById('qualityItems');
+
+// ── state ─────────────────────────────────────────────────────────────────────
+let hotTopicsState = [], titlesState = [], titlesScored = [], imagesState = [], coverImagesState = [];
+let selectedHotTopicIndex = -1, selectedTitleIndex = -1, selectedImageIndex = -1;
+let providerTouched = false, modelTouched = false;
+let currentProviderLabel = '', currentDefaultModel = '', currentOutputDir = '';
+let currentRichHtml = '';
+let currentTab = 'plain';
+let currentMode = 'rich';
+
+// ── article mode ──────────────────────────────────────────────────────────────
+function selectMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('#modeGrid .wx-mode-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.mode === mode);
+    });
+    saveForm();
+}
+
+const GENERATION_BTN_IDS = [
+    'btnHotTopics','btnTitles','btnArticle','btnImages',
+    'btnPackage','btnPublish','btnProbeCurrent','btnProbeAll',
+    'btnRenderImages','btnComfyStatus','btnComfyStart',
+    'btnHooks','btnQuotes','btnEnding','btnSeries','btnPositioning',
+    'btnCoverIdea','btnRewrite','btnExcerpt','btnCompliance','btnDeepCheck',
+    'btnTitles2','btnArticle2','btnImages2','btnPublish2',
+    'btnHooks2','btnQuotes2','btnEnding2','btnSeries2','btnCompliance2','btnKnowledge2',
+    'btnKnowledge',
+];
+
+// ── localStorage ──────────────────────────────────────────────────────────────
+const PERSIST_FIELDS = ['customTopicInput','coreViewpoint','contentNotesInput','audienceInput','toneInput','imagePositionSelect','accountPositioning'];
+const LS_KEY = 'wx_ops_v2';
+
+function saveForm() {
+    try {
+        const s = {};
+        PERSIST_FIELDS.forEach(id => { s[id] = document.getElementById(id)?.value ?? ''; });
+        s.provider = providerSelect.value;
+        s.mode = currentMode;
+        localStorage.setItem(LS_KEY, JSON.stringify(s));
+    } catch(_) {}
+}
+
+function restoreForm() {
+    try {
+        const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+        PERSIST_FIELDS.forEach(id => { const el = document.getElementById(id); if (el && s[id] != null) el.value = s[id]; });
+        if (s.provider) providerSelect.value = s.provider;
+        if (s.mode) selectMode(s.mode);
+    } catch(_) {}
+}
+
+// ── progress bar ──────────────────────────────────────────────────────────────
+function updateProgress() {
+    const done = [
+        !!selectedTopicInput.value.trim(),
+        !!(document.getElementById('coreViewpoint').value.trim()),
+        titlesState.length > 0,
+        !!markdownOutput.value.trim(),
+        !!(publishOutput.value.trim() || currentRichHtml),
+    ];
+    for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById('ps' + i);
+        const dot  = document.getElementById('pd' + i);
+        step.classList.remove('done','active');
+        dot.textContent = done[i-1] ? '✓' : String(i);
+        if (done[i-1]) {
+            step.classList.add('done');
+        } else {
+            // first not-done = active
+            const anyPending = done.slice(0, i-1).every(Boolean);
+            if (anyPending) { step.classList.add('active'); break; }
+        }
+    }
+}
+
+// ── tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabPlain').classList.toggle('active', tab === 'plain');
+    document.getElementById('tabRich').classList.toggle('active',  tab === 'rich');
+    document.getElementById('panePublishPlain').classList.toggle('active', tab === 'plain');
+    document.getElementById('panePublishRich').classList.toggle('active',  tab === 'rich');
+    document.getElementById('btnCopyPublish').textContent = tab === 'rich' ? '复制富文本' : '一键复制';
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function iv(id) { return document.getElementById(id).value.trim(); }
+function selectedProvider() { return providerSelect.value || 'deepseek'; }
+function selectedModel() { return modelInput.value.trim(); }
+function selectedTopic() { return selectedTopicInput.value.trim(); }
+function selectedImage() { return imagesState[selectedImageIndex] || {}; }
+
+function onProviderChanged() { providerTouched = true; modelTouched = false; saveForm(); loadStatus(); }
+function onModelInputChanged() { modelTouched = true; refreshModelStatusText(); }
+function resetModelToDefault() { modelTouched = false; modelInput.value = currentDefaultModel; refreshModelStatusText(); }
+
+function refreshModelStatusText() {
+    const m = selectedModel() || currentDefaultModel;
+    let t = m || '未指定模型';
+    if (m && currentDefaultModel && m !== currentDefaultModel) t = m + '（默认 ' + currentDefaultModel + '）';
+    modelStatus.textContent = (currentProviderLabel || selectedProvider()) + ' · ' + t + ' · ' + currentOutputDir;
+}
+
+function setStatus(text, kind = '') {
+    statusBox.textContent = text;
+    statusBox.className = 'wx-status' + (kind ? ' ' + kind : '');
+}
+
+function setBusy(busy) {
+    GENERATION_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = busy; });
+}
+
+async function apiPost(url, body) {
+    setBusy(true);
+    try {
+        const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error || '请求失败');
+        renderFiles(data.output_files || []);
+        return data.data || {};
+    } finally { setBusy(false); }
+}
+
+function renderFiles(files) {
+    fileList.textContent = files.length ? '输出文件：' + files.join('；') : '';
+}
+
+function keepBox(index) {
+    const label = document.createElement('label');
+    label.className = 'wx-keep';
+    label.onclick = e => e.stopPropagation();
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.dataset.keep = '1'; cb.dataset.index = String(index);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode('保留'));
+    return label;
+}
+
+function mergeKept(current, fresh, listId, keyFn) {
+    const kept = [];
+    document.querySelectorAll('#' + listId + ' input[data-keep]:checked').forEach(cb => {
+        const item = current[Number(cb.dataset.index)];
+        if (item) kept.push(item);
+    });
+    const seen = new Set(kept.map(keyFn));
+    const merged = kept.slice();
+    (fresh || []).forEach(item => {
+        const k = keyFn(item);
+        if (k && !seen.has(k)) { merged.push(item); seen.add(k); }
+    });
+    return merged;
+}
+
+// ── render diagnostics (model probe) ─────────────────────────────────────────
+function renderDiagnostics(results) {
+    diagnosticList.textContent = '';
+    (results || []).forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'wx-diagnostic ' + (item.available ? 'good' : 'bad');
+        const name = document.createElement('div');
+        name.className = 'wx-diagnostic-name';
+        name.textContent = (item.provider||'-') + ' · ' + (item.model||'-') + ' · ' + (item.latency_ms||0) + 'ms';
+        const msg = document.createElement('div');
+        msg.textContent = item.available ? ('可用：' + (item.message||'OK')) : (item.error||'不可用');
+        row.appendChild(name); row.appendChild(msg);
+        diagnosticList.appendChild(row);
+    });
+}
+
+// ── render hot topics ─────────────────────────────────────────────────────────
+function renderHotTopics() {
+    hotTopicList.textContent = '';
+    if (!hotTopicsState.length) {
+        hotTopicList.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px 0;">点击「获取热点50」加载当前热榜，或在左侧输入自定义话题</div>';
+        return;
+    }
+    hotTopicsState.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'wx-item' + (idx === selectedHotTopicIndex ? ' selected' : '');
+        card.onclick = () => selectHotTopic(idx);
+
+        const top = document.createElement('div'); top.className = 'wx-item-top';
+        const name = document.createElement('div'); name.className = 'wx-item-name';
+        name.textContent = item.rank + '. ' + item.title;
+        top.appendChild(name); top.appendChild(keepBox(idx));
+        card.appendChild(top);
+
+        if (item.summary) {
+            const s = document.createElement('div'); s.className = 'wx-item-text'; s.textContent = item.summary;
+            card.appendChild(s);
+        }
+
+        const meta = document.createElement('div'); meta.className = 'wx-meta';
+        [item.source_text||'', item.heat_text ? '热度 '+item.heat_text : ''].filter(Boolean).forEach(t => {
+            const c = document.createElement('span'); c.className = 'wx-chip'; c.textContent = t; meta.appendChild(c);
+        });
+        if (item.cached) {
+            const c = document.createElement('span'); c.className = 'wx-chip cached'; c.textContent = '缓存'; meta.appendChild(c);
+        }
+        card.appendChild(meta);
+        hotTopicList.appendChild(card);
+    });
+}
+
+// ── render titles ─────────────────────────────────────────────────────────────
+function renderTitles() {
+    titleList.textContent = '';
+    if (!titlesState.length) {
+        titleList.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px 0;">选择话题后点击「生成标题」</div>';
+        document.getElementById('titleSortHint').textContent = '';
+        return;
+    }
+    // Show hint about score sorting
+    const hasScores = titlesScored.length && titlesScored.some(t => t.score > 0);
+    document.getElementById('titleSortHint').textContent = hasScores ? '按传播力排序' : '';
+
+    // Build display list (scored or plain)
+    const displayList = titlesState.map((title, idx) => {
+        const scored = titlesScored[idx] || {};
+        return { title, idx, score: scored.score || 0, type: scored.type || '', reason: scored.reason || '' };
+    });
+    if (hasScores) displayList.sort((a, b) => b.score - a.score);
+
+    displayList.forEach(({title, idx, score, type, reason}) => {
+        const row = document.createElement('div');
+        row.className = 'wx-item' + (idx === selectedTitleIndex ? ' selected' : '');
+        row.onclick = () => selectTitle(idx);
+
+        const top = document.createElement('div'); top.className = 'wx-item-top';
+        const left = document.createElement('div'); left.className = 'wx-title-row';
+
+        if (score > 0) {
+            const badge = document.createElement('div');
+            badge.className = 'wx-score-badge ' + (score >= 8 ? 'wx-score-high' : score >= 6 ? 'wx-score-mid' : 'wx-score-low');
+            badge.textContent = score;
+            left.appendChild(badge);
+        }
+        const t = document.createElement('div'); t.className = 'wx-item-name'; t.textContent = title;
+        left.appendChild(t);
+        if (type) {
+            const tag = document.createElement('span'); tag.className = 'wx-title-type'; tag.textContent = type;
+            left.appendChild(tag);
+        }
+        top.appendChild(left); top.appendChild(keepBox(idx));
+        row.appendChild(top);
+        if (reason) {
+            const r = document.createElement('div'); r.className = 'wx-item-text'; r.textContent = reason;
+            row.appendChild(r);
+        }
+        titleList.appendChild(row);
+    });
+}
+
+// ── render cover images ───────────────────────────────────────────────────────
+function renderCoverImages() {
+    const section = document.getElementById('coverImageSection');
+    const list = document.getElementById('coverImageList');
+    if (!coverImagesState.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.textContent = '';
+    coverImagesState.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'wx-item wx-image-card';
+        const thumb = document.createElement('div');
+        const imageUrl = item.image_url || item.unsplash_url || '';
+        thumb.className = 'wx-cover-thumb';
+        if (imageUrl) { const img = document.createElement('img'); img.src = imageUrl; thumb.appendChild(img); }
+        else { thumb.textContent = item.scene || '封面图'; }
+        card.appendChild(thumb);
+        const nm = document.createElement('div'); nm.className = 'wx-item-name'; nm.style.marginTop = '6px'; nm.textContent = item.name || '封面图';
+        card.appendChild(nm);
+        if (item.reason) { const r = document.createElement('div'); r.className = 'wx-item-text'; r.textContent = item.reason; card.appendChild(r); }
+
+        const actions = document.createElement('div'); actions.className = 'wx-image-actions';
+        if (!imageUrl) {
+            const btn = document.createElement('button'); btn.className = 'wx-mini-btn green'; btn.textContent = '免费 AI 封面';
+            btn.onclick = e => { e.stopPropagation(); fetchUnsplashCover(idx); };
+            actions.appendChild(btn);
+        }
+        const cp = document.createElement('button'); cp.className = 'wx-mini-btn'; cp.textContent = '复制提示词';
+        cp.onclick = () => copyValue(item.prompt || ''); actions.appendChild(cp);
+        card.appendChild(actions);
+        list.appendChild(card);
+    });
+}
+
+// ── render images ─────────────────────────────────────────────────────────────
+function renderImages() {
+    imageList.textContent = '';
+    if (!imagesState.length) {
+        imageList.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px 0;grid-column:1/-1;">生成正文后点击「生成配图」</div>';
+        return;
+    }
+    imagesState.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'wx-item wx-image-card' + (idx === selectedImageIndex ? ' selected' : '');
+        card.onclick = () => selectImage(idx);
+
+        const thumb = document.createElement('div');
+        const imageUrl = item.image_url || item.unsplash_url || '';
+        thumb.className = 'wx-image-thumb' + (imageUrl ? ' has-image' : '');
+        if (imageUrl) {
+            const img = document.createElement('img'); img.src = imageUrl; img.alt = item.name || '配图';
+            thumb.appendChild(img);
+        } else {
+            thumb.textContent = item.name || '配图方案';
+        }
+        card.appendChild(thumb);
+
+        const top = document.createElement('div'); top.className = 'wx-item-top';
+        const nm = document.createElement('div'); nm.className = 'wx-item-name';
+        nm.textContent = item.scene || item.caption || item.name || '配图方案';
+        top.appendChild(nm); top.appendChild(keepBox(idx));
+        card.appendChild(top);
+
+        ['style','caption','reason'].forEach(key => {
+            if (!item[key]) return;
+            const line = document.createElement('div'); line.className = 'wx-item-text'; line.textContent = item[key];
+            card.appendChild(line);
+        });
+        if (item.render_error) {
+            const err = document.createElement('div'); err.className = 'wx-error'; err.textContent = item.render_error;
+            card.appendChild(err);
+        }
+
+        // Action buttons
+        const actions = document.createElement('div'); actions.className = 'wx-image-actions';
+
+        // Unsplash fallback button (always show if no rendered image)
+        if (!imageUrl) {
+            const unsplashBtn = document.createElement('button');
+            unsplashBtn.className = 'wx-mini-btn green';
+            unsplashBtn.textContent = '免费 AI 生图';
+            unsplashBtn.onclick = e => { e.stopPropagation(); fetchUnsplashImage(idx); };
+            actions.appendChild(unsplashBtn);
+        }
+
+        if (imageUrl) {
+            const open = document.createElement('a');
+            open.className = 'wx-mini-btn'; open.href = imageUrl; open.target = '_blank'; open.rel = 'noreferrer'; open.textContent = '打开图片';
+            open.onclick = e => e.stopPropagation();
+            const copy = document.createElement('button');
+            copy.className = 'wx-mini-btn'; copy.type = 'button'; copy.textContent = '复制图片';
+            copy.onclick = e => { e.stopPropagation(); copySelectedImageBlob(idx); };
+            actions.appendChild(open); actions.appendChild(copy);
+        }
+
+        const copyPromptBtn = document.createElement('button');
+        copyPromptBtn.className = 'wx-mini-btn'; copyPromptBtn.type = 'button'; copyPromptBtn.textContent = '复制提示词';
+        copyPromptBtn.onclick = e => { e.stopPropagation(); copyValue(item.prompt || ''); };
+        actions.appendChild(copyPromptBtn);
+
+        card.appendChild(actions);
+        imageList.appendChild(card);
+    });
+}
+
+// ── free AI image generation (pollinations.ai via backend proxy) ─────────────
+async function fetchFreeAiImage(prompt, width = 1024, height = 576) {
+    const proxyUrl = '/api/wechat-assistant/image-proxy?keywords=' + encodeURIComponent(prompt)
+        + '&width=' + width + '&height=' + height;
+    const res = await fetch(proxyUrl);
+    if (!res.ok) {
+        let msg = '图片生成失败';
+        try { msg = (await res.json()).error || msg; } catch(_) {}
+        throw new Error(msg);
+    }
+    const publicUrl = res.headers.get('X-Image-Url') || '';
+    return {
+        image_url: publicUrl || proxyUrl,
+        image_path: res.headers.get('X-Image-Path') || '',
+        unsplash_url: publicUrl || proxyUrl,
+    };
+}
+
+async function fetchUnsplashImage(idx) {
+    const item = imagesState[idx];
+    if (!item) return;
+    const prompt = (item.prompt || item.scene || item.name || '').trim();
+    if (!prompt) { setStatus('该方案缺少提示词，无法生成免费配图', 'bad'); return; }
+    setStatus('正在生成免费 AI 配图（约10-30秒）...');
+    try {
+        const img = await fetchFreeAiImage(prompt);
+        imagesState[idx] = { ...item, ...img };
+        renderImages();
+        setStatus('免费 AI 配图已生成', 'good');
+    } catch(e) {
+        setStatus('免费配图生成失败：' + e.message, 'bad');
+    }
+}
+
+// ── quality diagnosis ─────────────────────────────────────────────────────────
+async function runDiagnose() {
+    const markdown = markdownOutput.value.trim();
+    if (!markdown) { setStatus('请先生成正文', 'bad'); return; }
+    setStatus('正在诊断内容质量...');
+    try {
+        const res = await fetch('/api/wechat-assistant/diagnose', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ markdown, core_viewpoint: iv('coreViewpoint') }),
+        });
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.error || '诊断失败');
+        const d = payload.data || {};
+        qualityItems.textContent = '';
+        (d.issues || []).forEach(issue => {
+            const row = document.createElement('div');
+            row.className = 'wx-quality-item ' + (issue.level === 'ok' ? 'ok' : 'warn');
+            const dot = document.createElement('span');
+            dot.className = 'wx-quality-dot';
+            dot.textContent = issue.level === 'ok' ? '✓' : '⚠';
+            const text = document.createElement('span');
+            text.textContent = issue.msg;
+            row.appendChild(dot); row.appendChild(text);
+            qualityItems.appendChild(row);
+        });
+        // Compute reading time client-side
+        const charCount = (d.word_count || 0);
+        const mins = Math.max(1, Math.round(charCount / 300));
+        document.getElementById('readingTimeLabel').textContent = `· 约${mins}分钟阅读`;
+        qualityPanel.style.display = 'block';
+        setStatus('诊断完成', 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    }
+}
+
+// ── selection helpers ─────────────────────────────────────────────────────────
+function selectHotTopic(idx) {
+    const item = hotTopicsState[idx]; if (!item) return;
+    selectedHotTopicIndex = idx;
+    selectedTopicInput.value = item.title || '';
+    renderHotTopics();
+    updateProgress();
+}
+
+function useCustomTopic() {
+    const c = iv('customTopicInput');
+    if (!c) { setStatus('请输入自定义话题方向', 'bad'); return; }
+    selectedHotTopicIndex = -1;
+    selectedTopicInput.value = c;
+    renderHotTopics(); updateProgress();
+    setStatus('已使用自定义话题', 'good');
+}
+
+function selectTitle(idx) {
+    const title = titlesState[idx]; if (!title) return;
+    selectedTitleIndex = idx;
+    selectedTitleInput.value = title;
+    renderTitles(); updateProgress();
+}
+
+function selectImage(idx) {
+    if (!imagesState[idx]) return;
+    selectedImageIndex = idx;
+    renderImages();
+}
+
+// ── API: load status ──────────────────────────────────────────────────────────
+async function loadStatus() {
+    try {
+        const url = providerTouched
+            ? '/api/wechat-assistant/status?provider=' + encodeURIComponent(selectedProvider())
+            : '/api/wechat-assistant/status';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error || '配置读取失败');
+        if (Array.isArray(data.providers)) {
+            providerSelect.textContent = '';
+            data.providers.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.key;
+                opt.textContent = item.label + ' · ' + item.model + (item.api_key_configured ? '' : '（未配置）');
+                providerSelect.appendChild(opt);
+            });
+            providerSelect.value = data.provider || selectedProvider();
+        }
+        currentProviderLabel = data.provider_label || data.provider || selectedProvider();
+        currentDefaultModel  = data.model || '';
+        currentOutputDir     = data.output_dir || '';
+        if (!modelTouched || !selectedModel()) modelInput.value = currentDefaultModel;
+        refreshModelStatusText();
+        setStatus(
+            data.api_key_configured
+                ? '当前模型密钥已配置'
+                : '缺少密钥：请到设置页配置 ' + (data.provider_label||data.provider) + '，或配置环境变量 ' + data.api_key_env,
+            data.api_key_configured ? 'good' : 'bad'
+        );
+        if (data.api_key_configured) collapseModelConfigIfReady();
+    } catch(e) {
+        modelStatus.textContent = '配置异常';
+        setStatus(e.message, 'bad');
+    }
+}
+
+// ── API: hot topics ───────────────────────────────────────────────────────────
+async function fetchHotTopics() {
+    const tid = taskStart('获取热点话题', '连接中...');
+    try {
+        setBusy(true); setStatus('正在获取热点话题...');
+        const prev = selectedTopic();
+        const res = await fetch('/api/wechat-assistant/hot-topics?limit=50');
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.error || '热点获取失败');
+        const data = payload.data || {};
+        hotTopicsState = mergeKept(hotTopicsState, data.topics || [], 'hotTopicList', t => t.title || '');
+        selectedHotTopicIndex = hotTopicsState.findIndex(t => t.title === prev);
+        if (data.cached) hotTopicsState.forEach(t => { t.cached = true; });
+        renderHotTopics();
+        hotTopicMeta.textContent = (data.generated_at||'') + (data.cached?' · 缓存':'') + ' · ' + hotTopicsState.length + '个';
+        setStatus(data.cached ? '热点来自缓存（5分钟内）' : '热点话题已更新', 'good');
+        taskDone(tid, hotTopicsState.length + ' 个热点');
+        updateProgress();
+    } catch(e) {
+        setStatus(e.message, 'bad');
+        taskFail(tid, e.message);
+    } finally { setBusy(false); }
+}
+
+// ── API: titles ───────────────────────────────────────────────────────────────
+async function refreshTitles() {
+    const tid = taskStart('生成标题', '调用模型...');
+    try {
+        const topic = selectedTopic();
+        if (!topic) throw new Error('请先选择热点话题或填写自定义话题');
+        setStatus('正在生成标题（含传播力评分）...');
+        const prevTitle = selectedTitleInput.value;
+        const data = await apiPost('/api/wechat-assistant/titles', {
+            topic, core_viewpoint: iv('coreViewpoint'), content_notes: iv('contentNotesInput'),
+            audience: iv('audienceInput'), tone: iv('toneInput'),
+            provider: selectedProvider(), model: selectedModel(),
+        });
+        titlesState = mergeKept(titlesState, data.titles || [], 'titleList', t => t);
+        titlesScored = data.titles_scored || [];
+        selectedTitleIndex = titlesState.indexOf(prevTitle);
+        if (selectedTitleIndex < 0) selectedTitleInput.value = '';
+        renderTitles();
+        if (selectedTitleIndex >= 0) selectTitle(selectedTitleIndex);
+        setStatus('标题已生成（按传播力评分排序）', 'good');
+        taskDone(tid, titlesState.length + ' 个标题');
+        updateProgress();
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+}
+
+// ── API: generate excerpt ─────────────────────────────────────────────────────
+async function generateExcerpt() {
+    const markdown = markdownOutput.value.trim();
+    if (!markdown) { setStatus('请先生成正文', 'bad'); return; }
+    const tid = taskStart('生成文章摘要', '调用模型...');
+    setBusy(true); setStatus('正在生成文章摘要...');
+    try {
+        const res = await fetch('/api/wechat-assistant/excerpt', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                markdown, title: selectedTitleInput.value,
+                core_viewpoint: iv('coreViewpoint'),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '生成失败');
+        const d = payload.data;
+        const excerptText = document.getElementById('excerptText');
+        excerptText.textContent = d.excerpt || '';
+        document.getElementById('excerptCharCount').textContent = (d.char_count || 0) + '字';
+        document.getElementById('excerptPanel').style.display = 'block';
+        setStatus('摘要已生成（可复制粘贴到公众号摘要字段）', 'good');
+        taskDone(tid, (d.char_count || 0) + '字');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+// ── API: rewrite paragraph ────────────────────────────────────────────────────
+function toggleRewritePanel() {
+    const panel = document.getElementById('rewritePanel');
+    const visible = panel.style.display !== 'none';
+    panel.style.display = visible ? 'none' : 'block';
+    if (!visible) {
+        // Pre-fill with selected text if any
+        const sel = window.getSelection ? window.getSelection().toString() : '';
+        if (sel && sel.trim().length > 10) {
+            document.getElementById('rewriteInput').value = sel.trim();
+        }
+    }
+}
+
+async function doRewrite() {
+    const paragraph = document.getElementById('rewriteInput').value.trim();
+    if (!paragraph) { setStatus('请先填写要重写的段落', 'bad'); return; }
+    const tid = taskStart('段落重写', '调用模型...');
+    setBusy(true); setStatus('正在重写段落...');
+    try {
+        const res = await fetch('/api/wechat-assistant/rewrite-paragraph', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                paragraph,
+                instruction: document.getElementById('rewriteInstruction').value.trim(),
+                topic: selectedTopic(),
+                tone: iv('toneInput'),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '重写失败');
+        const rewriteOutput = document.getElementById('rewriteOutput');
+        rewriteOutput.value = payload.data.rewritten || '';
+        document.getElementById('rewriteResult').style.display = 'block';
+        setStatus('段落已重写', 'good');
+        taskDone(tid, '重写完成');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+function applyRewrite() {
+    const original = document.getElementById('rewriteInput').value.trim();
+    const rewritten = document.getElementById('rewriteOutput').value.trim();
+    if (!original || !rewritten) return;
+    const md = markdownOutput.value;
+    const idx = md.indexOf(original);
+    if (idx >= 0) {
+        markdownOutput.value = md.slice(0, idx) + rewritten + md.slice(idx + original.length);
+        setStatus('段落已替换到正文中', 'good');
+        document.getElementById('rewritePanel').style.display = 'none';
+        document.getElementById('rewriteResult').style.display = 'none';
+    } else {
+        setStatus('原段落在正文中未找到，请手动替换', 'bad');
+    }
+}
+
+// ── API: cover image ──────────────────────────────────────────────────────────
+async function generateCoverIdea() {
+    const topic = selectedTopic();
+    if (!topic) { setStatus('请先选择话题', 'bad'); return; }
+    setBusy(true); setStatus('正在生成封面图方案...');
+    try {
+        const res = await fetch('/api/wechat-assistant/cover-image-idea', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                topic, core_viewpoint: iv('coreViewpoint'), tone: iv('toneInput'),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '生成失败');
+        coverImagesState = payload.data.cover_images || [];
+        renderCoverImages();
+        setStatus('封面图方案已生成（9:5横版比例）', 'good');
+    } catch(e) { setStatus(e.message, 'bad'); }
+    finally { setBusy(false); }
+}
+
+async function fetchUnsplashCover(idx) {
+    const item = coverImagesState[idx];
+    if (!item) return;
+    const prompt = (item.prompt || item.scene || item.name || '').trim();
+    if (!prompt) { setStatus('该方案缺少提示词，无法生成封面图', 'bad'); return; }
+    setStatus('正在生成免费 AI 封面图（约10-30秒）...');
+    try {
+        // 封面方案为 9:5 横构图，与提示词约定一致
+        const img = await fetchFreeAiImage(prompt, 1080, 600);
+        coverImagesState[idx] = { ...item, ...img };
+        renderCoverImages();
+        setStatus('封面图已生成', 'good');
+    } catch(e) { setStatus('封面图生成失败：' + e.message, 'bad'); }
+}
+
+// ── publishing timing tip ─────────────────────────────────────────────────────
+function showPublishTimingTip() {
+    const now = new Date();
+    const hour = now.getHours();
+    const day = now.getDay(); // 0=Sun, 6=Sat
+    const isWeekend = day === 0 || day === 6;
+    const tipEl = document.getElementById('timingTip');
+    let msg = '', cls = '';
+    const goodHours = [[7,9],[12,13],[21,22]];
+    const inGoodHour = goodHours.some(([s,e]) => hour >= s && hour < e);
+    if (isWeekend && inGoodHour) {
+        msg = '⏰ 当前时段（周末 ' + hour + ':xx）是周末发布黄金期，发布后预期阅读量较高。';
+        cls = 'ok';
+    } else if (!isWeekend && inGoodHour) {
+        msg = '⏰ 当前时段是工作日发布黄金期（7-9点 / 12-13点 / 21-22点），现在发布效果较好。';
+        cls = 'ok';
+    } else if (hour >= 0 && hour < 6) {
+        msg = '⏰ 当前为深夜（' + hour + ':xx），建议保存草稿，于早上 7:30-9:00 或中午 12:00 发布。';
+    } else {
+        msg = '⏰ 最佳发布时段：工作日 7:30-9:00、12:00-13:00、21:00-22:00；周末 9:00-11:00。当前时段（' + hour + ':xx）为次优期。';
+    }
+    tipEl.innerHTML = `<div class="wx-timing-tip ${cls}">${msg}</div>`;
+}
+
+// ── API: article (streaming) ──────────────────────────────────────────────────
+async function writeArticle() {
+    const topic = selectedTopic();
+    const articleErrorTip = document.getElementById('articleErrorTip');
+    if (!topic) {
+        setStatus('请先选择热点话题或填写自定义话题', 'bad');
+        if (articleErrorTip) { articleErrorTip.textContent = '⚠️ 请先在左侧填写「已选话题」，再点击生成正文'; articleErrorTip.style.display = 'block'; }
+        return;
+    }
+    if (articleErrorTip) articleErrorTip.style.display = 'none';
+    const tid = taskStart('生成正文', '流式输出中...');
+    setBusy(true);
+    setStatus('正在生成正文（流式输出中）...');
+    markdownOutput.value = '';
+    qualityPanel.style.display = 'none';
+    markdownOutput.classList.add('wx-streaming-cursor');
+    try {
+        const res = await fetch('/api/wechat-assistant/article-stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                topic, title: selectedTitleInput.value,
+                core_viewpoint: iv('coreViewpoint'), content_notes: iv('contentNotesInput'),
+                audience: iv('audienceInput'), tone: iv('toneInput'),
+                provider: selectedProvider(), model: selectedModel(),
+                mode: currentMode,
+            }),
+        });
+        if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||'请求失败'); }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, {stream: true});
+            const lines = buf.split('\n'); buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                    const p = JSON.parse(line.slice(6));
+                    if (p.error) throw new Error(p.error);
+                    if (p.text) { markdownOutput.value += p.text; taskUpdate(tid, markdownOutput.value.length + ' 字'); }
+                    if (p.done && p.meta?.output_files) renderFiles(p.meta.output_files);
+                } catch(pe) { if (pe.message !== 'Unexpected end of JSON input') throw pe; }
+            }
+        }
+        setStatus('正文已生成', 'good');
+        taskDone(tid, markdownOutput.value.length + ' 字');
+        updateProgress();
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { markdownOutput.classList.remove('wx-streaming-cursor'); setBusy(false); }
+}
+
+// ── API: images ───────────────────────────────────────────────────────────────
+async function refreshImages() {
+    const tid = taskStart('生成配图', '生成配图方案...');
+    setBusy(true);
+    try {
+        const topic = selectedTopic();
+        if (!topic && !markdownOutput.value.trim()) throw new Error('请先选择话题或生成正文');
+        setStatus('正在生成配图方案...');
+        const prevPrompt = imagesState[selectedImageIndex]?.prompt || '';
+        const data = await apiPost('/api/wechat-assistant/images', {
+            topic, core_viewpoint: iv('coreViewpoint'), content_notes: iv('contentNotesInput'),
+            markdown: markdownOutput.value, audience: iv('audienceInput'), tone: iv('toneInput'),
+            provider: selectedProvider(), model: selectedModel(),
+        });
+        imagesState = mergeKept(imagesState, data.images || [], 'imageList', t => t.prompt||t.name||'');
+        selectedImageIndex = prevPrompt ? imagesState.findIndex(t => t.prompt === prevPrompt) : -1;
+        renderImages();
+        // 方案生成后自动出真图：本地 ComfyUI 在线优先用它，否则回退免费 AI 生图
+        let comfyDone = false;
+        try {
+            const st = await fetch('/api/wechat-assistant/comfy-status').then(r => r.json());
+            if (st.ok && st.alive) {
+                setStatus('正在用本地 ComfyUI 生成配图图片...');
+                taskUpdate(tid, 'ComfyUI 生图...');
+                comfyDone = await renderImagesWithComfy(false);
+            }
+        } catch(_) {}
+        if (!comfyDone) {
+            setStatus('正在生成免费 AI 配图（约10-30秒）...');
+            taskUpdate(tid, '免费 AI 生图...');
+            const freeJobs = imagesState.map((item, idx) => {
+                if (item.image_url || item.unsplash_url) return Promise.resolve();
+                const prompt = (item.prompt || item.scene || item.name || '').trim();
+                if (!prompt) return Promise.resolve();
+                return fetchFreeAiImage(prompt).then(img => {
+                    imagesState[idx] = { ...imagesState[idx], ...img };
+                }).catch(() => {});
+            });
+            await Promise.all(freeJobs);
+            renderImages();
+        }
+        const withImg = imagesState.filter(i => i.image_url || i.unsplash_url).length;
+        if (withImg) {
+            setStatus('配图已就绪（' + withImg + '/' + imagesState.length + ' 张真实图片），点击卡片选择使用', 'good');
+        } else {
+            setStatus('配图方案已生成，但图片生成失败，可点卡片上的「免费 AI 生图」重试', 'bad');
+        }
+        taskDone(tid, imagesState.length + ' 方案 · ' + withImg + ' 张图片');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+async function renderImagesWithComfy(force = false) {
+    if (!imagesState.length) { setStatus('请先生成配图方案', 'bad'); return false; }
+    try {
+        const prevPrompt = imagesState[selectedImageIndex]?.prompt || '';
+        setStatus('正在调用本地 ComfyUI 生成图片（未启动会自动启动，冷启动约1分钟）...');
+        const data = await apiPost('/api/wechat-assistant/render-images', {
+            images: imagesState, width:1024, height:576, steps:16, cfg:6.5, force,
+        });
+        imagesState = data.images || imagesState;
+        selectedImageIndex = prevPrompt ? imagesState.findIndex(t => t.prompt === prevPrompt) : selectedImageIndex;
+        if (selectedImageIndex < 0 && imagesState.length) selectedImageIndex = 0;
+        renderImages();
+        const errors = data.errors || [];
+        setStatus(errors.length ? '部分图片生成失败（可改用「免费 AI 生图」）' : '配图图片已生成', errors.length ? 'bad' : 'good');
+        return !errors.length;
+    } catch(e) {
+        setStatus('ComfyUI 不可用（可改用「免费 AI 生图」）：' + e.message, 'bad');
+        return false;
+    }
+}
+
+// ── API: generate publish (plain + rich) ──────────────────────────────────────
+async function generatePublish() {
+    const tid = taskStart('生成发布成稿', '纯文本 + 富文本并行...');
+    try {
+        if (!markdownOutput.value.trim()) throw new Error('请先生成正文');
+        setStatus('正在生成发布成稿...');
+        const body = {
+            title: selectedTitleInput.value,
+            markdown: markdownOutput.value,
+            image: selectedImage(),
+            image_position: iv('imagePositionSelect') || 'after_intro',
+        };
+        // Run plain text and rich HTML in parallel
+        const [plainData, richData] = await Promise.all([
+            apiPost('/api/wechat-assistant/publish-text', body).catch(e => { throw e; }),
+            fetch('/api/wechat-assistant/publish-html', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body),
+            }).then(r => r.json()).then(d => { if (!d.ok) throw new Error(d.error); return d.data || {}; }),
+        ]);
+        publishOutput.value = plainData.text || '';
+        currentRichHtml = richData.html || '';
+        // Update rich preview
+        if (currentRichHtml) {
+            richPreview.innerHTML = currentRichHtml;
+            richPreview.style.display = 'block';
+            richEmpty.style.display = 'none';
+        }
+        setStatus('发布成稿已生成（纯文本 + 富文本双格式）', 'good');
+        taskDone(tid, (publishOutput.value.length || 0) + ' 字');
+        showPublishTimingTip();
+        updateProgress();
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+}
+
+// ── one-click generate ────────────────────────────────────────────────────────
+async function generatePackage() {
+    try {
+        if (!selectedTopic()) throw new Error('请先选择热点话题或填写自定义话题');
+        await refreshTitles();
+        if (!selectedTitleInput.value && titlesState.length) selectTitle(0);
+        await writeArticle();
+        await refreshImages();
+    } catch(e) { setStatus(e.message, 'bad'); }
+}
+
+// ── probe / comfy ─────────────────────────────────────────────────────────────
+async function probeModel(probeAll) {
+    try {
+        setStatus(probeAll ? '正在检测全部模型...' : '正在检测当前模型...');
+        setBusy(true);
+        const res = await fetch('/api/wechat-assistant/probe', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({provider:selectedProvider(), model:selectedModel(), probe_all:probeAll}),
+        });
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error||'检测失败');
+        renderDiagnostics(data.results||[]);
+        const n = (data.results||[]).filter(t=>t.available).length;
+        setStatus(n ? '检测完成：有可用模型' : '检测完成：无可用模型', n ? 'good' : 'bad');
+    } catch(e) { setStatus(e.message, 'bad'); }
+    finally { setBusy(false); }
+}
+
+async function checkComfyUI() {
+    try {
+        setBusy(true); setStatus('正在检测 ComfyUI...');
+        const res = await fetch('/api/wechat-assistant/comfy-status');
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error||'检测失败');
+        const mt = data.default_checkpoint ? ' · 模型 ' + data.default_checkpoint : '';
+        setStatus(data.alive ? 'ComfyUI 已就绪' + mt : 'ComfyUI 未启动（可使用「搜免费配图」替代）', data.alive ? 'good' : '');
+    } catch(e) { setStatus(e.message, 'bad'); }
+    finally { setBusy(false); }
+}
+
+async function startComfyUI() {
+    try {
+        setBusy(true); setStatus('正在启动 ComfyUI...');
+        const res = await fetch('/api/comfyui/start', {method:'POST'});
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error||'启动失败');
+        setStatus(data.alive||data.http_alive ? 'ComfyUI 已启动' : (data.msg||'ComfyUI 正在启动中'), data.alive||data.http_alive ? 'good' : '');
+    } catch(e) { setStatus(e.message, 'bad'); }
+    finally { setBusy(false); }
+}
+
+// ── copy ──────────────────────────────────────────────────────────────────────
+async function copyPublish() {
+    if (currentTab === 'rich' && currentRichHtml) {
+        await copyRichText(currentRichHtml, publishOutput.value);
+    } else {
+        await copyValue(publishOutput.value);
+    }
+}
+
+async function copyRichText(html, plain) {
+    try {
+        if (!window.ClipboardItem) throw new Error('no ClipboardItem');
+        const htmlBlob  = new Blob([html],  {type:'text/html'});
+        const textBlob  = new Blob([plain||''], {type:'text/plain'});
+        await navigator.clipboard.write([new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob})]);
+        setStatus('富文本已复制到剪贴板（粘贴到公众号编辑器将保留标题、加粗、段落格式）', 'good');
+    } catch(e) {
+        // Fallback: copy plain text
+        await copyValue(plain || html.replace(/<[^>]+>/g,''));
+        setStatus('已复制纯文本（当前浏览器不支持富文本复制）', 'good');
+    }
+}
+
+async function copyText(id) { await copyValue(document.getElementById(id).value); }
+async function copySelectedTitle() { await copyValue(selectedTitleInput.value); }
+async function copySelectedImagePrompt() { await copyValue(selectedImage()?.prompt || ''); }
+
+async function copySelectedImageBlob(idx = selectedImageIndex) {
+    const item = imagesState[idx] || {};
+    const url = item.image_url || item.unsplash_url || '';
+    if (!url) { await copyValue(item.prompt || ''); return; }
+    try {
+        if (!window.ClipboardItem) throw new Error('no ClipboardItem');
+        const res = await fetch(url); const blob = await res.blob();
+        await navigator.clipboard.write([new ClipboardItem({[blob.type||'image/png']:blob})]);
+        setStatus('图片已复制到剪贴板', 'good');
+    } catch(e) { await copyValue(url); setStatus('已复制图片地址', 'good'); }
+}
+
+async function copyValue(text) {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setStatus('已复制到剪贴板', 'good');
+}
+
+// ── clear ─────────────────────────────────────────────────────────────────────
+function clearContent() {
+    titlesState = []; titlesScored = []; imagesState = []; coverImagesState = [];
+    selectedTitleIndex = -1; selectedImageIndex = -1;
+    selectedTopicInput.value = ''; selectedTitleInput.value = '';
+    markdownOutput.value = ''; publishOutput.value = '';
+    currentRichHtml = ''; richPreview.innerHTML = '';
+    richPreview.style.display = 'none'; richEmpty.style.display = '';
+    fileList.textContent = ''; qualityPanel.style.display = 'none';
+    document.getElementById('excerptPanel').style.display = 'none';
+    document.getElementById('rewritePanel').style.display = 'none';
+    document.getElementById('rewriteResult').style.display = 'none';
+    document.getElementById('timingTip').textContent = '';
+    renderTitles(); renderImages(); renderCoverImages(); updateProgress();
+    setStatus('内容已清空（热点列表保留）');
+}
+
+function clearAll() {
+    hotTopicsState = []; selectedHotTopicIndex = -1; hotTopicMeta.textContent = '';
+    clearContent();
+    renderHotTopics();
+}
+
+// ── API: hooks ────────────────────────────────────────────────────────────────
+async function generateHooks() {
+    const topic = selectedTopic();
+    if (!topic) { setStatus('请先选择话题', 'bad'); return; }
+    const tid = taskStart('生成开篇 Hook', '调用模型...');
+    setBusy(true); setStatus('正在生成开篇 Hook 方案...');
+    try {
+        const md = markdownOutput.value;
+        // Extract first 200 chars of article as current opening
+        const opening = md.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0,3).join(' ');
+        const res = await fetch('/api/wechat-assistant/hooks', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                topic, core_viewpoint: iv('coreViewpoint'),
+                article_opening: opening, tone: iv('toneInput'),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '生成失败');
+        const hooks = payload.data.hooks || [];
+        const list = document.getElementById('hookList');
+        list.textContent = '';
+        hooks.forEach(h => {
+            const card = document.createElement('div'); card.className = 'wx-hook-card';
+            const type = document.createElement('span'); type.className = 'wx-hook-type'; type.textContent = h.type || '创意型';
+            const text = document.createElement('div'); text.className = 'wx-hook-text'; text.textContent = h.hook || '';
+            const reason = document.createElement('div'); reason.className = 'wx-hook-reason'; reason.textContent = h.reason || '';
+            const actions = document.createElement('div'); actions.className = 'wx-hook-actions';
+            const useBtn = document.createElement('button'); useBtn.className = 'wx-btn primary'; useBtn.textContent = '用作开篇'; useBtn.style.minHeight='28px'; useBtn.style.fontSize='12px';
+            useBtn.onclick = () => applyHook(h.hook || '');
+            const copyBtn = document.createElement('button'); copyBtn.className = 'wx-btn'; copyBtn.textContent = '复制'; copyBtn.style.minHeight='28px'; copyBtn.style.fontSize='12px';
+            copyBtn.onclick = () => copyValue(h.hook || '');
+            actions.appendChild(useBtn); actions.appendChild(copyBtn);
+            card.appendChild(type); card.appendChild(text); card.appendChild(reason); card.appendChild(actions);
+            list.appendChild(card);
+        });
+        document.getElementById('hookPanel').style.display = 'block';
+        setStatus('Hook 方案已生成，选择一种替换文章开篇', 'good');
+        taskDone(tid, hooks.length + ' 种风格');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+function applyHook(hookText) {
+    let md = markdownOutput.value;
+    // Replace first non-heading paragraph
+    const lines = md.split('\n');
+    let insertIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() && !lines[i].startsWith('#')) { insertIdx = i; break; }
+    }
+    if (insertIdx < 0) { markdownOutput.value = hookText + '\n\n' + md; }
+    else {
+        // Find end of first paragraph block
+        let endIdx = insertIdx;
+        while (endIdx < lines.length && lines[endIdx].trim()) endIdx++;
+        lines.splice(insertIdx, endIdx - insertIdx, hookText);
+        markdownOutput.value = lines.join('\n');
+    }
+    setStatus('开篇已替换', 'good');
+    document.getElementById('hookPanel').style.display = 'none';
+}
+
+// ── API: quotes ───────────────────────────────────────────────────────────────
+async function extractQuotes() {
+    const markdown = markdownOutput.value.trim();
+    if (!markdown) { setStatus('请先生成正文', 'bad'); return; }
+    const tid = taskStart('提炼金句', '分析正文...');
+    setBusy(true); setStatus('正在提炼金句...');
+    try {
+        const res = await fetch('/api/wechat-assistant/quotes', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ markdown, topic: selectedTopic(), provider: selectedProvider(), model: selectedModel() }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '提炼失败');
+        const quotes = payload.data.quotes || [];
+        const list = document.getElementById('quotesList');
+        list.textContent = '';
+        quotes.forEach(q => {
+            const card = document.createElement('div'); card.className = 'wx-quote-card';
+            const text = document.createElement('div'); text.className = 'wx-quote-text'; text.textContent = '「' + (q.quote||'') + '」';
+            const why = document.createElement('div'); why.className = 'wx-quote-why'; why.textContent = q.why || '';
+            const actions = document.createElement('div'); actions.className = 'wx-hook-actions';
+            const copyBtn = document.createElement('button'); copyBtn.className = 'wx-btn'; copyBtn.textContent = '复制金句'; copyBtn.style.minHeight='26px'; copyBtn.style.fontSize='12px';
+            copyBtn.onclick = () => copyValue(q.quote || '');
+            const injectBtn = document.createElement('button'); injectBtn.className = 'wx-mini-btn green'; injectBtn.textContent = '插入正文分割线后';
+            injectBtn.onclick = () => injectQuoteCard(q.quote || '');
+            actions.appendChild(copyBtn); actions.appendChild(injectBtn);
+            card.appendChild(text); card.appendChild(why); card.appendChild(actions);
+            list.appendChild(card);
+        });
+        document.getElementById('quotesPanel').style.display = 'block';
+        setStatus('金句已提炼', 'good');
+        taskDone(tid, quotes.length + ' 条金句');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+function injectQuoteCard(quote) {
+    // Insert > **quote** (rendered as quote card in publish HTML) before last paragraph
+    const md = markdownOutput.value;
+    const quoteBlock = `\n---\n\n> **${quote}**\n\n---\n`;
+    const lastParaIdx = md.lastIndexOf('\n\n');
+    if (lastParaIdx > 0) {
+        markdownOutput.value = md.slice(0, lastParaIdx) + quoteBlock + md.slice(lastParaIdx);
+    } else {
+        markdownOutput.value = md + quoteBlock;
+    }
+    setStatus('金句卡片已插入正文（将在富文本中显示为高亮大字卡片）', 'good');
+}
+
+async function copyAllQuotes() {
+    const cards = document.querySelectorAll('#quotesList .wx-quote-text');
+    const text = Array.from(cards).map(c => c.textContent).join('\n\n');
+    await copyValue(text);
+}
+
+// ── API: ending ───────────────────────────────────────────────────────────────
+async function generateEnding() {
+    const topic = selectedTopic();
+    if (!topic && !markdownOutput.value.trim()) { setStatus('请先生成正文或选择话题', 'bad'); return; }
+    const tid = taskStart('生成互动结尾', '调用模型...');
+    setBusy(true); setStatus('正在生成互动引导结尾...');
+    try {
+        const res = await fetch('/api/wechat-assistant/engagement-ending', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                topic, core_viewpoint: iv('coreViewpoint'),
+                markdown: markdownOutput.value,
+                audience: iv('audienceInput'), tone: iv('toneInput'),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '生成失败');
+        const endings = payload.data.endings || [];
+        const list = document.getElementById('endingList');
+        list.textContent = '';
+        endings.forEach(e => {
+            const card = document.createElement('div'); card.className = 'wx-ending-card';
+            const type = document.createElement('span'); type.className = 'wx-ending-type'; type.textContent = e.type || '互动型';
+            const text = document.createElement('div'); text.className = 'wx-ending-text'; text.textContent = e.ending || '';
+            const goal = document.createElement('div'); goal.className = 'wx-ending-goal'; goal.textContent = '目标：' + (e.goal || '');
+            const actions = document.createElement('div'); actions.className = 'wx-hook-actions';
+            const appendBtn = document.createElement('button'); appendBtn.className = 'wx-btn primary'; appendBtn.textContent = '追加到结尾'; appendBtn.style.minHeight='28px'; appendBtn.style.fontSize='12px';
+            appendBtn.onclick = () => appendEnding(e.ending || '');
+            const copyBtn = document.createElement('button'); copyBtn.className = 'wx-btn'; copyBtn.textContent = '复制'; copyBtn.style.minHeight='28px'; copyBtn.style.fontSize='12px';
+            copyBtn.onclick = () => copyValue(e.ending || '');
+            actions.appendChild(appendBtn); actions.appendChild(copyBtn);
+            card.appendChild(type); card.appendChild(text); card.appendChild(goal); card.appendChild(actions);
+            list.appendChild(card);
+        });
+        document.getElementById('endingPanel').style.display = 'block';
+        setStatus('互动结尾已生成，选择一种追加到正文末尾', 'good');
+        taskDone(tid, endings.length + ' 种结尾');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+function appendEnding(endingText) {
+    const md = markdownOutput.value.trimEnd();
+    markdownOutput.value = md + '\n\n---\n\n' + endingText;
+    setStatus('互动结尾已追加到正文', 'good');
+    document.getElementById('endingPanel').style.display = 'none';
+}
+
+// ── API: series plan ──────────────────────────────────────────────────────────
+async function planSeries() {
+    const topic = selectedTopic();
+    if (!topic) { setStatus('请先选择话题', 'bad'); return; }
+    const tid = taskStart('规划内容系列', '调用模型...');
+    setBusy(true); setStatus('正在规划内容系列（5集）...');
+    try {
+        const res = await fetch('/api/wechat-assistant/series-plan', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                topic, core_viewpoint: iv('coreViewpoint'),
+                audience: iv('audienceInput'), tone: iv('toneInput'),
+                num_episodes: 5, provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '规划失败');
+        const plan = payload.data.plan || {};
+        document.getElementById('seriesName').textContent = (plan.series_name || '') + (plan.series_hook ? '：' + plan.series_hook : '');
+        const list = document.getElementById('seriesEpisodeList');
+        list.textContent = '';
+        (plan.episodes || []).forEach(ep => {
+            const row = document.createElement('div'); row.className = 'wx-series-ep';
+            const no = document.createElement('div'); no.className = 'wx-ep-no'; no.textContent = ep.episode || '?';
+            const body = document.createElement('div'); body.className = 'wx-ep-body';
+            const title = document.createElement('div'); title.className = 'wx-ep-title'; title.textContent = ep.title || '';
+            const meta = document.createElement('div'); meta.className = 'wx-ep-meta';
+            [ep.content_type, ep.publish_timing].filter(Boolean).forEach(t => {
+                const chip = document.createElement('span'); chip.className = 'wx-chip'; chip.textContent = t; meta.appendChild(chip);
+            });
+            const angle = document.createElement('div'); angle.className = 'wx-ep-angle'; angle.textContent = (ep.angle ? '角度：' + ep.angle : '') + (ep.core_point ? '\n观点：' + ep.core_point : '');
+            const useBtn = document.createElement('button'); useBtn.className = 'wx-mini-btn green'; useBtn.style.marginTop='6px'; useBtn.textContent = '用此选题写这篇';
+            useBtn.onclick = () => {
+                selectedTopicInput.value = ep.title || topic;
+                document.getElementById('coreViewpoint').value = ep.core_point || '';
+                saveForm(); updateProgress();
+                setStatus('已切换到系列第' + ep.episode + '集选题，可开始生成标题和正文', 'good');
+                document.getElementById('seriesPanel').style.display = 'none';
+            };
+            body.appendChild(title); body.appendChild(meta); body.appendChild(angle); body.appendChild(useBtn);
+            row.appendChild(no); row.appendChild(body);
+            list.appendChild(row);
+        });
+        document.getElementById('seriesPanel').style.display = 'block';
+        setStatus('系列规划完成，点击「用此选题写这篇」直接进入写作', 'good');
+        taskDone(tid, '5 集系列规划');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+async function copySeriesPlan() {
+    const items = document.querySelectorAll('#seriesEpisodeList .wx-series-ep');
+    const lines = Array.from(items).map((row, i) => {
+        const title = row.querySelector('.wx-ep-title')?.textContent || '';
+        const angle = row.querySelector('.wx-ep-angle')?.textContent || '';
+        return `第${i+1}篇：${title}\n${angle}`;
+    });
+    const header = document.getElementById('seriesName')?.textContent || '';
+    await copyValue(header + '\n\n' + lines.join('\n\n'));
+}
+
+// ── API: check positioning ────────────────────────────────────────────────────
+async function checkPositioning() {
+    const positioning = iv('accountPositioning');
+    if (!positioning) { setStatus('请先填写账号定位', 'bad'); return; }
+    const topic = selectedTopic();
+    if (!topic) { setStatus('请先选择话题', 'bad'); return; }
+    const tid = taskStart('账号定位检查', '分析匹配度...');
+    setBusy(true); setStatus('正在检查账号定位一致性...');
+    try {
+        const res = await fetch('/api/wechat-assistant/check-positioning', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                article_topic: topic,
+                article_summary: iv('coreViewpoint'),
+                account_positioning: positioning,
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '检查失败');
+        const check = payload.check || {};
+        const el = document.getElementById('positioningResult');
+        const consistent = check.consistent !== false;
+        el.className = 'wx-positioning-result ' + (consistent ? 'ok' : 'warn');
+        el.innerHTML = `<strong>${consistent ? '✓ 定位吻合' : '⚠ 存在偏离风险'}（${check.score || '-'}/10）</strong><br>
+${check.verdict || ''}<br>
+${check.risk ? '<span style="color:inherit;opacity:.8;">' + check.risk + '</span>' : ''}
+${check.suggestion ? '<br><em>' + check.suggestion + '</em>' : ''}`;
+        el.style.display = 'block';
+        setStatus(consistent ? '定位检查通过' : '存在定位偏离风险，请看工作区提示', consistent ? 'good' : 'bad');
+        taskDone(tid, (check.score || '-') + '/10 匹配');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+// ── history & data tracking ───────────────────────────────────────────────────
+const HISTORY_KEY = 'wx_ops_history_v1';
+
+function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(_) { return []; }
+}
+function saveHistory(arr) {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-50))); } catch(_) {}
+}
+
+function toggleHistoryPanel() {
+    const panel = document.getElementById('historyPanel');
+    const visible = panel.style.display !== 'none';
+    panel.style.display = visible ? 'none' : 'block';
+    if (!visible) renderHistoryList();
+}
+
+function savePublishRecord() {
+    const form = document.getElementById('recordForm');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    document.getElementById('historyPanel').style.display = 'block';
+}
+
+function confirmSaveRecord() {
+    const record = {
+        id: Date.now(),
+        date: new Date().toLocaleString('zh-CN'),
+        topic: selectedTopic() || '（未填写）',
+        title: selectedTitleInput.value || '（未填写）',
+        mode: currentMode,
+        reads: parseInt(document.getElementById('metaReads').value) || 0,
+        likes: parseInt(document.getElementById('metaLikes').value) || 0,
+        comments: parseInt(document.getElementById('metaComments').value) || 0,
+        note: document.getElementById('metaNote').value.trim(),
+    };
+    const history = loadHistory();
+    history.unshift(record);
+    saveHistory(history);
+    document.getElementById('recordForm').style.display = 'none';
+    renderHistoryList();
+    setStatus('发布记录已保存', 'good');
+}
+
+function renderHistoryList() {
+    const list = document.getElementById('historyList');
+    const history = loadHistory();
+    if (!history.length) {
+        list.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:16px 0;">暂无发布记录</div>';
+        return;
+    }
+    list.textContent = '';
+    history.forEach(r => {
+        const item = document.createElement('div'); item.className = 'wx-history-item';
+        const title = document.createElement('div'); title.className = 'wx-history-title'; title.textContent = r.title;
+        const meta = document.createElement('div'); meta.className = 'wx-history-meta'; meta.textContent = r.date + ' · ' + r.topic + ' · ' + (r.mode || '-') + '模式';
+        const stats = document.createElement('div'); stats.className = 'wx-history-stats';
+        if (r.reads || r.likes || r.comments) {
+            stats.innerHTML = `<span>阅读 ${r.reads}</span><span>在看 ${r.likes}</span><span>留言 ${r.comments}</span>`;
+        }
+        if (r.note) {
+            const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-top:3px;'; note.textContent = r.note;
+            item.appendChild(title); item.appendChild(meta); item.appendChild(stats); item.appendChild(note);
+        } else {
+            item.appendChild(title); item.appendChild(meta); item.appendChild(stats);
+        }
+        // Reuse button
+        const reuseBtn = document.createElement('button'); reuseBtn.className = 'wx-mini-btn'; reuseBtn.style.marginTop='6px'; reuseBtn.textContent = '重用此选题';
+        reuseBtn.onclick = () => {
+            selectedTopicInput.value = r.topic;
+            saveForm(); updateProgress();
+            setStatus('已切换到历史选题：' + r.topic, 'good');
+        };
+        item.appendChild(reuseBtn);
+        list.appendChild(item);
+    });
+}
+
+function clearHistory() {
+    if (!confirm('确认清空全部发布记录？')) return;
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistoryList();
+}
+
+// ── lifecycle badge on hot topics ─────────────────────────────────────────────
+const _lifecycleCache = {};
+
+async function analyzeLifecycle(topic, sourceCount, cardElement) {
+    if (_lifecycleCache[topic]) {
+        _renderLifecycleBadge(cardElement, _lifecycleCache[topic]);
+        return;
+    }
+    try {
+        const res = await fetch('/api/wechat-assistant/topic-lifecycle', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ topic, source_count: sourceCount, provider: selectedProvider(), model: selectedModel() }),
+        });
+        const payload = await res.json();
+        if (payload.ok && payload.analysis) {
+            _lifecycleCache[topic] = payload.analysis;
+            _renderLifecycleBadge(cardElement, payload.analysis);
+        }
+    } catch(_) {}
+}
+
+function _renderLifecycleBadge(card, analysis) {
+    if (!card || !analysis.lifecycle) return;
+    const old = card.querySelector('.wx-lifecycle-badge');
+    if (old) old.remove();
+    const badge = document.createElement('span');
+    const lc = analysis.lifecycle;
+    badge.className = 'wx-lifecycle-badge ' + (lc === '事件型' ? 'wx-lifecycle-event' : lc === '趋势型' ? 'wx-lifecycle-trend' : 'wx-lifecycle-ever');
+    badge.title = (analysis.reason || '') + ' · ' + (analysis.urgency || '');
+    badge.textContent = lc + ' · ' + (analysis.urgency || '');
+    card.querySelector('.wx-meta')?.appendChild(badge);
+}
+
+// Override selectHotTopic to trigger lifecycle analysis
+const _origSelectHotTopic = selectHotTopic;
+// eslint-disable-next-line no-global-assign
+function selectHotTopic(idx) {
+    const item = hotTopicsState[idx]; if (!item) return;
+    selectedHotTopicIndex = idx;
+    selectedTopicInput.value = item.title || '';
+    renderHotTopics();
+    updateProgress();
+    // Trigger lifecycle analysis for selected topic
+    const sourceCount = (item.sources || []).length || 1;
+    const cards = document.querySelectorAll('#hotTopicList .wx-item');
+    if (cards[idx]) analyzeLifecycle(item.title, sourceCount, cards[idx]);
+}
+
+// ── platform distribution ─────────────────────────────────────────────────────
+let currentPlatform = '';
+const platformCache = {};
+
+function togglePlatformPanel() {
+    const panel = document.getElementById('platformPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function switchPlatform(platform) {
+    currentPlatform = platform;
+    document.querySelectorAll('.wx-platform-btn').forEach(b => b.classList.toggle('active', b.dataset.platform === platform));
+    // Update header button to generate for this platform
+    document.getElementById('platformStatus').textContent = '点击右上角"复制内容"前请先生成';
+    if (platformCache[platform]) {
+        _showPlatformContent(platformCache[platform]);
+    } else {
+        generatePlatformContent(platform);
+    }
+}
+
+async function generatePlatformContent(platform) {
+    const markdown = markdownOutput.value.trim();
+    if (!markdown) { setStatus('请先生成正文', 'bad'); return; }
+    setBusy(true);
+    const platformNames = { zhihu:'知乎', xiaohongshu:'小红书', weibo:'微博', bilibili:'B站脚本' };
+    setStatus(`正在改写为${platformNames[platform] || platform}格式…`);
+    try {
+        const res = await fetch('/api/wechat-assistant/platform-format', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                markdown, title: selectedTitleInput.value,
+                platform, core_viewpoint: iv('coreViewpoint'),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '改写失败');
+        const content = payload.data.content || '';
+        platformCache[platform] = content;
+        _showPlatformContent(content);
+        setStatus(`${platformNames[platform]}版本已生成`, 'good');
+    } catch(e) { setStatus(e.message, 'bad'); }
+    finally { setBusy(false); }
+}
+
+function _showPlatformContent(content) {
+    document.getElementById('platformEmpty').style.display = 'none';
+    const ta = document.getElementById('platformOutput');
+    ta.style.display = 'block';
+    ta.value = content;
+}
+
+async function copyPlatformContent() {
+    if (!currentPlatform) { setStatus('请先选择目标平台', 'bad'); return; }
+    const content = platformCache[currentPlatform];
+    if (!content) { await generatePlatformContent(currentPlatform); return; }
+    await copyValue(content);
+}
+
+// ── compliance ────────────────────────────────────────────────────────────────
+async function runCompliance(deep = false) {
+    const markdown = markdownOutput.value.trim();
+    if (!markdown) { setStatus('请先生成正文', 'bad'); return; }
+    const tid = taskStart(deep ? 'AI 深度合规检查' : '合规规则扫描', '扫描中...');
+    setBusy(true);
+    setStatus(deep ? '正在进行 AI 深度合规检查…' : '正在进行合规规则扫描…');
+    try {
+        const res = await fetch('/api/wechat-assistant/compliance', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                markdown, title: selectedTitleInput.value, deep,
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '检查失败');
+
+        const list = document.getElementById('complianceList');
+        list.textContent = '';
+        const allIssues = [...(payload.rule_hits || []), ...(payload.llm_risks || [])];
+
+        if (!allIssues.length) {
+            const ok = document.createElement('div'); ok.className = 'wx-compliance-item ok';
+            ok.textContent = '✓ 未发现明显合规风险' + (deep ? '（AI 深度扫描通过）' : '（规则扫描通过，可开启 AI 深度检查）');
+            list.appendChild(ok);
+        } else {
+            allIssues.forEach(issue => {
+                const item = document.createElement('div');
+                item.className = 'wx-compliance-item ' + (issue.level === 'high' ? 'high' : 'warn');
+                const typeEl = document.createElement('strong'); typeEl.textContent = '【' + (issue.type||'风险') + '】 ';
+                const matched = (issue.matched || []).map(m => `<span class="wx-compliance-matched">${m}</span>`).join('');
+                const content = issue.content ? `<em>"${issue.content}"</em><br>` : '';
+                item.appendChild(typeEl);
+                item.innerHTML += matched + (matched ? '<br>' : '') + content + (issue.reason || '') + '<br><span style="opacity:.75;">' + (issue.suggestion || '') + '</span>';
+                list.appendChild(item);
+            });
+            if (payload.overall) {
+                const sum = document.createElement('div'); sum.className = 'wx-compliance-item warn';
+                sum.style.marginTop = '8px';
+                sum.textContent = '总结：' + payload.overall;
+                list.appendChild(sum);
+            }
+        }
+        document.getElementById('compliancePanel').style.display = 'block';
+        setStatus(allIssues.length ? `发现 ${allIssues.length} 处风险，请参考建议修改` : '合规检查通过', allIssues.length ? 'bad' : 'good');
+        taskDone(tid, allIssues.length ? allIssues.length + ' 处风险' : '✓ 通过');
+    } catch(e) { setStatus(e.message, 'bad'); taskFail(tid, e.message); }
+    finally { setBusy(false); }
+}
+
+// ── knowledge extraction ──────────────────────────────────────────────────────
+let knowledgePoints = [];   // extracted knowledge items
+
+async function extractKnowledge() {
+    const markdown = markdownOutput.value.trim();
+    if (!markdown) { setStatus('请先生成正文', 'bad'); return; }
+    const tid = taskStart('提炼知识点', '分析文章结构...');
+    setBusy(true); setStatus('正在从文章中提炼知识点...');
+    try {
+        const res = await fetch('/api/wechat-assistant/extract-knowledge', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                markdown,
+                title: selectedTitleInput.value.trim(),
+                topic: selectedTopic(),
+                provider: selectedProvider(), model: selectedModel(),
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '提炼失败');
+        const d = payload.data;
+        knowledgePoints = (d.knowledge_points || []).map(p => ({ ...p, _saved: false }));
+        renderKnowledgePoints(d.summary || '');
+        document.getElementById('knowledgePanel').style.display = 'block';
+        document.getElementById('btnSaveAllKnowledge').style.display = knowledgePoints.length ? '' : 'none';
+        setStatus(`已提炼 ${knowledgePoints.length} 个知识点，可逐条或全部存入素材库`, 'good');
+        taskDone(tid, knowledgePoints.length + ' 个知识点');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+        taskFail(tid, e.message);
+    } finally { setBusy(false); }
+}
+
+function renderKnowledgePoints(summary) {
+    const list = document.getElementById('knowledgeList');
+    const summaryBox = document.getElementById('knowledgeSummaryBox');
+    const badge = document.getElementById('knowledgeSummaryBadge');
+    list.textContent = '';
+    badge.textContent = knowledgePoints.length + ' 个知识点';
+
+    if (summary) {
+        summaryBox.style.display = 'block';
+        summaryBox.innerHTML = `<div class="wx-knowledge-summary">${summary}</div>`;
+    } else {
+        summaryBox.style.display = 'none';
+    }
+
+    if (!knowledgePoints.length) {
+        list.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px 0;">暂无提炼结果</div>';
+        return;
+    }
+
+    knowledgePoints.forEach((kp, idx) => {
+        const card = document.createElement('div');
+        card.className = 'wx-knowledge-card' + (kp._saved ? ' saved' : '');
+        card.id = 'kn-card-' + idx;
+
+        const header = document.createElement('div'); header.className = 'wx-kn-header';
+        const typeEl = document.createElement('span');
+        typeEl.className = 'wx-kn-type ' + (kp.type || '');
+        typeEl.textContent = kp.type || '通用';
+        const titleEl = document.createElement('div'); titleEl.className = 'wx-kn-title'; titleEl.textContent = kp.title || '';
+        header.appendChild(typeEl); header.appendChild(titleEl);
+
+        const contentEl = document.createElement('div'); contentEl.className = 'wx-kn-content'; contentEl.textContent = kp.content || '';
+
+        const tags = document.createElement('div'); tags.className = 'wx-kn-tags';
+        (kp.tags || []).forEach(t => {
+            const tag = document.createElement('span'); tag.className = 'wx-kn-tag'; tag.textContent = '#' + t;
+            tags.appendChild(tag);
+        });
+
+        const actions = document.createElement('div'); actions.className = 'wx-hook-actions';
+        if (kp._saved) {
+            const badge = document.createElement('span'); badge.className = 'wx-kn-saved-badge'; badge.textContent = '✓ 已存入素材库';
+            actions.appendChild(badge);
+        } else {
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'wx-btn primary'; saveBtn.textContent = '存入素材库';
+            saveBtn.style.cssText = 'min-height:28px;font-size:12px;';
+            saveBtn.onclick = () => saveOneKnowledge(idx);
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'wx-btn'; copyBtn.textContent = '复制';
+            copyBtn.style.cssText = 'min-height:28px;font-size:12px;';
+            copyBtn.onclick = () => copyValue((kp.title ? kp.title + '\n' : '') + (kp.content || ''));
+            actions.appendChild(saveBtn); actions.appendChild(copyBtn);
+        }
+
+        card.appendChild(header);
+        card.appendChild(contentEl);
+        if (tags.children.length) card.appendChild(tags);
+        card.appendChild(actions);
+        list.appendChild(card);
+    });
+}
+
+async function saveOneKnowledge(idx) {
+    const kp = knowledgePoints[idx];
+    if (!kp || kp._saved) return;
+    try {
+        const res = await fetch('/api/wechat-assistant/materials', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: kp.title || kp.type || '知识点',
+                content: kp.content || '',
+                category: kp.category || '通用',
+                tags: kp.tags || [],
+            }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '保存失败');
+        knowledgePoints[idx]._saved = true;
+        // Update card in-place to avoid full re-render
+        const card = document.getElementById('kn-card-' + idx);
+        if (card) {
+            card.className = 'wx-knowledge-card saved';
+            const actions = card.querySelector('.wx-hook-actions');
+            if (actions) {
+                actions.innerHTML = '<span class="wx-kn-saved-badge">✓ 已存入素材库</span>';
+            }
+        }
+        const allSaved = knowledgePoints.every(p => p._saved);
+        if (allSaved) document.getElementById('btnSaveAllKnowledge').style.display = 'none';
+        setStatus('知识点已存入素材库', 'good');
+    } catch(e) { setStatus(e.message, 'bad'); }
+}
+
+async function saveAllKnowledge() {
+    const unsaved = knowledgePoints.filter(p => !p._saved);
+    if (!unsaved.length) return;
+    const tid = taskStart('批量存入素材库', '保存 ' + unsaved.length + ' 个...');
+    setBusy(true);
+    let saved = 0;
+    for (let idx = 0; idx < knowledgePoints.length; idx++) {
+        if (knowledgePoints[idx]._saved) continue;
+        try {
+            const kp = knowledgePoints[idx];
+            const res = await fetch('/api/wechat-assistant/materials', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: kp.title || kp.type || '知识点',
+                    content: kp.content || '',
+                    category: kp.category || '通用',
+                    tags: kp.tags || [],
+                }),
+            });
+            const payload = await res.json();
+            if (payload.ok) { knowledgePoints[idx]._saved = true; saved++; }
+        } catch(_) {}
+        taskUpdate(tid, saved + '/' + unsaved.length);
+    }
+    renderKnowledgePoints(document.getElementById('knowledgeSummaryBox').querySelector('.wx-knowledge-summary')?.textContent || '');
+    document.getElementById('btnSaveAllKnowledge').style.display = 'none';
+    taskDone(tid, saved + ' 个已存入');
+    setStatus(saved + ' 个知识点已全部存入素材库', 'good');
+    setBusy(false);
+}
+
+// ── materials library ─────────────────────────────────────────────────────────
+let materialsState = [];
+let materialCatFilter = '';
+
+function toggleMaterialsPanel() {
+    const panel = document.getElementById('materialsPanel');
+    const visible = panel.style.display !== 'none';
+    panel.style.display = visible ? 'none' : 'block';
+    if (!visible) loadMaterials();
+}
+
+function toggleAddMaterial() {
+    const form = document.getElementById('addMaterialForm');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loadMaterials(category = materialCatFilter, query = '') {
+    try {
+        const params = new URLSearchParams();
+        if (category) params.set('category', category);
+        if (query) params.set('query', query);
+        const res = await fetch('/api/wechat-assistant/materials?' + params);
+        const payload = await res.json();
+        materialsState = payload.materials || [];
+        renderMaterials();
+    } catch(e) { setStatus('素材库加载失败', 'bad'); }
+}
+
+function filterMaterials(cat) {
+    materialCatFilter = cat;
+    document.querySelectorAll('#materialCatFilter .wx-mini-btn').forEach(b => {
+        b.classList.toggle('green', b.dataset.cat === cat);
+    });
+    loadMaterials(cat);
+}
+
+function searchMaterials() {
+    const q = document.getElementById('materialSearchInput').value.trim();
+    loadMaterials(materialCatFilter, q);
+}
+
+function renderMaterials() {
+    const list = document.getElementById('materialList');
+    if (!materialsState.length) {
+        list.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px 0;">素材库为空，点击「+ 添加素材」开始积累</div>';
+        return;
+    }
+    list.textContent = '';
+    materialsState.forEach(m => {
+        const card = document.createElement('div'); card.className = 'wx-material-card';
+        const header = document.createElement('div'); header.style.display = 'flex'; header.style.alignItems = 'center';
+        const title = document.createElement('span'); title.className = 'wx-material-title'; title.textContent = m.title || '';
+        const cat = document.createElement('span'); cat.className = 'wx-material-cat'; cat.textContent = m.category || '';
+        header.appendChild(title); header.appendChild(cat);
+        const content = document.createElement('div'); content.className = 'wx-material-content'; content.textContent = m.content || '';
+        const tags = document.createElement('div'); tags.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;';
+        (m.tags || []).forEach(t => {
+            const chip = document.createElement('span'); chip.className = 'wx-chip'; chip.textContent = '#' + t; tags.appendChild(chip);
+        });
+        const actions = document.createElement('div'); actions.className = 'wx-material-actions';
+        const useBtn = document.createElement('button'); useBtn.className = 'wx-mini-btn green'; useBtn.textContent = '注入素材';
+        useBtn.onclick = () => injectMaterial(m);
+        const copyBtn = document.createElement('button'); copyBtn.className = 'wx-mini-btn'; copyBtn.textContent = '复制';
+        copyBtn.onclick = () => copyValue(m.content || '');
+        const delBtn = document.createElement('button'); delBtn.className = 'wx-mini-btn'; delBtn.style.color = '#991b1b'; delBtn.textContent = '删除';
+        delBtn.onclick = () => deleteMaterial(m.id);
+        actions.appendChild(useBtn); actions.appendChild(copyBtn); actions.appendChild(delBtn);
+        card.appendChild(header); card.appendChild(content); if (m.tags?.length) card.appendChild(tags); card.appendChild(actions);
+        list.appendChild(card);
+    });
+}
+
+async function saveMaterial() {
+    const title = document.getElementById('newMaterialTitle').value.trim();
+    const content = document.getElementById('newMaterialContent').value.trim();
+    const category = document.getElementById('newMaterialCategory').value;
+    const tagsRaw = document.getElementById('newMaterialTags').value;
+    const tags = tagsRaw.split(/[,，]+/).map(t => t.trim()).filter(Boolean);
+    if (!title || !content) { setStatus('标题和内容不能为空', 'bad'); return; }
+    try {
+        const res = await fetch('/api/wechat-assistant/materials', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ title, content, category, tags }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) throw new Error(payload.error || '保存失败');
+        document.getElementById('newMaterialTitle').value = '';
+        document.getElementById('newMaterialContent').value = '';
+        document.getElementById('newMaterialTags').value = '';
+        toggleAddMaterial();
+        await loadMaterials();
+        setStatus('素材已保存到知识库', 'good');
+    } catch(e) { setStatus(e.message, 'bad'); }
+}
+
+async function deleteMaterial(id) {
+    if (!confirm('确认删除这条素材？')) return;
+    try {
+        const res = await fetch('/api/wechat-assistant/materials/' + id, { method: 'DELETE' });
+        const payload = await res.json();
+        if (!payload.ok) throw new Error(payload.error || '删除失败');
+        await loadMaterials();
+        setStatus('已删除', 'good');
+    } catch(e) { setStatus(e.message, 'bad'); }
+}
+
+function injectMaterial(m) {
+    const notes = document.getElementById('contentNotesInput');
+    const existing = notes.value.trim();
+    const inject = `【素材：${m.title}】\n${m.content}`;
+    notes.value = existing ? existing + '\n\n' + inject : inject;
+    saveForm();
+    setStatus(`已将「${m.title}」注入到内容素材区域，生成正文时将被参考`, 'good');
+}
+
+// ── A/B title tracking integration ───────────────────────────────────────────
+// Extend confirmSaveRecord to capture title score
+const _origConfirmSaveRecord = confirmSaveRecord;
+function confirmSaveRecord() {
+    // Find score of selected title
+    const titleText = selectedTitleInput.value.trim();
+    const scored = titlesScored.find(t => t.title === titleText);
+    // Temporarily attach to record via DOM data
+    document.getElementById('metaReads').dataset.titleScore = scored?.score || 0;
+    document.getElementById('metaReads').dataset.titleType = scored?.type || '';
+    _origConfirmSaveRecord();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 任务执行日志系统
+// ══════════════════════════════════════════════════════════════════════════════
+const _tasks = new Map(); // id → { label, status, detail, startTime, el }
+let _taskSeq = 0;
+
+function _taskEl(id) { return document.getElementById('wx-task-' + id); }
+
+function taskStart(label, detail = '') {
+    const id = ++_taskSeq;
+    const startTime = Date.now();
+    const list = document.getElementById('taskLogList');
+    const empty = document.getElementById('taskLogEmpty');
+    if (empty) empty.style.display = 'none';
+
+    const row = document.createElement('div');
+    row.className = 'wx-task-row running';
+    row.id = 'wx-task-' + id;
+    row.innerHTML = `
+        <div class="wx-task-icon"><div class="wx-task-spinner"></div></div>
+        <div class="wx-task-label">${label}</div>
+        <div class="wx-task-detail" id="wx-task-detail-${id}">${detail}</div>`;
+    list.prepend(row);  // newest on top
+    list.scrollTop = 0;
+
+    _tasks.set(id, { label, status: 'running', detail, startTime, row });
+    return id;
+}
+
+function taskUpdate(id, detail) {
+    const t = _tasks.get(id); if (!t) return;
+    t.detail = detail;
+    const el = document.getElementById('wx-task-detail-' + id);
+    if (el) el.textContent = detail;
+}
+
+function taskDone(id, detail = '') {
+    const t = _tasks.get(id); if (!t) return;
+    const elapsed = ((Date.now() - t.startTime) / 1000).toFixed(1);
+    t.status = 'done';
+    const row = t.row;
+    row.className = 'wx-task-row done';
+    row.innerHTML = `
+        <div class="wx-task-icon" style="color:#16a34a;">✓</div>
+        <div class="wx-task-label" style="color:#374151;">${t.label}</div>
+        <div class="wx-task-detail">${detail || t.detail}</div>
+        <div class="wx-task-time">${elapsed}s</div>`;
+}
+
+function taskFail(id, errorMsg = '') {
+    const t = _tasks.get(id); if (!t) return;
+    const elapsed = ((Date.now() - t.startTime) / 1000).toFixed(1);
+    t.status = 'error';
+    const row = t.row;
+    row.className = 'wx-task-row error';
+    row.innerHTML = `
+        <div class="wx-task-icon" style="color:#dc2626;">✗</div>
+        <div class="wx-task-label">${t.label}</div>
+        <div class="wx-task-detail" style="color:#dc2626;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${errorMsg}">${errorMsg || '失败'}</div>
+        <div class="wx-task-time">${elapsed}s</div>`;
+}
+
+function clearTaskLog() {
+    const list = document.getElementById('taskLogList');
+    const empty = document.getElementById('taskLogEmpty');
+    // Remove only done/error rows
+    list.querySelectorAll('.wx-task-row.done, .wx-task-row.error').forEach(r => r.remove());
+    _tasks.forEach((t, id) => { if (t.status !== 'running') _tasks.delete(id); });
+    const hasRunning = list.querySelector('.wx-task-row.running');
+    if (!hasRunning && empty) empty.style.display = 'block';
+}
+
+// ── sidebar collapse ─────────────────────────────────────────────────────────
+function toggleSidebarSection(bodyId, titleEl) {
+    const body = document.getElementById(bodyId);
+    const caret = titleEl.querySelector('[id$="Caret"]') || titleEl.querySelector('span:last-child');
+    const collapsed = body.classList.toggle('collapsed');
+    if (caret) caret.textContent = collapsed ? '▸' : '▾';
+}
+
+// Collapse model config by default once status loads
+function collapseModelConfigIfReady() {
+    const body = document.getElementById('modelConfigBody');
+    const caret = document.getElementById('modelConfigCaret');
+    if (body && !body.classList.contains('collapsed')) {
+        body.classList.add('collapsed');
+        if (caret) caret.textContent = '▸';
+    }
+}
+
+// ── scroll helper ─────────────────────────────────────────────────────────────
+function scrollToPanel(panelId) {
+    setTimeout(() => {
+        const el = document.getElementById(panelId);
+        if (el && el.style.display !== 'none') el.scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 120);
+}
+
+// ── fileList visibility ───────────────────────────────────────────────────────
+const _origSetFileList = typeof setFileList === 'function' ? setFileList : null;
+
+// Watch fileList changes to show/hide section
+const fileListObserver = new MutationObserver(() => {
+    const sec = document.getElementById('fileListSection');
+    if (sec) sec.style.display = fileList.textContent.trim() ? 'block' : 'none';
+});
+fileListObserver.observe(fileList, { childList: true, subtree: true, characterData: true });
+
+// ── init ──────────────────────────────────────────────────────────────────────
+restoreForm();
+loadStatus();
+updateProgress();
+</script>
+</body>
+</html>

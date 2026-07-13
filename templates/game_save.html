@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>富甲天下5存档修改器 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        .pick-panel {
+            border:1px solid var(--border,#e0e0e0);
+            border-radius:8px;
+            background:#fff;
+            padding:14px;
+        }
+        .pick-head {
+            display:grid;
+            grid-template-columns:auto 1fr;
+            gap:12px;
+            align-items:end;
+        }
+        .pick-hint { font-size:12px; color:var(--text-muted); margin-top:8px; }
+        .file-picker {
+            margin-top:14px;
+            border:1px solid var(--border,#e0e0e0);
+            border-radius:8px;
+            overflow:hidden;
+            background:#fff;
+        }
+        .picker-bar {
+            display:grid;
+            grid-template-columns:auto 1fr auto;
+            gap:8px;
+            align-items:center;
+            padding:10px;
+            background:var(--bg-main,#f7f7f7);
+            border-bottom:1px solid var(--border,#e0e0e0);
+        }
+        .picker-roots {
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            padding:10px;
+            border-bottom:1px solid var(--border,#f0f0f0);
+        }
+        .picker-root,
+        .picker-nav-btn {
+            border:1px solid var(--border,#d8d8d8);
+            background:#fff;
+            border-radius:6px;
+            padding:7px 10px;
+            font-size:12px;
+            color:var(--text-primary);
+            cursor:pointer;
+        }
+        .picker-root:hover,
+        .picker-nav-btn:hover { background:#f5f8ff; border-color:var(--accent,#4f8ef7); }
+        .picker-list { max-height:360px; overflow:auto; }
+        .picker-entry {
+            display:grid;
+            grid-template-columns:1fr auto;
+            gap:12px;
+            width:100%;
+            border:0;
+            border-bottom:1px solid var(--border,#f0f0f0);
+            background:#fff;
+            padding:10px 12px;
+            text-align:left;
+            cursor:pointer;
+            color:var(--text-primary);
+        }
+        .picker-entry:hover { background:#f5f8ff; }
+        .picker-entry:last-child { border-bottom:0; }
+        .picker-name { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .picker-meta { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+        .picker-empty { padding:24px 12px; text-align:center; color:var(--text-muted); font-size:13px; }
+
+        .status-bar { padding: 9px 13px; border-radius: 8px; font-size: 13px; margin-top: 8px; }
+        .status-bar.info  { background:#e8f0fe; color:#1a56db; }
+        .status-bar.ok    { background:#e3fcec; color:#166534; }
+        .status-bar.error { background:#fde8e8; color:#991b1b; }
+
+        /* 资源 */
+        .res-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .field-row { display:flex; flex-direction:column; gap:5px; }
+        .field-label { font-size:12px; color:var(--text-muted); font-weight:500; }
+        .field-input {
+            padding:8px 12px;
+            background:var(--bg-main,#f5f5f5);
+            border:1.5px solid var(--border,#e0e0e0);
+            border-radius:8px; font-size:14px;
+            color:var(--text-primary); width:100%; box-sizing:border-box;
+        }
+        .field-input:focus { outline:none; border-color:var(--accent,#4f8ef7); }
+        .field-input.changed { border-color:#f59e0b !important; background:#fffbea !important; }
+        .field-input[readonly] {
+            color: var(--text-muted);
+            background: #f7f7f7;
+        }
+        .lord-list { display:grid; grid-template-columns:1fr; gap:12px; }
+        .lord-card {
+            border:1px solid var(--border,#e0e0e0);
+            border-radius:8px;
+            background:#fff;
+            padding:14px;
+        }
+        .lord-card.current {
+            border-color:var(--accent,#4f8ef7);
+            box-shadow:0 0 0 2px rgba(79,142,247,.08);
+        }
+        .lord-card.modified { background:#fffdf0; }
+        .lord-head {
+            display:flex; justify-content:space-between; align-items:flex-start;
+            gap:12px; margin-bottom:12px;
+        }
+        .lord-name { font-size:16px; font-weight:700; color:var(--text-primary); }
+        .lord-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+        .lord-badge {
+            font-size:11px; padding:3px 8px; border-radius:999px;
+            background:#e8f0fe; color:#1a56db; white-space:nowrap;
+        }
+        .lord-subtitle {
+            font-size:12px; font-weight:600; color:var(--text-muted);
+            margin:12px 0 8px;
+        }
+        .no-pet {
+            font-size:13px; color:var(--text-muted);
+            padding:8px 0;
+        }
+
+        /* 武将表 */
+        .hero-toolbar {
+            display:flex; align-items:center; gap:10px; margin-bottom:10px;
+        }
+        .hero-search {
+            flex:1; padding:8px 12px;
+            border:1.5px solid var(--border,#e0e0e0);
+            border-radius:8px; font-size:13px;
+            background:var(--bg-main,#f5f5f5); color:var(--text-primary);
+        }
+        .hero-search:focus { outline:none; border-color:var(--accent,#4f8ef7); }
+        .hero-count { font-size:12px; color:var(--text-muted); white-space:nowrap; }
+        .template-toolbar {
+            display:grid;
+            grid-template-columns:minmax(160px, 1fr) auto minmax(180px, 1fr) auto auto;
+            gap:8px;
+            align-items:center;
+            margin:0 0 10px;
+        }
+        .template-select {
+            min-width:0;
+            padding:8px 12px;
+            border:1.5px solid var(--border,#e0e0e0);
+            border-radius:8px;
+            font-size:13px;
+            background:var(--bg-main,#f5f5f5);
+            color:var(--text-primary);
+        }
+        .template-status {
+            display:block;
+            min-height:18px;
+            margin-bottom:8px;
+            font-size:12px;
+            color:var(--text-muted);
+        }
+        .template-status.ok { color:#166534; }
+        .template-status.error { color:#991b1b; }
+        .template-status.info { color:#1a56db; }
+
+        .hero-table-wrap { overflow-x:auto; }
+        table.ht {
+            width:100%; border-collapse:collapse; font-size:13px;
+        }
+        table.ht th {
+            text-align:center; padding:8px 6px;
+            background:var(--bg-main,#f8f8f8);
+            color:var(--text-muted); font-weight:600; font-size:12px;
+            border-bottom:2px solid var(--border,#e0e0e0);
+            white-space:nowrap; position:sticky; top:0; z-index:1;
+        }
+        table.ht th.col-name { text-align:left; padding-left:12px; }
+        table.ht th.sortable { cursor:pointer; user-select:none; }
+        table.ht th.sortable:hover { color:var(--text-primary); background:#f0f0f0; }
+        table.ht th.sort-asc  { color:var(--accent,#4f8ef7); }
+        table.ht th.sort-desc { color:var(--accent,#4f8ef7); }
+        .sort-arrow { font-size:10px; margin-left:3px; opacity:.5; }
+        th.sort-asc  .sort-arrow,
+        th.sort-desc .sort-arrow { opacity:1; }
+        table.ht td {
+            padding:5px 4px;
+            border-bottom:1px solid var(--border,#f0f0f0);
+            vertical-align:middle;
+        }
+        table.ht tr:last-child td { border-bottom:none; }
+        table.ht tr.modified { background:#fffdf0; }
+        table.ht tr:hover td { background:#f5f8ff; }
+        table.ht tr.modified:hover td { background:#fff9e0; }
+
+        td.col-idx  { color:var(--text-muted); font-size:11px; text-align:center; width:30px; }
+        td.col-name { font-weight:500; padding-left:12px; white-space:nowrap; }
+        td.col-dim  { text-align:center; }
+
+        .dim-inp {
+            width:58px; padding:4px 0;
+            border:1.5px solid transparent;
+            border-radius:6px; font-size:13px;
+            text-align:center; background:transparent;
+            color:var(--text-primary); box-sizing:border-box;
+            transition:border-color .15s, background .15s;
+        }
+        .dim-inp:hover  { border-color:var(--border,#e0e0e0); background:#fff; }
+        .dim-inp:focus  { outline:none; border-color:var(--accent,#4f8ef7); background:#fff; }
+        .dim-inp.changed { border-color:#f59e0b !important; background:#fffbea !important; }
+
+        td.col-reset { width:44px; text-align:center; }
+        .btn-reset-row {
+            font-size:11px; padding:3px 8px;
+            border:1px solid var(--border,#ddd);
+            border-radius:6px; background:#fff;
+            color:var(--text-muted); cursor:pointer;
+            display:none;
+        }
+        .btn-reset-row:hover { background:#f5f5f5; }
+        tr.modified .btn-reset-row { display:inline-block; }
+
+        .modified-badge {
+            display:inline-block; font-size:11px;
+            padding:2px 8px; background:#fef3c7; color:#92400e;
+            border-radius:10px; margin-left:8px; font-weight:normal;
+        }
+        .section-title {
+            font-size:11px; font-weight:600; text-transform:uppercase;
+            letter-spacing:.06em; color:var(--text-muted); margin-bottom:10px;
+        }
+        .btn-row { display:flex; gap:10px; margin-top:16px; }
+        .backup-info {
+            font-size:12px; color:var(--text-muted);
+            margin-top:8px; padding:8px 12px;
+            background:var(--bg-main,#f5f5f5); border-radius:6px;
+        }
+        @media (max-width: 900px) {
+            .pick-head,
+            .picker-bar,
+            .template-toolbar {
+                grid-template-columns:1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">🎮</span>
+                    <span class="logo-text">富甲天下5 存档修改器</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- 选择存档 -->
+        <div class="section-label">第一步：选择存档文件</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <div class="pick-panel">
+                    <div class="pick-head">
+                        <button id="choose-file-btn" class="btn-primary" type="button">打开目录选择存档</button>
+                        <div class="field-row">
+                            <label class="field-label" for="source-path">当前存档完整路径</label>
+                            <input class="field-input" type="text" id="source-path" readonly
+                                   placeholder="尚未选择存档文件">
+                        </div>
+                    </div>
+                    <div class="pick-hint">请在本机目录中打开并选择 .sav 存档；生成的新文件会放到所选文件同级的 new 目录中，并保持原文件名。</div>
+                    <div id="file-picker" class="file-picker" style="display:none;">
+                        <div class="picker-roots" id="picker-roots"></div>
+                        <div class="picker-bar">
+                            <button id="picker-up-btn" class="picker-nav-btn" type="button">上级目录</button>
+                            <input id="picker-path" class="field-input" type="text" readonly>
+                            <button id="picker-refresh-btn" class="picker-nav-btn" type="button">刷新</button>
+                        </div>
+                        <div id="picker-list" class="picker-list"></div>
+                    </div>
+                </div>
+                <div id="upload-status"></div>
+            </div>
+        </div>
+
+        <!-- 主公 -->
+        <div id="lord-section" style="display:none;">
+            <div class="section-label" style="margin-top:24px;">第二步：修改主公与宠物</div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div class="hero-toolbar">
+                        <div class="section-title" style="margin-bottom:0;">主公基本信息与对应宠物</div>
+                        <span class="hero-count" id="lord-count"></span>
+                    </div>
+                    <div id="lord-list" class="lord-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 武将 -->
+        <div id="hero-section" style="display:none;">
+            <div class="section-label" style="margin-top:24px;">
+                第三步：修改武将属性
+                <span id="modified-badge" class="modified-badge" style="display:none;"></span>
+            </div>
+            <div class="card" style="display:block;">
+                <div class="card-body" style="display:block;">
+                    <div class="hero-toolbar">
+                        <input type="text" class="hero-search" id="hero-search"
+                               placeholder="搜索武将（简体/繁体/编号）…" autocomplete="off">
+                        <span class="hero-count" id="hero-count"></span>
+                    </div>
+                    <div class="template-toolbar">
+                        <input type="text" class="hero-search" id="template-name"
+                               placeholder="模板名称" autocomplete="off">
+                        <button id="save-template-btn" class="btn-secondary" type="button">保存模板</button>
+                        <select id="template-select" class="template-select"></select>
+                        <button id="apply-template-btn" class="btn-secondary" type="button">套用模板</button>
+                        <button id="delete-template-btn" class="btn-secondary" type="button">删除模板</button>
+                    </div>
+                    <div id="template-status" class="template-status"></div>
+                    <div class="hero-table-wrap">
+                        <table class="ht">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th class="col-name">武将</th>
+                                    <th class="col-name">归属主公</th>
+                                    <th class="sortable" data-dim="体力上限">体力上限<span class="sort-arrow">↕</span></th>
+                                    <th class="sortable" data-dim="武力">武力<span class="sort-arrow">↕</span></th>
+                                    <th class="sortable" data-dim="智力">智力<span class="sort-arrow">↕</span></th>
+                                    <th class="sortable" data-dim="防御力">防御力<span class="sort-arrow">↕</span></th>
+                                    <th class="sortable" data-dim="陆战">陆战<span class="sort-arrow">↕</span></th>
+                                    <th class="sortable" data-dim="水战">水战<span class="sort-arrow">↕</span></th>
+                                    <th class="sortable" data-dim="林战">林战<span class="sort-arrow">↕</span></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="hero-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 保存 -->
+        <div id="save-section" style="display:none; margin-top:4px;">
+            <div class="btn-row">
+                <button id="save-btn" class="btn-primary" style="flex:1;">💾 生成修改后的存档</button>
+                <button id="reset-all-btn" class="btn-secondary">重置全部</button>
+            </div>
+            <div id="save-status"></div>
+            <div id="backup-info" class="backup-info" style="display:none;"></div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+const RES_FIELDS = ['金额','士兵','金属','木材','石头','棉花','皮革'];
+const DIM_KEYS   = ['体力上限','武力','智力','防御力','陆战','水战','林战'];
+
+let tmpPath     = null;
+let sourcePath  = '';
+let originalFilename = '0.sav';
+let originalSize = null;
+let originalSha256 = '';
+let pickerPath = '';
+let pickerParent = '';
+let allLords    = [];      // [{slot, name, fields, pet}]
+let origLords   = [];
+let allHeroes   = [];      // [{idx, name, name_s, dims}]
+let origDims    = {};      // {idx: {dim: val}}
+let heroChanges = {};      // {idx: {dim: newVal}}
+let heroTemplates = [];
+let sortDim     = null;    // 当前排序维度
+let sortDir     = 0;       // 0=原序 1=升序 -1=降序
+
+function deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj || null));
+}
+
+// ── 选择并解析存档 ──────────────────────────────────────
+const sourcePathInput = document.getElementById('source-path');
+const chooseFileBtn = document.getElementById('choose-file-btn');
+const filePicker = document.getElementById('file-picker');
+const pickerRoots = document.getElementById('picker-roots');
+const pickerPathInput = document.getElementById('picker-path');
+const pickerList = document.getElementById('picker-list');
+const pickerUpBtn = document.getElementById('picker-up-btn');
+const pickerRefreshBtn = document.getElementById('picker-refresh-btn');
+const templateNameInput = document.getElementById('template-name');
+const saveTemplateBtn = document.getElementById('save-template-btn');
+const templateSelect = document.getElementById('template-select');
+const applyTemplateBtn = document.getElementById('apply-template-btn');
+const deleteTemplateBtn = document.getElementById('delete-template-btn');
+const templateStatus = document.getElementById('template-status');
+
+function showStatus(elId, type, text) {
+    const el = document.getElementById(elId);
+    el.textContent = '';
+    const bar = document.createElement('div');
+    bar.className = 'status-bar ' + type;
+    bar.textContent = text;
+    el.appendChild(bar);
+}
+
+function resetParsedSections() {
+    ['lord-section','hero-section','save-section'].forEach(
+        id => document.getElementById(id).style.display = 'none');
+    document.getElementById('save-status').textContent = '';
+    document.getElementById('backup-info').style.display = 'none';
+}
+
+function basename(path) {
+    return String(path || '').split(/[\\/]/).filter(Boolean).pop() || path;
+}
+
+function formatBytes(size) {
+    const n = Number(size || 0);
+    if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+    if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+    return n + ' B';
+}
+
+function renderPicker(data) {
+    pickerPath = data.path || '';
+    pickerParent = data.parent || '';
+    pickerPathInput.value = pickerPath;
+
+    pickerRoots.textContent = '';
+    (data.roots || []).forEach(root => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'picker-root';
+        btn.textContent = root.name;
+        btn.addEventListener('click', () => loadPicker(root.path));
+        pickerRoots.appendChild(btn);
+    });
+
+    pickerList.textContent = '';
+    const dirs = data.dirs || [];
+    const files = data.files || [];
+    if (!dirs.length && !files.length) {
+        const empty = document.createElement('div');
+        empty.className = 'picker-empty';
+        empty.textContent = '当前目录没有子目录或 .sav 存档';
+        pickerList.appendChild(empty);
+        return;
+    }
+
+    dirs.forEach(dir => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'picker-entry';
+        const name = document.createElement('span');
+        name.className = 'picker-name';
+        name.textContent = dir.name;
+        const meta = document.createElement('span');
+        meta.className = 'picker-meta';
+        meta.textContent = '目录';
+        row.appendChild(name);
+        row.appendChild(meta);
+        row.addEventListener('click', () => loadPicker(dir.path));
+        pickerList.appendChild(row);
+    });
+
+    files.forEach(file => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'picker-entry';
+        const time = file.mtime ? new Date(file.mtime * 1000).toLocaleString() : '';
+        const name = document.createElement('span');
+        name.className = 'picker-name';
+        name.textContent = file.name;
+        const meta = document.createElement('span');
+        meta.className = 'picker-meta';
+        meta.textContent = formatBytes(file.size) + (time ? ' · ' + time : '');
+        row.appendChild(name);
+        row.appendChild(meta);
+        row.addEventListener('click', () => parseSelectedPath(file.path));
+        pickerList.appendChild(row);
+    });
+}
+
+async function loadPicker(path) {
+    filePicker.style.display = 'block';
+    pickerList.innerHTML = '<div class="picker-empty">正在读取目录…</div>';
+    try {
+        const qs = path ? '?path=' + encodeURIComponent(path) : '';
+        const res = await fetch('/api/game-save/files' + qs);
+        const data = await res.json();
+        if (!res.ok) {
+            pickerList.innerHTML = '<div class="picker-empty">' + (data.error || '读取目录失败') + '</div>';
+            return;
+        }
+        renderPicker(data);
+    } catch(e) {
+        pickerList.innerHTML = '<div class="picker-empty">网络错误：' + e.message + '</div>';
+    }
+}
+
+function handleParsedData(data) {
+    tmpPath = data.tmp;
+    sourcePath = data.source_path || '';
+    originalFilename = data.original_filename || basename(sourcePath) || '0.sav';
+    originalSize = data.original_size || null;
+    originalSha256 = data.original_sha256 || '';
+    sourcePathInput.value = sourcePath;
+    allLords = Array.isArray(data.lords) ? data.lords : [];
+    origLords = deepClone(allLords) || [];
+    heroChanges = {};
+    setTemplateStatus('', '');
+
+    renderLords(allLords);
+
+    allHeroes = data.heroes || [];
+    origDims  = {};
+    allHeroes.forEach(h => { origDims[h.idx] = Object.assign({}, h.dims); });
+
+    renderTable(allHeroes);
+    updateBadge();
+    renderHeroTemplateOptions(templateSelect.value);
+    const currentLord = allLords.find(l => l.is_current) || allLords[0] || null;
+    const currentName = currentLord ? (currentLord.name_s || currentLord.name || '未知主公') : '';
+    showStatus('upload-status','ok',
+        '解析成功：'+originalFilename+'，共 '+allHeroes.length+' 名武将'
+        + (allLords.length ? '，主公 ' + allLords.length + ' 位' : '')
+        + (currentName ? '，当前主公：' + currentName : '')
+        + (data.source_path_message ? '；' + data.source_path_message : ''));
+
+    ['lord-section','hero-section','save-section'].forEach(
+        id => document.getElementById(id).style.display = 'block');
+    document.getElementById('save-status').textContent = '';
+    document.getElementById('backup-info').style.display = 'none';
+}
+
+async function parseSelectedPath(path) {
+    resetParsedSections();
+    showStatus('upload-status', 'info', '正在解析 ' + basename(path) + '…');
+    try {
+        const res  = await fetch('/api/game-save/parse-path', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ path }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showStatus('upload-status','error','❌ '+(data.error||'解析失败')); return; }
+        handleParsedData(data);
+        filePicker.style.display = 'none';
+    } catch(e) {
+        showStatus('upload-status','error','❌ 网络错误：'+e.message);
+    }
+}
+
+function currentPickerDirectory() {
+    if (sourcePath) return sourcePath.replace(/[\\/][^\\/]*$/, '');
+    return pickerPath || '';
+}
+
+chooseFileBtn.addEventListener('click', () => loadPicker(currentPickerDirectory()));
+pickerRefreshBtn.addEventListener('click', () => loadPicker(pickerPath));
+pickerUpBtn.addEventListener('click', () => {
+    if (pickerParent) loadPicker(pickerParent);
+});
+
+// ── 武将属性模板 ──────────────────────────────────────
+function setTemplateStatus(type, text) {
+    templateStatus.className = 'template-status ' + (type || '');
+    templateStatus.textContent = text || '';
+}
+
+function selectedHeroTemplate() {
+    const id = templateSelect.value;
+    return heroTemplates.find(t => String(t.id) === String(id)) || null;
+}
+
+function updateTemplateButtons() {
+    const hasChanges = Object.keys(heroChanges).length > 0;
+    const hasTemplate = !!templateSelect.value;
+    saveTemplateBtn.disabled = !hasChanges;
+    applyTemplateBtn.disabled = !hasTemplate || !allHeroes.length;
+    deleteTemplateBtn.disabled = !hasTemplate;
+}
+
+function renderHeroTemplateOptions(preferredId) {
+    const current = preferredId !== undefined ? preferredId : templateSelect.value;
+    templateSelect.textContent = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = '新建模板 / 选择模板';
+    templateSelect.appendChild(empty);
+
+    heroTemplates.forEach(tpl => {
+        const opt = document.createElement('option');
+        opt.value = tpl.id;
+        opt.textContent = tpl.name + '（' + (tpl.hero_count || 0) + '名 / ' + (tpl.field_count || 0) + '项）';
+        templateSelect.appendChild(opt);
+    });
+
+    if (current && heroTemplates.some(t => String(t.id) === String(current))) {
+        templateSelect.value = current;
+    } else {
+        templateSelect.value = '';
+    }
+    const tpl = selectedHeroTemplate();
+    if (tpl) templateNameInput.value = tpl.name || '';
+    updateTemplateButtons();
+}
+
+async function loadHeroTemplates(preferredId) {
+    try {
+        const res = await fetch('/api/game-save/hero-templates');
+        const data = await res.json();
+        if (!res.ok) {
+            setTemplateStatus('error', data.error || '读取模板失败');
+            return;
+        }
+        heroTemplates = Array.isArray(data.templates) ? data.templates : [];
+        renderHeroTemplateOptions(preferredId);
+    } catch(e) {
+        setTemplateStatus('error', '读取模板失败：' + e.message);
+    }
+}
+
+function heroByIdx(idx) {
+    return allHeroes.find(h => String(h.idx) === String(idx)) || null;
+}
+
+function normalizeHeroName(value) {
+    return String(value || '').replace(/\s+/g, '');
+}
+
+function heroNameKeys(hero) {
+    return [hero?.name_s, hero?.name]
+        .map(normalizeHeroName)
+        .filter(Boolean);
+}
+
+function templateHeroNameKeys(item) {
+    return [item?.name_s, item?.name]
+        .map(normalizeHeroName)
+        .filter(Boolean);
+}
+
+function heroNamesMatch(hero, item) {
+    const tplNames = templateHeroNameKeys(item);
+    if (!tplNames.length) return true;
+    const curNames = heroNameKeys(hero);
+    return tplNames.some(name => curNames.includes(name));
+}
+
+function findHeroForTemplateItem(key, item) {
+    const idx = item && item.idx !== undefined ? item.idx : key;
+    const byIdx = heroByIdx(idx);
+    if (byIdx && heroNamesMatch(byIdx, item)) return byIdx;
+
+    const tplNames = templateHeroNameKeys(item);
+    if (!tplNames.length) return null;
+    return allHeroes.find(hero => heroNameKeys(hero).some(name => tplNames.includes(name))) || null;
+}
+
+function setHeroDimChange(idx, dim, value) {
+    if (!origDims[idx] || origDims[idx][dim] === undefined) return false;
+    const nv = Math.max(0, parseInt(value, 10) || 0);
+    const origVal = origDims[idx][dim];
+    if (!heroChanges[idx]) heroChanges[idx] = {};
+    if (nv === origVal) {
+        delete heroChanges[idx][dim];
+        if (!Object.keys(heroChanges[idx]).length) delete heroChanges[idx];
+    } else {
+        heroChanges[idx][dim] = nv;
+    }
+    return true;
+}
+
+function buildHeroTemplatePayload() {
+    const payload = {};
+    Object.keys(heroChanges)
+        .sort((a, b) => Number(a) - Number(b))
+        .forEach(idx => {
+            const dims = {};
+            DIM_KEYS.forEach(dim => {
+                if (heroChanges[idx]?.[dim] !== undefined) {
+                    dims[dim] = Math.max(0, parseInt(heroChanges[idx][dim], 10) || 0);
+                }
+            });
+            if (!Object.keys(dims).length) return;
+            const hero = heroByIdx(idx) || {};
+            payload[idx] = {
+                idx: Number(idx),
+                name: hero.name || '',
+                name_s: hero.name_s || '',
+                lord_name: hero.lord_name || '',
+                dims,
+            };
+        });
+    return payload;
+}
+
+async function saveHeroTemplate() {
+    const heroes = buildHeroTemplatePayload();
+    if (!Object.keys(heroes).length) {
+        setTemplateStatus('error', '当前没有武将属性修改');
+        return;
+    }
+    const selected = selectedHeroTemplate();
+    const name = (templateNameInput.value.trim()
+        || selected?.name
+        || ('武将属性模板 ' + new Date().toLocaleString())).slice(0, 60);
+
+    saveTemplateBtn.disabled = true;
+    setTemplateStatus('info', '正在保存模板…');
+    try {
+        const res = await fetch('/api/game-save/hero-templates', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                id: templateSelect.value || '',
+                name,
+                heroes,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            setTemplateStatus('error', data.error || '保存模板失败');
+            return;
+        }
+        await loadHeroTemplates(data.template?.id || '');
+        setTemplateStatus('ok', '模板已保存：' + (data.template?.name || name));
+    } catch(e) {
+        setTemplateStatus('error', '保存模板失败：' + e.message);
+    } finally {
+        updateTemplateButtons();
+    }
+}
+
+function applyHeroTemplate(tpl) {
+    const heroes = tpl?.heroes || {};
+    let appliedHeroes = 0;
+    let appliedFields = 0;
+    let missedHeroes = 0;
+
+    Object.entries(heroes).forEach(([key, item]) => {
+        const target = findHeroForTemplateItem(key, item || {});
+        if (!target) {
+            missedHeroes += 1;
+            return;
+        }
+        const dims = item?.dims || {};
+        let changedForHero = 0;
+        DIM_KEYS.forEach(dim => {
+            if (dims[dim] === undefined) return;
+            if (setHeroDimChange(target.idx, dim, dims[dim])) {
+                changedForHero += 1;
+                appliedFields += 1;
+            }
+        });
+        if (changedForHero) appliedHeroes += 1;
+    });
+
+    applyFilterAndSort();
+    updateBadge();
+    setTemplateStatus('ok',
+        '已套用：' + appliedHeroes + ' 名武将，' + appliedFields + ' 项属性'
+        + (missedHeroes ? '；未匹配 ' + missedHeroes + ' 名' : ''));
+}
+
+saveTemplateBtn.addEventListener('click', saveHeroTemplate);
+templateSelect.addEventListener('change', () => {
+    const tpl = selectedHeroTemplate();
+    templateNameInput.value = tpl ? (tpl.name || '') : '';
+    setTemplateStatus('', '');
+    updateTemplateButtons();
+});
+applyTemplateBtn.addEventListener('click', () => {
+    const tpl = selectedHeroTemplate();
+    if (!tpl) {
+        setTemplateStatus('error', '请选择模板');
+        return;
+    }
+    if (!allHeroes.length) {
+        setTemplateStatus('error', '请先选择并解析存档');
+        return;
+    }
+    applyHeroTemplate(tpl);
+});
+deleteTemplateBtn.addEventListener('click', async () => {
+    const tpl = selectedHeroTemplate();
+    if (!tpl) return;
+    if (!confirm('删除模板：' + tpl.name + '？')) return;
+    deleteTemplateBtn.disabled = true;
+    setTemplateStatus('info', '正在删除模板…');
+    try {
+        const res = await fetch('/api/game-save/hero-templates/' + encodeURIComponent(tpl.id), {
+            method:'DELETE',
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            setTemplateStatus('error', data.error || '删除模板失败');
+            return;
+        }
+        templateNameInput.value = '';
+        await loadHeroTemplates('');
+        setTemplateStatus('ok', '模板已删除');
+    } catch(e) {
+        setTemplateStatus('error', '删除模板失败：' + e.message);
+    } finally {
+        updateTemplateButtons();
+    }
+});
+renderHeroTemplateOptions('');
+loadHeroTemplates();
+
+// ── 主公与宠物 ────────────────────────────────────────
+function getOrigLord(slot) {
+    return origLords.find(l => String(l.slot) === String(slot)) || null;
+}
+
+function makeNumberInput(value, origVal, onChange) {
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.className = 'field-input';
+    inp.min = 0;
+    inp.max = 999999999;
+    inp.value = Number(value || 0);
+    inp.title = '原值：' + Number(origVal || 0);
+    inp.addEventListener('change', () => {
+        const nv = Math.max(0, parseInt(inp.value, 10) || 0);
+        inp.value = nv;
+        inp.classList.toggle('changed', nv !== Number(origVal || 0));
+        if (onChange) onChange();
+    });
+    return inp;
+}
+
+function makeTextInput(value, origVal, onChange) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'field-input';
+    inp.maxLength = 4;
+    inp.value = value || '';
+    inp.title = '原值：' + (origVal || '');
+    inp.addEventListener('change', () => {
+        inp.value = inp.value.trim();
+        inp.classList.toggle('changed', inp.value !== (origVal || ''));
+        if (onChange) onChange();
+    });
+    return inp;
+}
+
+function updateLordCardState(slot) {
+    const card = document.querySelector(`[data-lord-slot="${slot}"]`);
+    if (!card) return;
+    card.classList.toggle('modified', !!card.querySelector('.field-input.changed'));
+}
+
+function renderLords(lords) {
+    document.getElementById('lord-count').textContent = (lords || []).length + ' 位';
+    const wrap = document.getElementById('lord-list');
+    wrap.textContent = '';
+
+    (lords || []).forEach(lord => {
+        const orig = getOrigLord(lord.slot) || lord;
+        const card = document.createElement('div');
+        card.className = 'lord-card' + (lord.is_current ? ' current' : '');
+        card.dataset.lordSlot = lord.slot;
+
+        const head = document.createElement('div');
+        head.className = 'lord-head';
+        const left = document.createElement('div');
+        const name = document.createElement('div');
+        name.className = 'lord-name';
+        name.textContent = lord.name_s || lord.name || ('主公 #' + lord.slot);
+        const meta = document.createElement('div');
+        meta.className = 'lord-meta';
+        meta.textContent = '槽位 ' + lord.slot + ' · 武将编号 ' + lord.hero_idx;
+        left.appendChild(name);
+        left.appendChild(meta);
+        head.appendChild(left);
+        if (lord.is_current) {
+            const badge = document.createElement('span');
+            badge.className = 'lord-badge';
+            badge.textContent = '当前主公';
+            head.appendChild(badge);
+        }
+        card.appendChild(head);
+
+        const baseTitle = document.createElement('div');
+        baseTitle.className = 'lord-subtitle';
+        baseTitle.textContent = '基本信息';
+        card.appendChild(baseTitle);
+
+        const resGrid = document.createElement('div');
+        resGrid.className = 'res-grid';
+        RES_FIELDS.forEach(field => {
+            const row = document.createElement('div');
+            row.className = 'field-row';
+            const label = document.createElement('label');
+            label.className = 'field-label';
+            label.textContent = field === '金额' ? '金额（铜钱）' : field;
+            const inp = makeNumberInput(
+                lord.fields?.[field],
+                orig.fields?.[field],
+                () => updateLordCardState(lord.slot)
+            );
+            inp.dataset.lordField = field;
+            row.appendChild(label);
+            row.appendChild(inp);
+            resGrid.appendChild(row);
+        });
+        card.appendChild(resGrid);
+
+        const petTitle = document.createElement('div');
+        petTitle.className = 'lord-subtitle';
+        petTitle.textContent = '对应宠物';
+        card.appendChild(petTitle);
+
+        if (lord.pet) {
+            const petGrid = document.createElement('div');
+            petGrid.className = 'res-grid';
+
+            const nameRow = document.createElement('div');
+            nameRow.className = 'field-row';
+            const nameLabel = document.createElement('label');
+            nameLabel.className = 'field-label';
+            nameLabel.textContent = '宠物名称';
+            const nameInput = makeTextInput(
+                lord.pet.name || lord.pet.name_s || '',
+                orig.pet?.name || orig.pet?.name_s || '',
+                () => updateLordCardState(lord.slot)
+            );
+            nameInput.dataset.petField = 'name';
+            nameRow.appendChild(nameLabel);
+            nameRow.appendChild(nameInput);
+            petGrid.appendChild(nameRow);
+
+            const levelRow = document.createElement('div');
+            levelRow.className = 'field-row';
+            const levelLabel = document.createElement('label');
+            levelLabel.className = 'field-label';
+            levelLabel.textContent = '宠物等级';
+            const levelInput = makeNumberInput(
+                lord.pet.level,
+                orig.pet?.level,
+                () => updateLordCardState(lord.slot)
+            );
+            levelInput.dataset.petField = 'level';
+            levelRow.appendChild(levelLabel);
+            levelRow.appendChild(levelInput);
+            petGrid.appendChild(levelRow);
+
+            const pointsRow = document.createElement('div');
+            pointsRow.className = 'field-row';
+            const pointsLabel = document.createElement('label');
+            pointsLabel.className = 'field-label';
+            pointsLabel.textContent = '升级点数';
+            const pointsInput = makeNumberInput(
+                lord.pet.upgrade_points,
+                orig.pet?.upgrade_points,
+                () => updateLordCardState(lord.slot)
+            );
+            pointsInput.dataset.petField = 'upgrade_points';
+            pointsRow.appendChild(pointsLabel);
+            pointsRow.appendChild(pointsInput);
+            petGrid.appendChild(pointsRow);
+
+            card.appendChild(petGrid);
+        } else {
+            const empty = document.createElement('div');
+            empty.className = 'no-pet';
+            empty.textContent = '无宠物数据';
+            card.appendChild(empty);
+        }
+
+        wrap.appendChild(card);
+    });
+}
+
+function getLordsPatch() {
+    const patch = {};
+    allLords.forEach(lord => {
+        const card = document.querySelector(`[data-lord-slot="${lord.slot}"]`);
+        if (!card) return;
+        const fields = {};
+        card.querySelectorAll('[data-lord-field]').forEach(inp => {
+            fields[inp.dataset.lordField] = Math.max(0, parseInt(inp.value, 10) || 0);
+        });
+        const lordPatch = { fields };
+        if (lord.pet) {
+            const pet = {};
+            card.querySelectorAll('[data-pet-field]').forEach(inp => {
+                if (inp.dataset.petField === 'name') {
+                    pet.name = inp.value.trim();
+                } else {
+                    pet[inp.dataset.petField] = Math.max(0, parseInt(inp.value, 10) || 0);
+                }
+            });
+            lordPatch.pet = pet;
+        }
+        patch[lord.slot] = lordPatch;
+    });
+    return patch;
+}
+
+function countLordChanges() {
+    let n = 0;
+    allLords.forEach(lord => {
+        const card = document.querySelector(`[data-lord-slot="${lord.slot}"]`);
+        if (card && card.querySelector('.field-input.changed')) n += 1;
+    });
+    return n;
+}
+
+// ── 渲染武将表格 ──────────────────────────────────────
+function renderTable(heroes) {
+    document.getElementById('hero-count').textContent = heroes.length + ' 名';
+    const tbody = document.getElementById('hero-tbody');
+    tbody.textContent = '';
+
+    heroes.forEach(h => {
+        const tr = document.createElement('tr');
+        tr.dataset.idx = h.idx;
+        if (heroChanges[h.idx]) tr.classList.add('modified');
+
+        // 编号
+        const tdIdx = document.createElement('td');
+        tdIdx.className = 'col-idx';
+        tdIdx.textContent = h.idx;
+        tr.appendChild(tdIdx);
+
+        // 名字
+        const tdName = document.createElement('td');
+        tdName.className = 'col-name';
+        tdName.textContent = h.name_s || h.name;
+        tr.appendChild(tdName);
+
+        const tdLord = document.createElement('td');
+        tdLord.className = 'col-name';
+        tdLord.textContent = h.lord_name || '未归属';
+        tr.appendChild(tdLord);
+
+        // 7 个维度
+        DIM_KEYS.forEach(dim => {
+            const origVal = origDims[h.idx][dim];
+            const curVal  = (heroChanges[h.idx]?.[dim] !== undefined)
+                            ? heroChanges[h.idx][dim] : origVal;
+
+            const td  = document.createElement('td');
+            td.className = 'col-dim';
+
+            const inp = document.createElement('input');
+            inp.type      = 'number';
+            inp.className = 'dim-inp' + (curVal !== origVal ? ' changed' : '');
+            inp.min       = 0;
+            inp.max       = 9999;
+            inp.value     = curVal;
+            inp.title     = '原值：' + origVal;
+            inp.dataset.heroIdx = h.idx;
+            inp.dataset.dim = dim;
+
+            inp.addEventListener('change', () => {
+                const nv = Math.max(0, parseInt(inp.value, 10) || 0);
+                inp.value = nv;
+                if (!heroChanges[h.idx]) heroChanges[h.idx] = {};
+                if (nv === origVal) {
+                    delete heroChanges[h.idx][dim];
+                    if (!Object.keys(heroChanges[h.idx]).length) delete heroChanges[h.idx];
+                } else {
+                    heroChanges[h.idx][dim] = nv;
+                }
+                inp.classList.toggle('changed', nv !== origVal);
+                tr.classList.toggle('modified', !!heroChanges[h.idx]);
+                const btn = tr.querySelector('.btn-reset-row');
+                if (btn) btn.style.display = heroChanges[h.idx] ? 'inline-block' : 'none';
+                updateBadge();
+                // 若当前按此维度排序，重新排（不重新渲染，只移动行）
+                if (sortDim && sortDir !== 0) applyFilterAndSort();
+            });
+
+            td.appendChild(inp);
+            tr.appendChild(td);
+        });
+
+        // 还原按钮
+        const tdReset = document.createElement('td');
+        tdReset.className = 'col-reset';
+        const btnReset = document.createElement('button');
+        btnReset.className   = 'btn-reset-row';
+        btnReset.textContent = '还原';
+        btnReset.style.display = heroChanges[h.idx] ? 'inline-block' : 'none';
+        btnReset.addEventListener('click', () => {
+            delete heroChanges[h.idx];
+            tr.classList.remove('modified');
+            btnReset.style.display = 'none';
+            // 还原本行所有输入框
+            DIM_KEYS.forEach((dim, i) => {
+                const inp = tr.querySelectorAll('.dim-inp')[i];
+                if (inp) {
+                    inp.value = origDims[h.idx][dim];
+                    inp.classList.remove('changed');
+                }
+            });
+            updateBadge();
+        });
+        tdReset.appendChild(btnReset);
+        tr.appendChild(tdReset);
+
+        tbody.appendChild(tr);
+    });
+}
+
+// ── 搜索过滤 ──────────────────────────────────────────
+document.getElementById('hero-search').addEventListener('input', function() {
+    applyFilterAndSort();
+});
+
+function getFilteredHeroes() {
+    const q = document.getElementById('hero-search').value.trim();
+    return q
+        ? allHeroes.filter(h =>
+            (h.name_s||'').includes(q) ||
+            (h.name||'').includes(q)   ||
+            (h.lord_name||'').includes(q) ||
+            String(h.idx) === q)
+        : [...allHeroes];
+}
+
+function applyFilterAndSort() {
+    let list = getFilteredHeroes();
+    if (sortDim && sortDir !== 0) {
+        list.sort((a, b) => {
+            const va = (heroChanges[a.idx]?.[sortDim] !== undefined)
+                       ? heroChanges[a.idx][sortDim] : origDims[a.idx][sortDim];
+            const vb = (heroChanges[b.idx]?.[sortDim] !== undefined)
+                       ? heroChanges[b.idx][sortDim] : origDims[b.idx][sortDim];
+            return sortDir * (va - vb);
+        });
+    }
+    renderTable(list);
+}
+
+// ── 表头排序点击 ──────────────────────────────────────
+document.querySelector('.ht thead').addEventListener('click', e => {
+    const th = e.target.closest('th.sortable');
+    if (!th) return;
+    const dim = th.dataset.dim;
+    if (sortDim === dim) {
+        // 循环：升 → 降 → 原序
+        sortDir = sortDir === 1 ? -1 : sortDir === -1 ? 0 : 1;
+        if (sortDir === 0) sortDim = null;
+    } else {
+        sortDim = dim;
+        sortDir = 1;
+    }
+    // 更新表头样式
+    document.querySelectorAll('.ht th.sortable').forEach(t => {
+        t.classList.remove('sort-asc','sort-desc');
+        t.querySelector('.sort-arrow').textContent = '↕';
+    });
+    if (sortDim && sortDir !== 0) {
+        th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+        th.querySelector('.sort-arrow').textContent = sortDir === 1 ? '↑' : '↓';
+    }
+    applyFilterAndSort();
+});
+
+function updateBadge() {
+    const n  = Object.keys(heroChanges).length;
+    const el = document.getElementById('modified-badge');
+    el.textContent  = n + ' 名已修改';
+    el.style.display = n > 0 ? 'inline-block' : 'none';
+    updateTemplateButtons();
+}
+
+// ── 重置全部 ──────────────────────────────────────────
+document.getElementById('reset-all-btn').addEventListener('click', () => {
+    allLords = deepClone(origLords) || [];
+    renderLords(allLords);
+    heroChanges = {};
+    sortDim = null; sortDir = 0;
+    document.querySelectorAll('.ht th.sortable').forEach(t => {
+        t.classList.remove('sort-asc','sort-desc');
+        t.querySelector('.sort-arrow').textContent = '↕';
+    });
+    applyFilterAndSort();
+    updateBadge();
+    document.getElementById('save-status').textContent = '';
+    setTemplateStatus('', '');
+});
+
+// ── 保存 ─────────────────────────────────────────────
+document.getElementById('save-btn').addEventListener('click', async () => {
+    if (!tmpPath) return;
+    const lords = getLordsPatch();
+
+    document.getElementById('save-btn').disabled = true;
+    showStatus('save-status','info','⏳ 生成存档中…');
+
+    try {
+        const res  = await fetch('/api/game-save/save', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                tmp: tmpPath,
+                source_path: sourcePathInput.value.trim() || sourcePath,
+                original_filename: originalFilename,
+                original_size: originalSize,
+                original_sha256: originalSha256,
+                fields:{},
+                lords,
+                heroes:heroChanges
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showStatus('save-status','error','❌ '+(data.error||'保存失败')); return; }
+
+        const nc = Object.keys(heroChanges).length;
+        const lordChanged = countLordChanges();
+        showStatus('save-status','ok',
+            '✅ 修改成功！新存档已生成到原文件同级 new 目录'
+            + (nc || lordChanged
+                ? '（含 ' + [
+                    lordChanged ? lordChanged + ' 位主公' : '',
+                    nc ? nc + ' 名武将' : ''
+                ].filter(Boolean).join('，') + '）'
+                : ''));
+
+        const bi = document.getElementById('backup-info');
+        bi.style.display = 'block';
+        bi.textContent = '已生成：' + (data.output || '新存档');
+
+        if (data.download) {
+            const a = document.createElement('a');
+            a.href = data.download;
+            a.download = data.filename || originalFilename || '0.sav';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+    } catch(e) {
+        showStatus('save-status','error','❌ 网络错误：'+e.message);
+    } finally {
+        document.getElementById('save-btn').disabled = false;
+    }
+});
+</script>
+</body>
+</html>

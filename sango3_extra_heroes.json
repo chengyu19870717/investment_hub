@@ -1,0 +1,50 @@
+[
+  {
+    "id": "unk_01184",
+    "name": "未知武將A",
+    "title": "（待識別）",
+    "faction": "未知",
+    "faction_tag": "?",
+    "desc": "v-sc-2場景獨有，天數75，點數=10。請比對遊戲確認名稱。",
+    "ptr_off": 4484,
+    "ptr_C": 0,
+    "level_off": null,
+    "discovered": true
+  },
+  {
+    "id": "unk_0118c",
+    "name": "未知武將B",
+    "title": "（待識別）",
+    "faction": "未知",
+    "faction_tag": "?",
+    "desc": "v-sc-2場景獨有，天數75，點數=1。請比對遊戲確認名稱。",
+    "ptr_off": 4492,
+    "ptr_C": 0,
+    "level_off": null,
+    "discovered": true
+  },
+  {
+    "id": "unk_011ac",
+    "name": "未知武將C",
+    "title": "（待識別）",
+    "faction": "未知",
+    "faction_tag": "?",
+    "desc": "v-sc-2場景獨有，天數75，點數=3。請比對遊戲確認名稱。",
+    "ptr_off": 4524,
+    "ptr_C": 0,
+    "level_off": null,
+    "discovered": true
+  },
+  {
+    "id": "unk_011e0",
+    "name": "未知武將D",
+    "title": "（待識別）",
+    "faction": "未知",
+    "faction_tag": "?",
+    "desc": "v-sc-2場景獨有，天數75，點數=9。請比對遊戲確認名稱。",
+    "ptr_off": 4576,
+    "ptr_C": 0,
+    "level_off": null,
+    "discovered": true
+  }
+]

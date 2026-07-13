@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
 </head>
 <body>
     <div class="page page--home">
@@ -15,9 +15,22 @@
                         <span class="logo-icon">🧰</span>
                         <span class="logo-text">程钰的百宝箱</span>
                     </div>
-                    <a href="/settings" title="设置" style="color:var(--text-muted);font-size:20px;text-decoration:none;padding:4px 8px;border-radius:8px;transition:color 0.2s,background 0.2s;"
-                       onmouseover="this.style.color='var(--text-primary)';this.style.background='var(--bg-card)'"
-                       onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent'">⚙️</a>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button id="restart-btn" title="重启服务"
+                            style="display:flex;align-items:center;gap:5px;padding:5px 12px;
+                                   background:transparent;border:1.5px solid var(--border,#e0e0e0);
+                                   border-radius:8px;font-size:13px;color:var(--text-muted);
+                                   cursor:pointer;transition:all .2s;"
+                            onmouseover="this.style.borderColor='var(--accent,#4f8ef7)';this.style.color='var(--accent,#4f8ef7)'"
+                            onmouseout="this.style.borderColor='var(--border,#e0e0e0)';this.style.color='var(--text-muted)'">
+                            <span id="restart-icon">🔄</span>
+                            <span id="restart-label">重启服务</span>
+                        </button>
+                        <a href="/settings" title="设置"
+                           style="color:var(--text-muted);font-size:20px;text-decoration:none;padding:4px 8px;border-radius:8px;transition:color 0.2s,background 0.2s;"
+                           onmouseover="this.style.color='var(--text-primary)';this.style.background='var(--bg-card)'"
+                           onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent'">⚙️</a>
+                    </div>
                 </div>
             </div>
         </header>
@@ -51,5 +64,62 @@
             <span>程钰的百宝箱 · 本地版</span>
         </footer>
     </div>
+<script>
+function restartFetchWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-store' },
+    }).finally(() => clearTimeout(timer));
+}
+
+document.getElementById('restart-btn').addEventListener('click', async () => {
+    const btn   = document.getElementById('restart-btn');
+    const icon  = document.getElementById('restart-icon');
+    const label = document.getElementById('restart-label');
+    btn.disabled = true;
+    icon.textContent  = '⏳';
+    label.textContent = '重启中…';
+    let accepted = false;
+    try {
+        const res = await fetch('/api/restart', { method: 'POST', cache: 'no-store' });
+        accepted = res.ok;
+    } catch (_) {
+        accepted = true;
+    }
+    if (!accepted) {
+        icon.textContent  = '⚠️';
+        label.textContent = '重启失败';
+        setTimeout(() => {
+            icon.textContent = '🔄';
+            label.textContent = '重启服务';
+            btn.disabled = false;
+        }, 1800);
+        return;
+    }
+    // 先等一段时间让服务退出
+    await new Promise(r => setTimeout(r, 1200));
+    // 轮询 GET / 等待服务恢复
+    icon.textContent  = '⏳';
+    label.textContent = '等待恢复…';
+    const t1 = Date.now();
+    while (Date.now() - t1 < 30000) {
+        await new Promise(r => setTimeout(r, 700));
+        try {
+            const r = await restartFetchWithTimeout('/?restart_check=' + Date.now(), 650);
+            if (r.ok) { location.reload(); return; }
+        } catch (_) {}
+    }
+    icon.textContent  = '⚠️';
+    label.textContent = '恢复超时';
+    setTimeout(() => {
+        icon.textContent = '🔄';
+        label.textContent = '重启服务';
+        btn.disabled = false;
+    }, 2200);
+});
+</script>
 </body>
 </html>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>股票分析 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
 <style>
 /* ── 工具栏 ── */
 .stock-toolbar {
@@ -76,6 +76,9 @@
 .wl-ana:hover { opacity: .7; }
 .wl-dl  { border: none; background: none; color: #34c759; font-size: 12px; cursor: pointer; padding: 0 2px; }
 .wl-dl:hover { opacity: .7; }
+.wl-bt  { border: none; background: none; color: #5856d6; font-size: 12px; cursor: pointer; padding: 0 2px; }
+.wl-bt:hover { opacity: .7; }
+.wl-bt:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ── 历史数据下载面板 ── */
 .dl-panel {
@@ -382,7 +385,9 @@
     <header class="header">
         <div class="header-inner">
             <div style="display:flex;align-items:center;gap:12px;">
+                {% if not embedded %}
                 <a href="/" class="back-btn">←</a>
+                {% endif %}
                 <div class="logo"><span class="logo-icon">📈</span><span class="logo-text">股票分析</span></div>
             </div>
         </div>
@@ -988,9 +993,12 @@ function renderWlTags() {
         const fct = el('button', 'wl-dl'); fct.textContent = '⚖️';
         fct.title = `配置 ${name}(${code}) 因子权重`;
         fct.addEventListener('click', () => openFactorModal(code, name));
+        const bt = el('button', 'wl-bt'); bt.textContent = '📊';
+        bt.title = `回测 ${name}(${code})`;
+        bt.addEventListener('click', () => backtestSingleStock(code, name));
         const del = el('button', 'wl-del'); del.textContent = '×';
         del.addEventListener('click', () => delStock(code));
-        tag.appendChild(ana); tag.appendChild(dlb); tag.appendChild(fct); tag.appendChild(del); c.appendChild(tag);
+        tag.appendChild(ana); tag.appendChild(dlb); tag.appendChild(fct); tag.appendChild(bt); tag.appendChild(del); c.appendChild(tag);
     });
 }
 
@@ -1299,6 +1307,45 @@ async function _pollBacktest() {
             else { log.textContent += '✅ 回测完成'; renderBtResults(st.results || []); }
         }
     } catch(e) {}
+}
+
+// ── 单只股票回测 ──────────────────────────────────────────
+let btSingleTimer = null;
+
+async function backtestSingleStock(code, name) {
+    const days = parseInt(document.getElementById('bt-days-sel').value);
+    const msg = document.getElementById('wl-progress');
+    msg.style.display = 'block';
+    msg.textContent = `📊 正在回测 ${name}(${code})，约 30~60 秒…`;
+    try {
+        const r = await fetch('/api/stock/backtest/single', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code, days})
+        });
+        if (!r.ok) {
+            const j = await r.json();
+            msg.textContent = '❌ ' + j.error;
+            return;
+        }
+        clearInterval(btSingleTimer);
+        btSingleTimer = setInterval(async () => {
+            const st = await (await fetch('/api/stock/backtest/single/status')).json();
+            if (!st.done) return;
+            clearInterval(btSingleTimer);
+            if (st.error) {
+                msg.textContent = `❌ 回测失败：${st.error}`;
+            } else {
+                msg.textContent = `✅ ${name} 回测完成`;
+                // 渲染单只股票回测结果
+                const wrap = document.getElementById('bt-result-wrap');
+                wrap.style.display = 'block';
+                renderBtResults(st.results || []);
+            }
+        }, 1800);
+    } catch(e) {
+        msg.textContent = '❌ ' + e.message;
+    }
 }
 
 const BT_SCHEMES = ['当前配置','技术面 50%','技术面 60%','技术面 70%','均衡配置','资金主导'];

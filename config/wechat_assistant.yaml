@@ -1,0 +1,29 @@
+provider: deepseek
+output_dir: output/wechat
+
+providers:
+  qwen:
+    label: Qwen
+    api_type: openai_chat
+    setting_key: qwen_api_key
+    api_key_env: DASHSCOPE_API_KEY
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    model: qwen-plus
+    timeout_seconds: 90
+  deepseek:
+    label: DeepSeek
+    api_type: openai_chat
+    setting_key: deepseek_api_key
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com/chat/completions
+    model: deepseek-v4-flash
+    timeout_seconds: 90
+
+generation:
+  temperature: 0.72
+  topic_max_tokens: 1800
+  article_max_tokens: 4200
+  title_max_tokens: 1200
+  default_audience: 关注商业、投资、科技与个人成长的微信公众号读者
+  default_tone: 清醒、克制、有洞察、有故事感
+  article_word_count: 1500-2000

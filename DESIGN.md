@@ -37,7 +37,8 @@ investment_hub/
     ├── audio.html           # 录音转会议纪要页
     ├── chart.html           # 一图一表（流程图编辑器）
     ├── tasks.html           # 待办管理页
-    └── settings.html        # 设置页（API Key 配置）
+    ├── settings.html        # 设置页（API Key 配置）
+    └── quant_params.html    # 量化参数（因子权重配置）
 ```
 
 ---
@@ -102,6 +103,31 @@ DELETE /api/tasks/{id}
 GET    /api/tasks/dates
 ```
 
+### 5. 量化参数 `/quant-params`
+- 因子权重配置与管理（来自股神计划五维评分系统）
+- 支持新增 / 编辑 / 删除因子
+- 实时显示权重总和（应为 100%）、因子数量、启用数量
+- 权重分配可视化进度条
+- 默认内置 5 个因子：技术面(30%)、基本面(20%)、资金面(20%)、情绪面(15%)、筹码面(15%)
+
+**相关 API：**
+```
+GET    /api/factor-weights          # 因子列表
+POST   /api/factor-weights          # 新增因子
+PUT    /api/factor-weights/{id}     # 更新因子
+DELETE /api/factor-weights/{id}     # 删除因子
+```
+
+**因子说明（来自股神计划 `ai_scorer.py`）：**
+
+| 因子Key | 因子名称 | 默认权重 | 说明 |
+|---|---|---|---|
+| technical | 技术面 | 30% | 技术指标评分（MA/MACD/KDJ/布林带等） |
+| fundamental | 基本面 | 20% | 基本面指标评分（毛利率/ROE/营收增长/PE等） |
+| money_flow | 资金面 | 20% | 资金流向评分（主力净流入/流通市值） |
+| sentiment | 情绪面 | 15% | 市场情绪评分（换手率/量比/涨跌幅） |
+| chip | 筹码面 | 15% | 筹码分布评分（筹码密集/获利比/筹码宽度） |
+
 ---
 
 ## 数据库结构（SQLite）
@@ -132,6 +158,18 @@ CREATE TABLE charts (
     data_json  TEXT NOT NULL,  -- {"nodes":[{id,x,y,label}], "edges":[{id,from,to}]}
     created_at TEXT,
     updated_at TEXT
+);
+
+-- 因子权重（量化参数）
+CREATE TABLE factor_weights (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    factor_key      TEXT UNIQUE NOT NULL,
+    factor_name     TEXT NOT NULL,
+    weight          REAL NOT NULL DEFAULT 0,
+    description     TEXT,
+    is_active       INTEGER DEFAULT 1,
+    created_at      TEXT,
+    updated_at      TEXT
 );
 ```
 

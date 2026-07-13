@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>需求文档工作流 - 程钰的百宝箱</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        body { background:#f4f6f8; }
+        .rd-page { max-width:1320px; }
+        .rd-header { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 24px; }
+        .rd-title { display:flex; align-items:center; gap:12px; min-width:0; }
+        .rd-title-main { font-size:18px; font-weight:850; color:var(--text-primary); }
+        .rd-title-sub { color:var(--text-muted); font-size:12px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .rd-main { padding:18px 24px 36px; display:grid; grid-template-columns:420px minmax(0,1fr); gap:16px; align-items:start; }
+        .rd-panel { background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 1px 3px rgba(15,23,42,.06); overflow:hidden; }
+        .rd-panel-hd { padding:13px 15px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        .rd-panel-title { font-size:14px; font-weight:850; color:var(--text-primary); }
+        .rd-panel-body { padding:14px 15px; display:flex; flex-direction:column; gap:11px; }
+        .rd-field { display:flex; flex-direction:column; gap:6px; }
+        .rd-label { font-size:12px; font-weight:750; color:var(--text-secondary); }
+        .rd-input, .rd-textarea, .rd-select {
+            width:100%; border:1px solid var(--border); border-radius:8px; background:#f8fafc;
+            color:var(--text-primary); padding:9px 10px; font-size:13px; font-family:inherit; outline:none;
+        }
+        .rd-textarea { min-height:170px; resize:vertical; line-height:1.65; }
+        .rd-textarea.compact { min-height:92px; }
+        .rd-input:focus, .rd-textarea:focus, .rd-select:focus { border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,.12); }
+        .rd-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .rd-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .rd-btn {
+            min-height:36px; border:1px solid var(--border); border-radius:8px; background:#fff;
+            color:var(--text-secondary); font-size:13px; font-weight:750; cursor:pointer;
+            display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; padding:0 10px;
+        }
+        .rd-btn:hover { background:#f8fafc; color:var(--text-primary); }
+        .rd-btn.primary { background:#0f766e; border-color:#0f766e; color:#fff; }
+        .rd-btn.primary:hover { background:#115e59; color:#fff; }
+        .rd-btn:disabled { opacity:.55; cursor:not-allowed; }
+        .rd-status { min-height:36px; display:flex; align-items:center; padding:9px 11px; border-radius:8px; background:#ecfeff; color:#155e75; font-size:12px; line-height:1.55; }
+        .rd-status.bad { background:#fef2f2; color:#991b1b; }
+        .rd-status.good { background:#f0fdf4; color:#166534; }
+        .rd-workspace { display:flex; flex-direction:column; gap:14px; min-width:0; }
+        .rd-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .rd-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .rd-option {
+            border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:9px 10px;
+            display:flex; align-items:flex-start; gap:8px; min-width:0;
+        }
+        .rd-option input { margin-top:3px; }
+        .rd-option-title { font-size:12px; font-weight:850; color:#111827; line-height:1.4; }
+        .rd-option-desc { font-size:12px; color:#64748b; line-height:1.45; margin-top:2px; }
+        .rd-list { display:flex; flex-direction:column; gap:8px; padding:14px 15px; }
+        .rd-item { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 11px; }
+        .rd-item-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+        .rd-item-name { font-size:13px; font-weight:850; color:#111827; line-height:1.45; overflow-wrap:anywhere; }
+        .rd-item-text { font-size:12px; color:#64748b; line-height:1.55; margin-top:5px; overflow-wrap:anywhere; }
+        .rd-mini { min-height:30px; padding:0 9px; border-radius:7px; font-size:12px; white-space:nowrap; }
+        .rd-point-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:start; }
+        .rd-point-row input { min-height:34px; }
+        .rd-chip { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 9px; background:#e0f2fe; color:#075985; font-size:12px; border:0; margin:4px 4px 0 0; }
+        .rd-empty { color:#64748b; font-size:13px; line-height:1.7; padding:14px 15px; }
+        @media(max-width:1100px) {
+            .rd-main { grid-template-columns:1fr; }
+            .rd-grid, .rd-options { grid-template-columns:1fr; }
+        }
+        @media(max-width:680px) {
+            .rd-header { align-items:flex-start; flex-direction:column; padding:12px 14px; }
+            .rd-main { padding:14px; }
+            .rd-actions, .rd-row { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="page rd-page">
+    <header class="header">
+        <div class="rd-header">
+            <div class="rd-title">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo"><span class="logo-icon">📄</span></div>
+                <div>
+                    <div class="rd-title-main">需求文档工作流</div>
+                    <div class="rd-title-sub" id="dirStatus">读取配置中...</div>
+                </div>
+            </div>
+            <button class="rd-btn" type="button" onclick="loadOptions()">刷新</button>
+        </div>
+    </header>
+
+    <main class="rd-main">
+        <section class="rd-panel">
+            <div class="rd-panel-hd">
+                <div class="rd-panel-title">工作流控制台</div>
+            </div>
+            <div class="rd-panel-body">
+                <div id="statusBox" class="rd-status">等待输入</div>
+                <div class="rd-field">
+                    <label class="rd-label" for="saveDirInput">文档存放目录</label>
+                    <input class="rd-input" id="saveDirInput" placeholder="例如：/Users/chengyu/Documents/需求文档工作流">
+                </div>
+                <div class="rd-actions">
+                    <button class="rd-btn" type="button" onclick="openDirectory()">打开目录</button>
+                    <button class="rd-btn" type="button" onclick="copyValue(document.getElementById('saveDirInput').value)">复制目录</button>
+                </div>
+                <div class="rd-field">
+                    <label class="rd-label" for="sourceDocSelect">来源/优化文档</label>
+                    <select class="rd-select" id="sourceDocSelect" onchange="refreshNextVersion()"></select>
+                </div>
+                <div class="rd-actions">
+                    <button class="rd-btn" type="button" onclick="importSelectedDocument()">解析选中文档</button>
+                    <button class="rd-btn" type="button" onclick="copyValue(selectedSourceDocPath())">复制文档路径</button>
+                </div>
+                <div class="rd-actions">
+                    <button class="rd-btn" type="button" onclick="copyCliPrompt('Claude')">复制 Claude 指令</button>
+                    <button class="rd-btn" type="button" onclick="copyCliPrompt('Codex')">复制 Codex 指令</button>
+                </div>
+                <div class="rd-row">
+                    <div class="rd-field">
+                        <label class="rd-label" for="modelSelect">模型名称</label>
+                        <select class="rd-select" id="modelSelect" onchange="refreshNextVersion()"></select>
+                    </div>
+                    <div class="rd-field">
+                        <label class="rd-label" for="nextVersionInput">下一版本</label>
+                        <input class="rd-input" id="nextVersionInput" disabled>
+                    </div>
+                </div>
+                <div class="rd-field">
+                    <label class="rd-label" for="requirementNameInput">需求名称</label>
+                    <input class="rd-input" id="requirementNameInput" placeholder="解析后自动填入，也可手工修改" oninput="refreshNextVersion()">
+                </div>
+                <div class="rd-field">
+                    <label class="rd-label" for="descriptionInput">需求描述</label>
+                    <textarea class="rd-textarea" id="descriptionInput" placeholder="写下你的想法，例如：我要做一个需求文档工作流，支持解析描述、生成Word、按模型和版本命名、打开目录和复制路径..."></textarea>
+                </div>
+                <div class="rd-field">
+                    <label class="rd-label" for="iterationNotesInput">人工修订/合并说明</label>
+                    <textarea class="rd-textarea compact" id="iterationNotesInput" placeholder="导入 Claude/Codex 优化文档后，可以在这里记录你采纳、拒绝或合并的意见。"></textarea>
+                </div>
+                <div class="rd-actions">
+                    <button class="rd-btn primary" id="btnParse" type="button" onclick="parseRequirement()">解析功能点</button>
+                    <button class="rd-btn primary" id="btnGenerate" type="button" onclick="generateDocument()">生成Word文档</button>
+                    <button class="rd-btn" type="button" onclick="addPoint()">新增功能点</button>
+                    <button class="rd-btn" type="button" onclick="clearForm()">清空</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="rd-workspace">
+            <section class="rd-panel">
+                <div class="rd-panel-hd">
+                    <div class="rd-panel-title">业务需求通用要素</div>
+                    <button class="rd-btn rd-mini" type="button" onclick="toggleAllSections()">全选/反选</button>
+                </div>
+                <div class="rd-list">
+                    <div class="rd-options" id="sectionOptions"></div>
+                </div>
+            </section>
+
+            <div class="rd-grid">
+                <section class="rd-panel">
+                    <div class="rd-panel-hd">
+                        <div class="rd-panel-title">解析出的功能点</div>
+                        <button class="rd-btn rd-mini" type="button" onclick="copyPoints()">复制功能点</button>
+                    </div>
+                    <div class="rd-list" id="featurePointList"></div>
+                </section>
+
+                <section class="rd-panel">
+                    <div class="rd-panel-hd">
+                        <div class="rd-panel-title">最近生成</div>
+                        <button class="rd-btn rd-mini" type="button" onclick="listDocuments()">刷新列表</button>
+                    </div>
+                    <div class="rd-list" id="documentList"></div>
+                </section>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+const statusBox = document.getElementById('statusBox');
+const dirStatus = document.getElementById('dirStatus');
+const saveDirInput = document.getElementById('saveDirInput');
+const modelSelect = document.getElementById('modelSelect');
+const requirementNameInput = document.getElementById('requirementNameInput');
+const nextVersionInput = document.getElementById('nextVersionInput');
+const descriptionInput = document.getElementById('descriptionInput');
+const sectionOptions = document.getElementById('sectionOptions');
+const featurePointList = document.getElementById('featurePointList');
+const documentList = document.getElementById('documentList');
+const sourceDocSelect = document.getElementById('sourceDocSelect');
+const iterationNotesInput = document.getElementById('iterationNotesInput');
+let sectionState = [];
+let featurePoints = [];
+let documentsState = [];
+let importedRawText = '';
+let importedSourcePath = '';
+
+function setStatus(text, kind = '') {
+    statusBox.textContent = text;
+    statusBox.className = 'rd-status' + (kind ? ' ' + kind : '');
+}
+
+function setBusy(busy) {
+    ['btnParse', 'btnGenerate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = busy;
+    });
+}
+
+async function loadOptions() {
+    try {
+        const params = new URLSearchParams({
+            save_dir: saveDirInput.value || '',
+            model_name: modelSelect.value || 'Deepseek',
+            requirement_name: requirementNameInput.value || '',
+            source_doc_path: selectedSourceDocPath() || importedSourcePath || ''
+        });
+        const res = await fetch('/api/requirement-docs/options?' + params.toString());
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error || '读取失败');
+        saveDirInput.value = data.save_dir || data.default_dir || '';
+        dirStatus.textContent = saveDirInput.value;
+        if (!modelSelect.options.length) {
+            (data.model_options || []).forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.textContent = item;
+                modelSelect.appendChild(opt);
+            });
+        }
+        sectionState = data.section_options || [];
+        renderSections((data.section_options || []).map(item => item.id));
+        renderDocuments(data.documents || []);
+        nextVersionInput.value = data.next_version || 'V1.0';
+        setStatus('配置已读取', 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    }
+}
+
+function selectedSectionIds() {
+    return Array.from(document.querySelectorAll('#sectionOptions input[type=checkbox]:checked')).map(input => input.value);
+}
+
+function renderSections(selectedIds) {
+    const selected = new Set(selectedIds || []);
+    sectionOptions.textContent = '';
+    sectionState.forEach(item => {
+        const label = document.createElement('label');
+        label.className = 'rd-option';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = item.id;
+        input.checked = selected.has(item.id);
+        const body = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'rd-option-title';
+        title.textContent = item.label;
+        const desc = document.createElement('div');
+        desc.className = 'rd-option-desc';
+        desc.textContent = item.description || '';
+        body.appendChild(title);
+        body.appendChild(desc);
+        label.appendChild(input);
+        label.appendChild(body);
+        sectionOptions.appendChild(label);
+    });
+}
+
+function toggleAllSections() {
+    const inputs = Array.from(document.querySelectorAll('#sectionOptions input[type=checkbox]'));
+    const shouldCheck = inputs.some(input => !input.checked);
+    inputs.forEach(input => input.checked = shouldCheck);
+}
+
+function renderFeaturePoints() {
+    featurePointList.textContent = '';
+    if (!featurePoints.length) {
+        const empty = document.createElement('div');
+        empty.className = 'rd-empty';
+        empty.textContent = '输入需求描述后点击“解析功能点”。';
+        featurePointList.appendChild(empty);
+        return;
+    }
+    featurePoints.forEach((point, index) => {
+        const row = document.createElement('div');
+        row.className = 'rd-point-row';
+        const input = document.createElement('input');
+        input.className = 'rd-input';
+        input.value = point;
+        input.oninput = () => featurePoints[index] = input.value.trim();
+        const remove = document.createElement('button');
+        remove.className = 'rd-btn rd-mini';
+        remove.type = 'button';
+        remove.textContent = '删除';
+        remove.onclick = () => {
+            featurePoints.splice(index, 1);
+            renderFeaturePoints();
+        };
+        row.appendChild(input);
+        row.appendChild(remove);
+        featurePointList.appendChild(row);
+    });
+}
+
+function addPoint() {
+    featurePoints.push('');
+    renderFeaturePoints();
+}
+
+async function parseRequirement() {
+    try {
+        const description = descriptionInput.value.trim();
+        if (!description) throw new Error('请先填写需求描述');
+        setBusy(true);
+        setStatus('正在解析需求功能点...');
+        const res = await fetch('/api/requirement-docs/parse', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({description})
+        });
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.error || '解析失败');
+        const data = payload.data || {};
+        if (!requirementNameInput.value.trim()) requirementNameInput.value = data.requirement_name || '';
+        featurePoints = data.feature_points || [];
+        renderFeaturePoints();
+        renderSections(data.selected_sections || []);
+        await refreshNextVersion();
+        setStatus('功能点已解析', 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    } finally {
+        setBusy(false);
+    }
+}
+
+async function generateDocument() {
+    try {
+        const description = descriptionInput.value.trim();
+        const requirementName = requirementNameInput.value.trim();
+        if (!description) throw new Error('请先填写需求描述');
+        if (!requirementName) throw new Error('请填写需求名称');
+        const points = featurePoints.map(item => item.trim()).filter(Boolean);
+        if (!points.length) throw new Error('请先解析或维护至少一个功能点');
+        setBusy(true);
+        setStatus('正在生成 Word 需求文档...');
+        const res = await fetch('/api/requirement-docs/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                save_dir: saveDirInput.value,
+                model_name: modelSelect.value,
+                requirement_name: requirementName,
+                description,
+                feature_points: points,
+                selected_sections: selectedSectionIds(),
+                author: '程钰',
+                source_doc_path: selectedSourceDocPath() || importedSourcePath,
+                source_doc_text: importedRawText,
+                iteration_notes: iterationNotesInput.value.trim()
+            })
+        });
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error || '生成失败');
+        renderDocuments(data.documents || []);
+        nextVersionInput.value = data.next_version || '';
+        const doc = data.document || {};
+        setStatus('已生成：' + (doc.filename || ''), 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    } finally {
+        setBusy(false);
+    }
+}
+
+async function listDocuments() {
+    try {
+        const params = new URLSearchParams({save_dir: saveDirInput.value || ''});
+        const res = await fetch('/api/requirement-docs/list?' + params.toString());
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error || '读取列表失败');
+        renderDocuments(data.documents || []);
+        dirStatus.textContent = data.save_dir || saveDirInput.value;
+        setStatus('文档列表已刷新', 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    }
+}
+
+function renderDocuments(docs) {
+    documentsState = docs || [];
+    renderSourceDocOptions();
+    documentList.textContent = '';
+    if (!documentsState.length) {
+        const empty = document.createElement('div');
+        empty.className = 'rd-empty';
+        empty.textContent = '当前目录还没有生成过需求文档。';
+        documentList.appendChild(empty);
+        return;
+    }
+    documentsState.forEach(doc => {
+        const card = document.createElement('div');
+        card.className = 'rd-item';
+        const top = document.createElement('div');
+        top.className = 'rd-item-top';
+        const name = document.createElement('div');
+        name.className = 'rd-item-name';
+        name.textContent = doc.filename || '';
+        const copy = document.createElement('button');
+        copy.className = 'rd-btn rd-mini';
+        copy.type = 'button';
+        copy.textContent = '复制路径';
+        copy.onclick = () => copyValue(doc.path || '');
+        top.appendChild(name);
+        top.appendChild(copy);
+        const meta = document.createElement('div');
+        meta.className = 'rd-item-text';
+        meta.innerHTML = [
+            doc.model_name ? '<span class="rd-chip">' + escapeHtml(doc.model_name) + '</span>' : '',
+            doc.version ? '<span class="rd-chip">' + escapeHtml(doc.version) + '</span>' : '',
+            doc.updated_at ? '<span class="rd-chip">' + escapeHtml(doc.updated_at) + '</span>' : ''
+        ].join('');
+        const path = document.createElement('div');
+        path.className = 'rd-item-text';
+        path.textContent = doc.path || '';
+        card.appendChild(top);
+        card.appendChild(meta);
+        card.appendChild(path);
+        documentList.appendChild(card);
+    });
+}
+
+function renderSourceDocOptions() {
+    if (!sourceDocSelect) return;
+    const previous = sourceDocSelect.value || importedSourcePath;
+    sourceDocSelect.textContent = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = '不选择来源文档';
+    sourceDocSelect.appendChild(empty);
+    documentsState.forEach(doc => {
+        const opt = document.createElement('option');
+        opt.value = doc.path || '';
+        opt.textContent = doc.filename || doc.path || '';
+        sourceDocSelect.appendChild(opt);
+    });
+    if (previous && Array.from(sourceDocSelect.options).some(opt => opt.value === previous)) {
+        sourceDocSelect.value = previous;
+    }
+}
+
+function selectedSourceDocPath() {
+    return sourceDocSelect ? sourceDocSelect.value.trim() : '';
+}
+
+async function importSelectedDocument() {
+    try {
+        const path = selectedSourceDocPath();
+        if (!path) throw new Error('请先在“来源/优化文档”中选择一个 Word 文档');
+        setBusy(true);
+        setStatus('正在解析来源文档...');
+        const res = await fetch('/api/requirement-docs/import', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path})
+        });
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.error || '解析文档失败');
+        const data = payload.data || {};
+        importedSourcePath = data.path || path;
+        importedRawText = data.raw_text || '';
+        requirementNameInput.value = data.requirement_name || requirementNameInput.value;
+        descriptionInput.value = data.description || descriptionInput.value;
+        featurePoints = data.feature_points || [];
+        renderFeaturePoints();
+        renderSections(data.selected_sections || []);
+        await refreshNextVersion();
+        setStatus('已导入：' + (data.filename || ''), 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    } finally {
+        setBusy(false);
+    }
+}
+
+async function copyCliPrompt(targetModel) {
+    try {
+        const sourcePath = selectedSourceDocPath() || importedSourcePath;
+        if (!sourcePath) throw new Error('请先选择或导入一份来源文档');
+        const requirementName = requirementNameInput.value.trim();
+        if (!requirementName) throw new Error('请先填写需求名称');
+        const res = await fetch('/api/requirement-docs/cli-prompt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                save_dir: saveDirInput.value,
+                source_doc_path: sourcePath,
+                target_model: targetModel,
+                requirement_name: requirementName
+            })
+        });
+        const payload = await res.json();
+        if (!res.ok || payload.ok === false) throw new Error(payload.error || '生成指令失败');
+        await copyValue(payload.prompt || '');
+        setStatus(targetModel + ' CLI 指令已复制', 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    }
+}
+
+async function refreshNextVersion() {
+    if (!requirementNameInput.value.trim()) {
+        nextVersionInput.value = 'V1.0';
+        return;
+    }
+    try {
+        const params = new URLSearchParams({
+            save_dir: saveDirInput.value || '',
+            model_name: modelSelect.value || 'Deepseek',
+            requirement_name: requirementNameInput.value || '',
+            source_doc_path: selectedSourceDocPath() || importedSourcePath || ''
+        });
+        const res = await fetch('/api/requirement-docs/options?' + params.toString());
+        const data = await res.json();
+        if (data.ok) nextVersionInput.value = data.next_version || 'V1.0';
+    } catch(_) {}
+}
+
+async function openDirectory() {
+    try {
+        const res = await fetch('/api/requirement-docs/open-dir', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({save_dir: saveDirInput.value})
+        });
+        const data = await res.json();
+        if (!res.ok || data.ok === false) throw new Error(data.error || '打开目录失败');
+        saveDirInput.value = data.path || saveDirInput.value;
+        dirStatus.textContent = saveDirInput.value;
+        setStatus('目录已打开', 'good');
+    } catch(e) {
+        setStatus(e.message, 'bad');
+    }
+}
+
+function clearForm() {
+    requirementNameInput.value = '';
+    descriptionInput.value = '';
+    iterationNotesInput.value = '';
+    importedRawText = '';
+    importedSourcePath = '';
+    if (sourceDocSelect) sourceDocSelect.value = '';
+    featurePoints = [];
+    renderFeaturePoints();
+    nextVersionInput.value = 'V1.0';
+    setStatus('已清空');
+}
+
+async function copyPoints() {
+    await copyValue(featurePoints.map((item, index) => (index + 1) + '. ' + item).join('\n'));
+}
+
+async function copyValue(text) {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setStatus('已复制到剪贴板', 'good');
+}
+
+function escapeHtml(text) {
+    return String(text || '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+loadOptions();
+renderFeaturePoints();
+</script>
+</body>
+</html>

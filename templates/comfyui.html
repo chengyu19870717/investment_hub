@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI 管理 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        /* ── 状态指示灯 ── */
+        .indicator {
+            display: inline-block; width: 10px; height: 10px;
+            border-radius: 50%; margin-right: 7px; flex-shrink: 0;
+            transition: background .3s;
+        }
+        .indicator.on  { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+        .indicator.off { background: #9ca3af; }
+        .indicator.checking { background: #f59e0b; animation: pulse .8s infinite; }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* ── 主状态卡 ── */
+        .status-card {
+            border-radius: 14px;
+            border: 2px solid var(--border, #e0e0e0);
+            padding: 24px 28px;
+            background: var(--bg-card, #fff);
+            transition: border-color .3s;
+        }
+        .status-card.running { border-color: #22c55e44; background: #f0fdf4; }
+        .status-card.stopped { border-color: var(--border, #e0e0e0); }
+
+        .status-row {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 16px; font-weight: 600; color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+        .status-sub {
+            font-size: 12px; color: var(--text-muted); margin-top: 2px;
+        }
+
+        /* ── 按钮组 ── */
+        .btn-group { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+        .btn-start {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 20px; border-radius: 9px; font-size: 14px; font-weight: 600;
+            background: #22c55e; color: #fff; border: none; cursor: pointer;
+            transition: background .15s, transform .1s;
+        }
+        .btn-start:hover:not(:disabled) { background: #16a34a; }
+        .btn-start:active:not(:disabled) { transform: scale(.97); }
+
+        .btn-stop {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 20px; border-radius: 9px; font-size: 14px; font-weight: 600;
+            background: #ef4444; color: #fff; border: none; cursor: pointer;
+            transition: background .15s, transform .1s;
+        }
+        .btn-stop:hover:not(:disabled) { background: #dc2626; }
+        .btn-stop:active:not(:disabled) { transform: scale(.97); }
+
+        .btn-open {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 20px; border-radius: 9px; font-size: 14px; font-weight: 600;
+            background: var(--accent, #4f8ef7); color: #fff; border: none; cursor: pointer;
+            text-decoration: none; transition: background .15s, transform .1s;
+        }
+        .btn-open:hover { background: #2563eb; }
+        .btn-open.disabled { background: #9ca3af; pointer-events: none; }
+
+        button:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* ── 模型列表 ── */
+        .model-section { margin-top: 24px; }
+        .section-title {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: var(--text-muted); margin-bottom: 10px;
+        }
+        .model-list { display: flex; flex-direction: column; gap: 6px; }
+        .model-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px; border-radius: 8px;
+            background: var(--bg-main, #f8f8f8);
+            border: 1px solid var(--border, #e8e8e8);
+            font-size: 13px; color: var(--text-primary);
+        }
+        .model-icon { font-size: 16px; flex-shrink: 0; }
+        .model-name { flex: 1; font-weight: 500; word-break: break-all; }
+        .model-empty {
+            font-size: 13px; color: var(--text-muted);
+            padding: 10px 12px;
+        }
+
+        /* ── 日志 ── */
+        .log-box {
+            margin-top: 8px;
+            padding: 8px 12px; border-radius: 8px;
+            background: var(--bg-main, #f5f5f5);
+            font-size: 12px; color: var(--text-muted);
+            min-height: 28px;
+        }
+        .log-box.error { color: #dc2626; background: #fef2f2; }
+        .log-box.ok    { color: #166534; background: #f0fdf4; }
+
+        /* ── PID badge ── */
+        .pid-badge {
+            display: inline-block; font-size: 11px;
+            padding: 2px 8px; border-radius: 6px;
+            background: #dbeafe; color: #1e40af; margin-left: 4px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo">
+                    <span class="logo-icon">🎨</span>
+                    <span class="logo-text">ComfyUI 管理</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- 状态卡 -->
+        <div class="section-label">服务状态</div>
+        <div id="status-card" class="card status-card stopped" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <div class="status-row">
+                    <span class="indicator checking" id="indicator"></span>
+                    <span id="status-text">检测中…</span>
+                    <span id="pid-badge" class="pid-badge" style="display:none;"></span>
+                </div>
+                <div class="status-sub" id="status-sub">正在探测 http://localhost:8188</div>
+
+                <div class="btn-group">
+                    <button id="btn-start" class="btn-start" disabled>
+                        <span>▶</span> 启动 ComfyUI
+                    </button>
+                    <button id="btn-stop" class="btn-stop" disabled>
+                        <span>■</span> 停止
+                    </button>
+                    <a id="btn-open" class="btn-open disabled"
+                       href="http://localhost:8188" target="_blank" rel="noopener">
+                        <span>🌐</span> 打开 ComfyUI
+                    </a>
+                </div>
+
+                <div id="log-box" class="log-box"></div>
+            </div>
+        </div>
+
+        <!-- 模型列表 -->
+        <div class="section-label" style="margin-top:24px;">已安装模型</div>
+        <div class="card" style="display:block;">
+            <div class="card-body" style="display:block;">
+                <div class="model-list" id="model-list">
+                    <div class="model-empty">加载中…</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+const COMFY_URL = 'http://localhost:8188';
+
+let currentAlive = null;
+let polling = null;
+
+// ── DOM 引用 ────────────────────────────────────
+const card       = document.getElementById('status-card');
+const indicator  = document.getElementById('indicator');
+const statusText = document.getElementById('status-text');
+const statusSub  = document.getElementById('status-sub');
+const pidBadge   = document.getElementById('pid-badge');
+const btnStart   = document.getElementById('btn-start');
+const btnStop    = document.getElementById('btn-stop');
+const btnOpen    = document.getElementById('btn-open');
+const logBox     = document.getElementById('log-box');
+const modelList  = document.getElementById('model-list');
+
+// ── 状态更新 ────────────────────────────────────
+function applyStatus(data) {
+    const alive = data.alive;
+    const pid   = data.pid;
+
+    // 指示灯
+    indicator.className = 'indicator ' + (alive ? 'on' : 'off');
+
+    // 文字
+    statusText.textContent = alive ? '运行中' : '已停止';
+    statusSub.textContent  = alive
+        ? `访问地址：${data.url}`
+        : `ComfyUI 未启动（端口 8188）`;
+
+    // PID badge
+    if (pid) {
+        pidBadge.textContent = 'PID ' + pid;
+        pidBadge.style.display = 'inline-block';
+    } else {
+        pidBadge.style.display = 'none';
+    }
+
+    // 卡片样式
+    card.className = 'card status-card ' + (alive ? 'running' : 'stopped');
+
+    // 按钮
+    btnStart.disabled = alive;
+    btnStop.disabled  = !alive && !pid;
+    if (alive) {
+        btnOpen.classList.remove('disabled');
+        btnOpen.href = data.url;
+    } else {
+        btnOpen.classList.add('disabled');
+    }
+
+    // 模型
+    if (data.models !== undefined) {
+        renderModels(data.models, data.downloading);
+    }
+
+    currentAlive = alive;
+}
+
+function renderModels(models, downloading) {
+    let html = '';
+    if (models && models.length) {
+        html += models.map(m =>
+            `<div class="model-item">
+                <span class="model-icon">✅</span>
+                <span class="model-name">${m.name}</span>
+                <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${m.size_mb} MB</span>
+            </div>`
+        ).join('');
+    }
+    if (downloading && downloading.length) {
+        html += downloading.map(d =>
+            `<div class="model-item" style="flex-direction:column;align-items:flex-start;gap:5px;">
+                <div style="display:flex;align-items:center;gap:8px;width:100%;">
+                    <span class="model-icon">⏬</span>
+                    <span class="model-name">${d.name}</span>
+                    <span style="font-size:11px;color:#f59e0b;white-space:nowrap;">${d.pct}%</span>
+                </div>
+                <div style="width:100%;background:#e5e7eb;border-radius:4px;height:4px;">
+                    <div style="width:${d.pct}%;background:#f59e0b;height:4px;border-radius:4px;transition:width .5s;"></div>
+                </div>
+                <span style="font-size:11px;color:var(--text-muted);">${d.done_mb} MB / 约 6636 MB</span>
+            </div>`
+        ).join('');
+    }
+    modelList.innerHTML = html || '<div class="model-empty">暂无模型（checkpoints 目录为空）</div>';
+}
+
+function setLog(msg, type = '') {
+    logBox.textContent = msg;
+    logBox.className = 'log-box ' + type;
+}
+
+// ── 轮询 ────────────────────────────────────────
+async function fetchStatus() {
+    try {
+        const r = await fetch('/api/comfyui/status');
+        const d = await r.json();
+        applyStatus(d);
+    } catch (e) {
+        indicator.className = 'indicator checking';
+        statusText.textContent = '探测中…';
+    }
+}
+
+function startPolling(interval = 4000) {
+    stopPolling();
+    fetchStatus();
+    polling = setInterval(fetchStatus, interval);
+}
+function stopPolling() {
+    if (polling) { clearInterval(polling); polling = null; }
+}
+
+// ── 启动 ────────────────────────────────────────
+btnStart.addEventListener('click', async () => {
+    btnStart.disabled = true;
+    indicator.className = 'indicator checking';
+    statusText.textContent = '启动中…';
+    statusSub.textContent  = '正在初始化，首次加载模型约需 30-60 秒，请稍候…';
+    setLog('⏳ 正在启动 ComfyUI（约 30-60 秒）…');
+    stopPolling();
+    try {
+        const r = await fetch('/api/comfyui/start', { method: 'POST' });
+        const d = await r.json();
+        if (!d.ok) {
+            setLog('❌ ' + (d.error || '启动失败'), 'error');
+            startPolling(3000);
+            return;
+        }
+        if (d.alive) {
+            setLog('✅ 启动成功', 'ok');
+        } else {
+            setLog(`⏳ ${d.msg || '正在加载，请稍候…'}`, '');
+        }
+        applyStatus(d);
+    } catch (e) {
+        setLog('❌ 请求失败：' + e.message, 'error');
+    }
+    // 启动后加快轮询，直到变为运行中
+    startPolling(2000);
+});
+
+// ── 停止 ────────────────────────────────────────
+btnStop.addEventListener('click', async () => {
+    btnStop.disabled = true;
+    setLog('⏳ 正在停止…');
+    stopPolling();
+    try {
+        const r = await fetch('/api/comfyui/stop', { method: 'POST' });
+        const d = await r.json();
+        setLog(d.ok ? '✅ 已停止' : '❌ ' + (d.error || '停止失败'), d.ok ? 'ok' : 'error');
+    } catch(e) {
+        setLog('❌ ' + e.message, 'error');
+    }
+    setTimeout(() => startPolling(3000), 1000);
+});
+
+// 初始化
+startPolling();
+</script>
+</body>
+</html>

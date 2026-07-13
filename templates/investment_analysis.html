@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投资分析 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <style>
+        body { background: #f4f6f8; }
+        .ia-page { width: 100%; max-width: 1440px; }
+        .ia-page * { min-width: 0; }
+        .ia-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 13px 24px;
+        }
+        .ia-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .ia-title-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .ia-title-main { font-size: 18px; font-weight: 850; color: var(--text-primary); }
+        .ia-title-sub { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ia-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+        .icon-btn, .ia-btn {
+            border: 1px solid var(--border); background: #fff; color: var(--text-secondary);
+            border-radius: 8px; min-height: 34px; cursor: pointer; transition: background .16s, border-color .16s, color .16s, opacity .16s;
+            display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+        }
+        .icon-btn { width: 36px; font-size: 17px; }
+        .ia-btn { padding: 7px 13px; font-size: 13px; font-weight: 750; gap: 6px; }
+        .icon-btn:hover, .ia-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .ia-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .ia-btn.primary:hover { opacity: .9; color: #fff; }
+        .ia-btn.ghost { background: #f8fafc; }
+        .ia-btn:disabled, .icon-btn:disabled { opacity: .55; cursor: not-allowed; }
+        .spin { animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .ia-main { padding: 16px 24px 36px; display: flex; flex-direction: column; gap: 14px; }
+        .ia-progress { display: none; border-radius: 8px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; padding: 9px 12px; font-size: 13px; }
+        .ia-progress.show { display: block; }
+        .monitor-tabs {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px;
+        }
+        .monitor-card {
+            position: relative; min-height: 86px; border: 1px solid var(--border); border-radius: 8px;
+            background: #fff; padding: 12px 36px 11px 12px; text-align: left; cursor: pointer;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, .05); transition: border-color .16s, box-shadow .16s, transform .16s;
+        }
+        .monitor-card:hover { border-color: #bfdbfe; box-shadow: 0 5px 16px rgba(15, 23, 42, .08); }
+        .monitor-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, .13); }
+        .monitor-close {
+            position: absolute; right: 8px; top: 8px; width: 24px; height: 24px; border: 1px solid transparent;
+            border-radius: 6px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 16px; line-height: 1;
+        }
+        .monitor-close:hover { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+        .monitor-name { font-size: 14px; font-weight: 850; color: var(--text-primary); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .monitor-code { margin-top: 2px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .monitor-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
+        .tag {
+            display: inline-flex; align-items: center; min-height: 21px; border-radius: 999px;
+            padding: 2px 8px; font-size: 11px; font-weight: 750; line-height: 1.35;
+            background: #f1f5f9; color: #475569; max-width: 100%; overflow-wrap: anywhere;
+        }
+        .tag.good { background: #dcfce7; color: #15803d; }
+        .tag.warn { background: #fef3c7; color: #92400e; }
+        .tag.bad { background: #fee2e2; color: #b91c1c; }
+        .tag.info { background: #dbeafe; color: #1d4ed8; }
+        .tagline { display: flex; gap: 5px; flex-wrap: wrap; }
+        .detail-shell { display: flex; flex-direction: column; gap: 14px; }
+        .detail-hero {
+            background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px;
+            display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+        }
+        .hero-name { font-size: 24px; line-height: 1.15; font-weight: 900; color: var(--text-primary); }
+        .hero-sub { color: var(--text-muted); font-size: 13px; margin-top: 6px; overflow-wrap: anywhere; }
+        .hero-text { color: var(--text-secondary); line-height: 1.75; margin-top: 12px; font-size: 14px; max-width: 1040px; overflow-wrap: anywhere; }
+        .hero-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 8px; width: 100%; min-width: 0; }
+        .metric { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 10px; min-height: 72px; }
+        .metric-label { font-size: 11px; color: var(--text-muted); }
+        .metric-value { font-size: 20px; font-weight: 900; color: var(--text-primary); margin-top: 5px; font-variant-numeric: tabular-nums; }
+        .metric-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.45; overflow-wrap: anywhere; }
+        .metric.good .metric-value { color: #15803d; }
+        .metric.warn .metric-value { color: #b45309; }
+        .metric.bad .metric-value { color: #b91c1c; }
+        .ia-grid { display: grid; gap: 14px; }
+        .ia-grid.two { grid-template-columns: 1fr 1fr; }
+        .ia-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .ia-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+        .ia-card-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 12px; padding: 13px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .ia-card-title { font-size: 14px; font-weight: 850; color: var(--text-primary); overflow-wrap: anywhere; }
+        .ia-card-meta { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; text-align: right; }
+        .ia-card-pad { padding: 14px 16px 16px; }
+        .summary-list, .risk-list, .event-list, .model-list { display: flex; flex-direction: column; gap: 9px; }
+        .summary-item, .risk-item, .event-card, .model-item {
+            border: 1px solid #eef2f7; background: #f8fafc; border-radius: 8px; padding: 10px 11px;
+        }
+        .summary-title, .risk-title, .event-title, .model-title { font-size: 13px; font-weight: 850; color: var(--text-primary); overflow-wrap: anywhere; }
+        .summary-desc, .risk-desc, .event-desc, .model-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin-top: 4px; overflow-wrap: anywhere; }
+        .risk-item.high { border-left: 4px solid #ef4444; }
+        .risk-item.medium { border-left: 4px solid #f59e0b; }
+        .risk-item.low { border-left: 4px solid #38bdf8; }
+        .chain-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .chain-box { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 11px; min-height: 104px; }
+        .chain-title { color: var(--text-muted); font-size: 12px; font-weight: 850; margin-bottom: 7px; }
+        .company-line { color: var(--text-secondary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+        .bar-row { display: grid; grid-template-columns: minmax(72px, 92px) minmax(0, 1fr) minmax(42px, 48px); gap: 9px; align-items: center; margin: 8px 0; }
+        .bar-name { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bar { height: 7px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 999px; background: #64748b; }
+        .bar-fill.good { background: #22c55e; }
+        .bar-fill.warn { background: #f59e0b; }
+        .bar-fill.bad { background: #ef4444; }
+        .bar-value { color: var(--text-secondary); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+        .signal-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .signal-column {
+            min-width: 0; border: 1px solid #eef2f7; background: #f8fafc;
+            border-radius: 8px; overflow: hidden;
+        }
+        .signal-column-hd {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 10px 11px; border-bottom: 1px solid #eef2f7; background: #fff;
+        }
+        .signal-kind { font-size: 13px; font-weight: 850; color: var(--text-primary); overflow-wrap: anywhere; }
+        .signal-list { padding: 11px; display: flex; flex-direction: column; gap: 9px; min-height: 220px; }
+        .signal {
+            border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; padding: 10px 11px; background: #fff;
+        }
+        .signal.good { border-left-color: #22c55e; }
+        .signal.bad { border-left-color: #ef4444; }
+        .signal.watch { border-left-color: #f59e0b; }
+        .signal-title { font-size: 13px; font-weight: 850; color: var(--text-primary); overflow-wrap: anywhere; }
+        .signal-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-top: 4px; overflow-wrap: anywhere; }
+        .signal-meta { display: flex; gap: 6px; flex-wrap: wrap; color: var(--text-muted); font-size: 11px; margin-top: 6px; }
+        .track-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 14px; }
+        .price-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .empty { padding: 18px; color: var(--text-muted); font-size: 13px; text-align: center; }
+        .modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .38); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-mask.show { display: flex; }
+        .modal { width: min(640px, 100%); max-height: calc(100vh - 40px); background: #fff; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 18px 50px rgba(15, 23, 42, .24); overflow: hidden; }
+        .modal-hd { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 15px; font-weight: 850; color: var(--text-primary); }
+        .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .add-form { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .add-search { position: relative; }
+        .add-search, .add-form .full { grid-column: 1 / -1; }
+        .input {
+            width: 100%; min-height: 36px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+            font-size: 13px; color: var(--text-primary); outline: none;
+        }
+        .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, .14); }
+        .search-results {
+            display: none; margin-top: 6px; max-height: 220px;
+            border: 1px solid var(--border); background: #fff; border-radius: 8px; box-shadow: 0 8px 18px rgba(15, 23, 42, .12); overflow-y: auto;
+        }
+        .search-results.show { display: block; }
+        .search-item { width: 100%; border: 0; background: #fff; padding: 9px 11px; display: flex; justify-content: space-between; gap: 10px; cursor: pointer; }
+        .search-item:hover { background: #f8fafc; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; }
+        .add-message { min-height: 18px; font-size: 12px; color: var(--text-muted); }
+        .add-message.good { color: #15803d; }
+        .add-message.bad { color: #b91c1c; }
+
+        @media (max-width: 1180px) {
+            .hero-metrics { min-width: 0; }
+            .ia-grid.two, .track-grid, .chain-grid, .signal-board { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 760px) {
+            .ia-header { align-items: flex-start; flex-direction: column; padding: 12px 14px; }
+            .ia-actions { width: 100%; justify-content: flex-start; }
+            .ia-main { padding: 14px; }
+            .monitor-tabs, .ia-grid.three, .hero-metrics, .price-grid, .add-form { grid-template-columns: 1fr; }
+            .bar-row { grid-template-columns: minmax(64px, 78px) minmax(0, 1fr) minmax(38px, 42px); }
+        }
+    </style>
+</head>
+<body>
+<div class="page ia-page">
+    <header class="header">
+        <div class="ia-header">
+            <div class="ia-title">
+                <a href="/" class="back-btn">←</a>
+                <div class="logo"><span class="logo-icon">📈</span></div>
+                <div class="ia-title-text">
+                    <div class="ia-title-main">投资分析</div>
+                    <div class="ia-title-sub" id="dataSub">正在读取投资数据...</div>
+                </div>
+            </div>
+            <div class="ia-actions">
+                <button class="icon-btn" id="btnRefresh" title="刷新股票分析" onclick="refreshAnalysis()"><span id="refreshIcon">↻</span></button>
+                <button class="ia-btn primary" type="button" onclick="openAddModal()">新增</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main ia-main">
+        <div class="ia-progress" id="progressBox"></div>
+        <section class="monitor-tabs" id="monitorTabs"></section>
+        <section class="detail-shell" id="stockDetail"></section>
+    </main>
+</div>
+
+<div class="modal-mask" id="addModal" onclick="if (event.target === this) closeAddModal()">
+    <div class="modal">
+        <div class="modal-hd">
+            <div class="modal-title">新增监控股票</div>
+            <button class="icon-btn" type="button" onclick="closeAddModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="add-search">
+                <input class="input" id="addSearchInput" type="search" placeholder="搜索股票名称或代码" autocomplete="off" oninput="scheduleWatchSearch(this.value)">
+                <div class="search-results" id="watchSearchResults"></div>
+            </div>
+            <form class="add-form" onsubmit="addWatchlistFromForm(event)">
+                <input class="input" id="watchCodeInput" placeholder="股票代码">
+                <input class="input" id="watchNameInput" placeholder="股票名称">
+                <div class="add-message full" id="watchManageMsg"></div>
+                <div class="modal-actions full">
+                    <button class="ia-btn ghost" type="button" onclick="closeAddModal()">取消</button>
+                    <button class="ia-btn primary" id="btnAddWatch" type="submit">添加监控</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/investment_analysis.js?v=7"></script>
+</body>
+</html>

@@ -92,7 +92,7 @@ body {
 /* ── 首页功能入口：4列固定 ────────────────────────────── */
 .card-grid-4 {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 14px;
 }
 
@@ -165,14 +165,15 @@ body {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
 .card-desc {
     font-size: 12px;
     color: var(--text-muted);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
 }
 
 .card-badge {
@@ -189,6 +190,22 @@ body {
     height: 16px;
     color: var(--text-muted);
     flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+    .header-inner {
+        padding: 12px 14px;
+    }
+    .main {
+        padding: 18px 14px 32px;
+    }
+    .card-grid-4 {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .card {
+        padding: 14px;
+    }
 }
 
 /* ── Footer ───────────────────────────────────────────── */
