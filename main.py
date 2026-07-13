@@ -2703,6 +2703,33 @@ def get_stock_factors(code: str):
         })
     return result
 
+@app.get("/api/investment-analysis/factor-weights")
+def get_investment_analysis_factor_weights():
+    """
+    批量版 /api/stock-factors/{code}：一次性返回 watchlist 里每只股票的因子权重（覆盖值+默认值），
+    供投资分析详情页做因子归因展示，避免逐只股票单独请求。
+    """
+    conn = get_db()
+    rows = conn.execute("SELECT code, factor_key, weight FROM stock_factor_overrides").fetchall()
+    conn.close()
+    overrides = {}
+    for r in rows:
+        overrides.setdefault(r["code"], {})[r["factor_key"]] = r["weight"]
+    watch_codes = [c for c, _n in _read_watchlist()]
+    out = {}
+    for code in watch_codes:
+        ov = overrides.get(code, {})
+        out[code] = [
+            {
+                "factor_key": fk,
+                "factor_name": FACTOR_NAMES[fk],
+                "weight": ov.get(fk, DEFAULT_WEIGHTS[fk]),
+                "is_override": fk in ov,
+            }
+            for fk in FACTOR_KEYS
+        ]
+    return {"weights": out}
+
 @app.put("/api/stock-factors/{code}")
 async def update_stock_factors(code: str, request: Request):
     """批量更新某只股票的因子权重覆盖"""

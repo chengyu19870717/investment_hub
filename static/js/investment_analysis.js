@@ -9,6 +9,7 @@ const state = {
     exposuresByCode: {},
     dimensionsByCode: {},
     dimensionHistoryByCode: {},
+    factorWeightsByCode: {},
     selectedCode: '',
     watchSearchSelected: null,
 };
@@ -954,6 +955,71 @@ function renderEventsSection(ctx) {
     `;
 }
 
+const FACTOR_SCORE_FIELD = {
+    technical: 'tech_score',
+    fundamental: 'fund_score',
+    money_flow: 'money_score',
+    sentiment: 'sentiment_score',
+    chip: 'chip_score',
+};
+
+function factorWeights(code) {
+    return codeKeys(code).map(key => state.factorWeightsByCode[key]).find(Boolean) || null;
+}
+
+function renderFactorAttribution(ctx) {
+    const { watch, stock } = ctx;
+    const code = stock?.code || watch?.code;
+    if (!stock) {
+        return `
+            <section class="ia-card">
+                <div class="ia-card-hd"><div class="ia-card-title">七、因子归因分析</div><div class="ia-card-meta">待分析</div></div>
+                <div class="ia-card-pad"><div class="empty">该监控股票尚未生成最新分析结果，暂不能拆解因子贡献。</div></div>
+            </section>
+        `;
+    }
+    const weights = factorWeights(code) || Object.keys(FACTOR_SCORE_FIELD).map(fk => ({
+        factor_key: fk, factor_name: fk, weight: 0, is_override: false,
+    }));
+    const rows = weights.map(w => {
+        const field = FACTOR_SCORE_FIELD[w.factor_key];
+        const raw = Number(stock[field]);
+        const contribution = (_isNum(raw) ? raw : 0) * Number(w.weight || 0);
+        return { ...w, raw: _isNum(raw) ? raw : null, contribution };
+    });
+    const totalContribution = rows.reduce((sum, r) => sum + r.contribution, 0);
+    const probability = Number(stock.probability || 0);
+    const delta = probability - totalContribution;
+    return `
+        <section class="ia-card">
+            <div class="ia-card-hd">
+                <div class="ia-card-title">七、因子归因分析</div>
+                <div class="ia-card-meta">${weights.some(w => w.is_override) ? '含个股权重覆盖' : '使用全局默认权重'}</div>
+            </div>
+            <div class="ia-card-pad model-list">
+                ${rows.map(r => `
+                    <div>
+                        <div class="bar-row">
+                            <div class="bar-name">${escapeHtml(r.factor_name)}</div>
+                            <div class="bar"><div class="bar-fill ${scoreClass(r.raw ?? 0)}" style="width:${clamp(r.raw ?? 0)}%"></div></div>
+                            <div class="bar-value">${r.raw === null ? '-' : fmtNum(r.raw, 0)}</div>
+                        </div>
+                        <div class="model-desc">权重 ${fmtPct(r.weight * 100, 0)}${r.is_override ? '（个股覆盖）' : '（全局默认）'} · 贡献 ${fmtNum(r.contribution, 1)} 分</div>
+                    </div>
+                `).join('')}
+                <div class="summary-item">
+                    <div class="summary-title">五因子加权预估 ${fmtNum(totalContribution, 1)} 分</div>
+                    <div class="summary-desc">系统最终给出的上涨概率为 ${fmtPct(probability)}，与五因子加权预估相差 ${fmtNum(delta, 1)} 分，差值来自权重表未覆盖的模型细节（如风控修正、极端值处理），仅供参考，不代表归因不完整。</div>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
+function _isNum(v) {
+    return v !== null && v !== undefined && !Number.isNaN(Number(v));
+}
+
 function renderDetail() {
     const ctx = selectedContext();
     const box = document.getElementById('stockDetail');
@@ -969,6 +1035,7 @@ function renderDetail() {
         renderSignalsSection(ctx),
         renderTracking(ctx),
         renderEventsSection(ctx),
+        renderFactorAttribution(ctx),
     ].join('');
 }
 
@@ -1150,7 +1217,7 @@ function renderAll() {
 async function loadAll() {
     setProgress('正在读取投资分析数据...');
     try {
-        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult] = await Promise.all([
+        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult] = await Promise.all([
             safeJson('/api/stock/results'),
             safeJson('/api/stock/results/history?limit=5'),
             safeJson('/api/watchlist'),
@@ -1159,6 +1226,7 @@ async function loadAll() {
             loadIndustryData(),
             safeJson('/api/investment-analysis/dimensions'),
             safeJson('/api/investment-analysis/history?limit=30'),
+            safeJson('/api/investment-analysis/factor-weights'),
         ]);
         state.stockResult = stockResult || null;
         state.stocks = stockResult?.stocks || [];
@@ -1169,6 +1237,7 @@ async function loadAll() {
         state.industryData = industryData || {};
         state.dimensionsByCode = dimensionsResult?.dimensions || {};
         state.dimensionHistoryByCode = dimHistoryResult?.history || {};
+        state.factorWeightsByCode = factorWeightsResult?.weights || {};
         renderAll();
         setProgress('');
     } catch (e) {
