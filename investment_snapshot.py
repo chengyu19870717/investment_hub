@@ -14,6 +14,7 @@
 import json
 import re
 import sqlite3
+import subprocess
 from datetime import datetime, date
 from pathlib import Path
 
@@ -216,6 +217,41 @@ def stock_dimensions(stock, exposures_by_code):
     }
 
 
+def _applescript_escape(s):
+    return str(s).replace('\\', '\\\\').replace('"', '\\"')
+
+
+def send_mac_notification(title, message):
+    """本地 macOS 通知（osascript），仅在触发脚本的这台 Mac 上弹出，不做跨设备补发。"""
+    script = f'display notification "{_applescript_escape(message)}" with title "{_applescript_escape(title)}"'
+    try:
+        subprocess.run(['osascript', '-e', script], check=False, timeout=10)
+    except Exception:
+        pass
+
+
+def detect_alerts(prev_row, code, name, dims, stock):
+    """对比上一次快照，找出值得主动提醒的信号变化。不依赖前端页面打开与否。"""
+    alerts = []
+    probability = float(stock.get('probability') or 0)
+    risk_label = str(stock.get('risk_label') or '')
+    if prev_row is None:
+        return alerts
+    prev_probability = float(prev_row['probability'] or 0)
+    prev_risk_label = str(prev_row['risk_label'] or '')
+    prev_divergent = bool(prev_row['divergent'])
+
+    if risk_label != prev_risk_label and ('危险' in risk_label or '高风险' in risk_label):
+        alerts.append(f'{name}({code})风险标签变为「{risk_label}」（原「{prev_risk_label or "无"}」）')
+    if dims['divergent'] and not prev_divergent:
+        alerts.append(f'{name}({code})三维评分出现背离，分差 {dims["spread"]:.0f}')
+    if prev_probability < 55 <= probability:
+        alerts.append(f'{name}({code})上涨概率突破55%进入进攻区（{prev_probability:.1f}%→{probability:.1f}%）')
+    if prev_probability >= 40 > probability:
+        alerts.append(f'{name}({code})上涨概率跌破40%进入弱势区（{prev_probability:.1f}%→{probability:.1f}%）')
+    return alerts
+
+
 def run_snapshot(snapshot_date=None):
     """计算一次快照并写入 stock_dimension_snapshots。同一天重复跑会覆盖当天数据（幂等）。"""
     init_snapshot_table()
@@ -241,6 +277,7 @@ def run_snapshot(snapshot_date=None):
     conn = get_db()
     now = datetime.now().isoformat()
     written = 0
+    all_alerts = []
     for item in targets:
         stock = None
         for k in code_keys(item['code']):
@@ -250,6 +287,13 @@ def run_snapshot(snapshot_date=None):
         if not stock:
             continue
         dims = stock_dimensions(stock, exposures_by_code)
+        name = item.get('name') or stock.get('name')
+        prev_row = conn.execute(
+            "SELECT * FROM stock_dimension_snapshots WHERE code=? AND snapshot_date<? "
+            "ORDER BY snapshot_date DESC LIMIT 1",
+            (item['code'], snapshot_date),
+        ).fetchone()
+        all_alerts.extend(detect_alerts(prev_row, item['code'], name, dims, stock))
         conn.execute("""
             INSERT INTO stock_dimension_snapshots
                 (snapshot_date, code, name, probability, score, price, risk_label,
@@ -262,7 +306,7 @@ def run_snapshot(snapshot_date=None):
                 divergent=excluded.divergent, exposures_count=excluded.exposures_count,
                 created_at=excluded.created_at
         """, (
-            snapshot_date, item['code'], item.get('name') or stock.get('name'),
+            snapshot_date, item['code'], name,
             stock.get('probability'), stock.get('score'), stock.get('price'), stock.get('risk_label'),
             dims['supply'], dims['demand'], dims['profit'], dims['spread'],
             1 if dims['divergent'] else 0, dims['exposures_count'], now,
@@ -270,7 +314,16 @@ def run_snapshot(snapshot_date=None):
         written += 1
     conn.commit()
     conn.close()
-    return {'ok': True, 'written': written, 'snapshot_date': snapshot_date, 'report_date': report.get('date')}
+
+    if all_alerts:
+        title = f'投资分析信号提醒（{len(all_alerts)}条）'
+        body = '；'.join(all_alerts)
+        send_mac_notification(title, body[:250])
+
+    return {
+        'ok': True, 'written': written, 'snapshot_date': snapshot_date,
+        'report_date': report.get('date'), 'alerts': all_alerts,
+    }
 
 
 if __name__ == '__main__':
