@@ -33,6 +33,7 @@ from investment_snapshot import (
     build_exposures as _snap_build_exposures,
     stock_dimensions as _snap_stock_dimensions,
     code_keys as _snap_code_keys,
+    load_thresholds as _snap_load_thresholds,
 )
 
 app = FastAPI()
@@ -3025,6 +3026,15 @@ def get_investment_analysis_kline(code: str, days: int = 120):
         for r in reversed(rows)
     ]
     return {"code": code, "kline": kline}
+
+@app.get("/api/investment-analysis/thresholds")
+def get_investment_analysis_thresholds():
+    """
+    信号/决策阈值的唯一权威来源（config/investment_thresholds.json）。
+    前端 investment_analysis.js 从这里取，Python(investment_snapshot) 直接读同一文件，
+    避免两端各自硬编码 55%/40%/背离阈值/危险关键词导致页面徽章与推送不一致。
+    """
+    return _snap_load_thresholds()
 
 @app.get("/api/investment-analysis/alerts")
 def get_investment_analysis_alerts(limit: int = 50):

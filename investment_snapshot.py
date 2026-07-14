@@ -23,6 +23,34 @@ DB_PATH = Path.home() / ".baibao" / "baibao.db"
 REPORT_DIR = Path.home() / "project" / "quant_trading" / "reports"
 INDUSTRY_CHAIN_PATH = BASE_DIR / "static" / "data" / "industry_chain.json"
 WATCHLIST_PATH = Path.home() / "project" / "quant_trading" / "config" / "watchlist.json"
+THRESHOLDS_PATH = BASE_DIR / "config" / "investment_thresholds.json"
+
+# 阈值默认值——与 config/investment_thresholds.json 保持一致，仅作文件缺失时的兜底
+DEFAULT_THRESHOLDS = {
+    "prob_attack": 55, "prob_attack_strong": 62,
+    "prob_defense": 40, "prob_defense_strong": 30,
+    "divergent_spread": 26, "divergent_spread_strong": 35,
+    "growth_improve": 20, "revenue_pressure": -35,
+    "profit_pressure": -50, "profit_crash": -100,
+    "risk_defensive_keywords": ["危险"],
+    "risk_alert_keywords": ["危险", "高风险"],
+}
+
+
+def load_thresholds():
+    """读取阈值配置（唯一权威来源）。文件缺失或损坏时回退默认值，保证脚本不因配置问题崩溃。"""
+    merged = dict(DEFAULT_THRESHOLDS)
+    if THRESHOLDS_PATH.exists():
+        try:
+            with open(THRESHOLDS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            merged.update({k: v for k, v in data.items() if not k.startswith("_")})
+        except Exception:
+            pass
+    return merged
+
+
+THRESHOLDS = load_thresholds()
 
 
 def get_db():
@@ -223,7 +251,7 @@ def stock_dimensions(stock, exposures_by_code):
         'demand': clamp(demand),
         'profit': clamp(profit),
         'spread': spread,
-        'divergent': spread >= 26,
+        'divergent': spread >= THRESHOLDS['divergent_spread'],
         'exposures_count': len(exposures),
     }
 
@@ -252,14 +280,17 @@ def detect_alerts(prev_row, code, name, dims, stock):
     prev_risk_label = str(prev_row['risk_label'] or '')
     prev_divergent = bool(prev_row['divergent'])
 
-    if risk_label != prev_risk_label and ('危险' in risk_label or '高风险' in risk_label):
+    attack = THRESHOLDS['prob_attack']
+    defense = THRESHOLDS['prob_defense']
+    alert_kw = THRESHOLDS['risk_alert_keywords']
+    if risk_label != prev_risk_label and any(kw in risk_label for kw in alert_kw):
         alerts.append({'type': 'risk', 'message': f'{name}({code})风险标签变为「{risk_label}」（原「{prev_risk_label or "无"}」）'})
     if dims['divergent'] and not prev_divergent:
         alerts.append({'type': 'divergent', 'message': f'{name}({code})三维评分出现背离，分差 {dims["spread"]:.0f}'})
-    if prev_probability < 55 <= probability:
-        alerts.append({'type': 'prob_up', 'message': f'{name}({code})上涨概率突破55%进入进攻区（{prev_probability:.1f}%→{probability:.1f}%）'})
-    if prev_probability >= 40 > probability:
-        alerts.append({'type': 'prob_down', 'message': f'{name}({code})上涨概率跌破40%进入弱势区（{prev_probability:.1f}%→{probability:.1f}%）'})
+    if prev_probability < attack <= probability:
+        alerts.append({'type': 'prob_up', 'message': f'{name}({code})上涨概率突破{attack}%进入进攻区（{prev_probability:.1f}%→{probability:.1f}%）'})
+    if prev_probability >= defense > probability:
+        alerts.append({'type': 'prob_down', 'message': f'{name}({code})上涨概率跌破{defense}%进入弱势区（{prev_probability:.1f}%→{probability:.1f}%）'})
     return alerts
 
 

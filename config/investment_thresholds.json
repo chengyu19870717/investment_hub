@@ -1,0 +1,15 @@
+{
+  "_comment": "投资分析信号/决策阈值的唯一权威来源。Python(investment_snapshot.py) 直接读本文件，前端(investment_analysis.js) 通过 /api/investment-analysis/thresholds 读取，避免两端各自硬编码导致页面徽章与推送通知不一致。改这里即可同时生效两端。",
+  "prob_attack": 55,
+  "prob_attack_strong": 62,
+  "prob_defense": 40,
+  "prob_defense_strong": 30,
+  "divergent_spread": 26,
+  "divergent_spread_strong": 35,
+  "growth_improve": 20,
+  "revenue_pressure": -35,
+  "profit_pressure": -50,
+  "profit_crash": -100,
+  "risk_defensive_keywords": ["危险"],
+  "risk_alert_keywords": ["危险", "高风险"]
+}

@@ -18,7 +18,25 @@ const state = {
     overviewSort: { key: 'probability', asc: false },
     selectedCode: '',
     watchSearchSelected: null,
+    // 阈值默认值——与 config/investment_thresholds.json 一致，仅作接口未返回时的兜底
+    thresholds: {
+        prob_attack: 55, prob_attack_strong: 62,
+        prob_defense: 40, prob_defense_strong: 30,
+        divergent_spread: 26, divergent_spread_strong: 35,
+        growth_improve: 20, revenue_pressure: -35,
+        profit_pressure: -50, profit_crash: -100,
+        risk_defensive_keywords: ['危险'],
+        risk_alert_keywords: ['危险', '高风险'],
+    },
 };
+
+function isDangerLabel(label) {
+    return (state.thresholds.risk_defensive_keywords || []).some(kw => String(label || '').includes(kw));
+}
+
+function isAlertRiskLabel(label) {
+    return (state.thresholds.risk_alert_keywords || []).some(kw => String(label || '').includes(kw));
+}
 
 let watchSearchTimer = null;
 let refreshTimer = null;
@@ -130,9 +148,10 @@ function scoreClass(score) {
 
 function decisionForStock(stock) {
     if (!stock) return { label: '待分析', cls: 'warn' };
+    const t = state.thresholds;
     const probability = Number(stock.probability || 0);
-    if (probability >= 55 && !String(stock.risk_label || '').includes('危险')) return { label: '偏进攻', cls: 'good' };
-    if (probability < 40 || String(stock.risk_label || '').includes('危险')) return { label: '偏防守', cls: 'bad' };
+    if (probability >= t.prob_attack && !isDangerLabel(stock.risk_label)) return { label: '偏进攻', cls: 'good' };
+    if (probability < t.prob_defense || isDangerLabel(stock.risk_label)) return { label: '偏防守', cls: 'bad' };
     return { label: '观察', cls: 'warn' };
 }
 
@@ -372,18 +391,19 @@ function buildRiskList(stock, watch) {
     const risks = [];
     const exposures = getExposures(stock?.code || watch?.code);
     const dims = stockDimensions(stock);
+    const t = state.thresholds;
     const add = (title, desc, severity = 'medium', action = '') => risks.push({ title, desc, severity, action });
     if (!stock) {
         add('缺少最新股票分析结果', '当前监控股票尚未生成最新分析，价格、资金和盈利侧判断不完整。', 'medium', '点击右上角刷新标识重新抓取分析数据。');
     } else {
-        if (Number(stock.probability || 0) < 40 || String(stock.risk_label || '').includes('危险')) {
-            add('价格与风险评分偏弱', `上涨概率 ${fmtPct(stock.probability)}，风险标签为 ${stock.risk_label || '未标注'}。`, Number(stock.probability || 0) < 30 ? 'high' : 'medium', stock.risk_advice || '控制仓位，等待反转证据。');
+        if (Number(stock.probability || 0) < t.prob_defense || isDangerLabel(stock.risk_label)) {
+            add('价格与风险评分偏弱', `上涨概率 ${fmtPct(stock.probability)}，风险标签为 ${stock.risk_label || '未标注'}。`, Number(stock.probability || 0) < t.prob_defense_strong ? 'high' : 'medium', stock.risk_advice || '控制仓位，等待反转证据。');
         }
-        if (Number(stock.profit_growth || 0) < -50 || Number(stock.revenue_growth || 0) < -35) {
-            add('盈利侧验证不足', `营收增速 ${fmtPct(stock.revenue_growth)}，利润增速 ${fmtPct(stock.profit_growth)}。`, Number(stock.profit_growth || 0) < -100 ? 'high' : 'medium', '复核财报、订单和费用端变化。');
+        if (Number(stock.profit_growth || 0) < t.profit_pressure || Number(stock.revenue_growth || 0) < t.revenue_pressure) {
+            add('盈利侧验证不足', `营收增速 ${fmtPct(stock.revenue_growth)}，利润增速 ${fmtPct(stock.profit_growth)}。`, Number(stock.profit_growth || 0) < t.profit_crash ? 'high' : 'medium', '复核财报、订单和费用端变化。');
         }
         if (dims.divergent) {
-            add('三维交叉验证出现背离', `供给 ${fmtNum(dims.supply, 0)}、需求 ${fmtNum(dims.demand, 0)}、盈利 ${fmtNum(dims.profit, 0)}，分差 ${fmtNum(dims.spread, 0)}。`, dims.spread >= 35 ? 'high' : 'medium', '确认背离来自数据滞后还是基本面变化。');
+            add('三维交叉验证出现背离', `供给 ${fmtNum(dims.supply, 0)}、需求 ${fmtNum(dims.demand, 0)}、盈利 ${fmtNum(dims.profit, 0)}，分差 ${fmtNum(dims.spread, 0)}。`, dims.spread >= t.divergent_spread_strong ? 'high' : 'medium', '确认背离来自数据滞后还是基本面变化。');
         }
         if (Number(stock.max_position || 0) <= 0) {
             add('仓位建议为零', '系统风控给出的最大仓位为 0%，不适合直接进攻。', 'high', '只保留观察，等待概率和盈利侧改善。');
@@ -417,18 +437,19 @@ function buildStockSignals(stock, watch) {
     const signals = { good: [], bad: [], watch: [] };
     const exposures = getExposures(stock?.code || watch?.code);
     const dims = stockDimensions(stock);
+    const t = state.thresholds;
     const analysisDate = dataDate(stock);
     if (stock) {
-        if (Number(stock.probability || 0) >= 55) {
+        if (Number(stock.probability || 0) >= t.prob_attack) {
             addSignal(signals, 'good', '概率进入进攻区', `上涨概率 ${fmtPct(stock.probability)}，价格/情绪侧给出正向提示。`, {
-                severity: Number(stock.probability || 0) >= 62 ? 'high' : 'medium',
+                severity: Number(stock.probability || 0) >= t.prob_attack_strong ? 'high' : 'medium',
                 dimension: '价格/情绪',
                 identifiedDate: analysisDate,
                 basis: `股票分析结果 ${analysisDate}`,
                 stock,
             });
         }
-        if (Number(stock.revenue_growth || 0) > 20 || Number(stock.profit_growth || 0) > 20) {
+        if (Number(stock.revenue_growth || 0) > t.growth_improve || Number(stock.profit_growth || 0) > t.growth_improve) {
             addSignal(signals, 'good', '成长侧数据改善', `营收增速 ${fmtPct(stock.revenue_growth)}，利润增速 ${fmtPct(stock.profit_growth)}。`, {
                 severity: 'medium',
                 dimension: '盈利侧',
@@ -437,18 +458,18 @@ function buildStockSignals(stock, watch) {
                 stock,
             });
         }
-        if (Number(stock.probability || 0) < 40 || String(stock.risk_label || '').includes('危险')) {
+        if (Number(stock.probability || 0) < t.prob_defense || isDangerLabel(stock.risk_label)) {
             addSignal(signals, 'bad', '风险评分偏弱', `概率 ${fmtPct(stock.probability)}，${stock.risk_advice || stock.reason || '需要控制仓位。'}`, {
-                severity: Number(stock.probability || 0) < 30 ? 'high' : 'medium',
+                severity: Number(stock.probability || 0) < t.prob_defense_strong ? 'high' : 'medium',
                 dimension: '价格/风控',
                 identifiedDate: analysisDate,
                 basis: `股票分析结果 ${analysisDate}`,
                 stock,
             });
         }
-        if (Number(stock.revenue_growth || 0) < -35 || Number(stock.profit_growth || 0) < -50) {
+        if (Number(stock.revenue_growth || 0) < t.revenue_pressure || Number(stock.profit_growth || 0) < t.profit_pressure) {
             addSignal(signals, 'bad', '基本面承压', `营收增速 ${fmtPct(stock.revenue_growth)}，利润增速 ${fmtPct(stock.profit_growth)}，盈利验证没有跟上。`, {
-                severity: Number(stock.profit_growth || 0) < -100 ? 'high' : 'medium',
+                severity: Number(stock.profit_growth || 0) < t.profit_crash ? 'high' : 'medium',
                 dimension: '盈利侧',
                 identifiedDate: analysisDate,
                 basis: `基本面数据 ${analysisDate}`,
@@ -466,7 +487,7 @@ function buildStockSignals(stock, watch) {
         }
         if (dims.divergent) {
             addSignal(signals, 'watch', '三维指标背离', `供给 ${fmtNum(dims.supply, 0)}、需求 ${fmtNum(dims.demand, 0)}、盈利 ${fmtNum(dims.profit, 0)} 不同步。`, {
-                severity: dims.spread >= 35 ? 'high' : 'medium',
+                severity: dims.spread >= state.thresholds.divergent_spread_strong ? 'high' : 'medium',
                 dimension: '交叉验证',
                 identifiedDate: analysisDate,
                 basis: `三维交叉验证 ${analysisDate}`,
@@ -1522,7 +1543,7 @@ function renderRankingTable(rows) {
                 <td class="ov-num">${fmtNum(r.demand, 0)}</td>
                 <td class="ov-num">${fmtNum(r.profit, 0)}</td>
                 <td class="ov-num">${r.hasStock ? fmtPct(r.maxPosition * 100, 0) : '-'}</td>
-                <td>${r.riskLabel ? `<span class="tag ${String(r.riskLabel).includes('危险') || String(r.riskLabel).includes('高') ? 'bad' : 'warn'}">${escapeHtml(r.riskLabel)}</span>` : '-'}</td>
+                <td>${r.riskLabel ? `<span class="tag ${isAlertRiskLabel(r.riskLabel) ? 'bad' : 'warn'}">${escapeHtml(r.riskLabel)}</span>` : '-'}</td>
                 <td class="ov-num">${r.eventCount || '-'}</td>
             </tr>
         `;
@@ -1542,7 +1563,7 @@ function renderPortfolioCard(rows) {
     const totalPosition = analyzed.reduce((s, r) => s + r.maxPosition, 0);
     const attackCount = rows.filter(r => r.decision.label === '偏进攻').length;
     const defenseCount = rows.filter(r => r.decision.label === '偏防守').length;
-    const riskyCount = rows.filter(r => String(r.riskLabel).includes('危险') || String(r.riskLabel).includes('高')).length;
+    const riskyCount = rows.filter(r => isAlertRiskLabel(r.riskLabel)).length;
     const industryCount = {};
     analyzed.forEach(r => { if (r.industry) industryCount[r.industry] = (industryCount[r.industry] || 0) + 1; });
     const topIndustry = Object.entries(industryCount).sort((a, b) => b[1] - a[1])[0];
@@ -1603,7 +1624,7 @@ function renderAll() {
 async function loadAll() {
     setProgress('正在读取投资分析数据...');
     try {
-        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult, factorBacktestResult, alertsResult] = await Promise.all([
+        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult, factorBacktestResult, alertsResult, thresholdsResult] = await Promise.all([
             safeJson('/api/stock/results'),
             safeJson('/api/stock/results/history?limit=5'),
             safeJson('/api/watchlist'),
@@ -1616,6 +1637,7 @@ async function loadAll() {
             safeJson('/api/investment-analysis/notes'),
             safeJson('/api/investment-analysis/factor-backtest'),
             safeJson('/api/investment-analysis/alerts?limit=50'),
+            safeJson('/api/investment-analysis/thresholds'),
         ]);
         state.stockResult = stockResult || null;
         state.stocks = stockResult?.stocks || [];
@@ -1631,6 +1653,9 @@ async function loadAll() {
         state.factorBacktestByCode = factorBacktestResult?.backtest || {};
         state.factorBacktestGeneratedAt = factorBacktestResult?.generated_at || null;
         state.alerts = Array.isArray(alertsResult) ? alertsResult : [];
+        if (thresholdsResult && typeof thresholdsResult === 'object') {
+            state.thresholds = { ...state.thresholds, ...thresholdsResult };
+        }
         renderAll();
         setProgress('');
     } catch (e) {
