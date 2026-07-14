@@ -10,6 +10,7 @@ const state = {
     dimensionsByCode: {},
     dimensionHistoryByCode: {},
     factorWeightsByCode: {},
+    notes: [],
     selectedCode: '',
     watchSearchSelected: null,
 };
@@ -1020,6 +1021,98 @@ function _isNum(v) {
     return v !== null && v !== undefined && !Number.isNaN(Number(v));
 }
 
+function stockNotes(code) {
+    return state.notes.filter(n => sameCode(n.code, code));
+}
+
+function verdictCls(verdict) {
+    if (verdict === '兑现') return 'good';
+    if (verdict === '未兑现') return 'bad';
+    return 'warn';
+}
+
+function renderDecisionReview(ctx) {
+    const code = ctx.stock?.code || ctx.watch?.code;
+    const name = ctx.stock?.name || ctx.watch?.name || '';
+    if (!code) return '';
+    const notes = stockNotes(code);
+    return `
+        <section class="ia-card">
+            <div class="ia-card-hd">
+                <div class="ia-card-title">八、决策复盘</div>
+                <div class="ia-card-meta">${notes.length} 条记录</div>
+            </div>
+            <div class="ia-card-pad summary-list">
+                ${notes.length ? notes.map(n => `
+                    <div class="summary-item">
+                        <div class="summary-title">
+                            ${escapeHtml(n.created_at ? n.created_at.slice(0, 10) : '')} 关注理由
+                            ${n.resolved ? `<span class="tag ${verdictCls(n.verdict)}">${escapeHtml(n.verdict)}</span>` : '<span class="tag warn">待复盘</span>'}
+                        </div>
+                        <div class="summary-desc">${escapeHtml(n.note)}${n.target_date ? `（预期验证点：${escapeHtml(n.target_date)}）` : ''}</div>
+                        ${n.resolved
+                            ? `<div class="summary-desc">${n.resolved_note ? `复盘：${escapeHtml(n.resolved_note)}` : ''}</div>`
+                            : `<div class="modal-actions" style="justify-content:flex-start; padding-top:8px;">
+                                <button class="ia-btn ghost" type="button" onclick="resolveDecisionNote(${n.id}, '兑现')">标记兑现</button>
+                                <button class="ia-btn ghost" type="button" onclick="resolveDecisionNote(${n.id}, '部分兑现')">部分兑现</button>
+                                <button class="ia-btn ghost" type="button" onclick="resolveDecisionNote(${n.id}, '未兑现')">未兑现</button>
+                               </div>`
+                        }
+                    </div>
+                `).join('') : '<div class="empty">还没有记录关注理由，用下面的表单记一条。</div>'}
+                <form class="add-form" onsubmit="submitDecisionNote(event, ${escapeJsArg(code)}, ${escapeJsArg(name)})">
+                    <textarea class="input full" id="decisionNoteInput" rows="2" placeholder="当初为什么关注这只股票？预期看到什么信号会验证这个判断？" required></textarea>
+                    <input class="input" id="decisionTargetDate" type="date" placeholder="预期验证日期（可选）">
+                    <div class="modal-actions full" style="justify-content:flex-start;">
+                        <button class="ia-btn primary" type="submit">记录关注理由</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    `;
+}
+
+async function submitDecisionNote(event, code, name) {
+    event.preventDefault();
+    const noteEl = document.getElementById('decisionNoteInput');
+    const dateEl = document.getElementById('decisionTargetDate');
+    const note = String(noteEl?.value || '').trim();
+    if (!note) return;
+    setProgress('正在记录关注理由...');
+    try {
+        const res = await fetch('/api/investment-analysis/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, name, note, target_date: dateEl?.value || '' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '记录失败');
+        setProgress('');
+        await loadAll();
+    } catch (e) {
+        setProgress(`记录失败：${e.message}`);
+    }
+}
+
+async function resolveDecisionNote(id, verdict) {
+    const reflection = prompt(`记一句复盘小结（可留空）——判定为「${verdict}」`, '');
+    if (reflection === null) return;
+    setProgress('正在保存复盘结果...');
+    try {
+        const res = await fetch(`/api/investment-analysis/notes/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ verdict, resolved_note: reflection }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '保存失败');
+        setProgress('');
+        await loadAll();
+    } catch (e) {
+        setProgress(`保存失败：${e.message}`);
+    }
+}
+
 function renderDetail() {
     const ctx = selectedContext();
     const box = document.getElementById('stockDetail');
@@ -1036,6 +1129,7 @@ function renderDetail() {
         renderTracking(ctx),
         renderEventsSection(ctx),
         renderFactorAttribution(ctx),
+        renderDecisionReview(ctx),
     ].join('');
 }
 
@@ -1217,7 +1311,7 @@ function renderAll() {
 async function loadAll() {
     setProgress('正在读取投资分析数据...');
     try {
-        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult] = await Promise.all([
+        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult] = await Promise.all([
             safeJson('/api/stock/results'),
             safeJson('/api/stock/results/history?limit=5'),
             safeJson('/api/watchlist'),
@@ -1227,6 +1321,7 @@ async function loadAll() {
             safeJson('/api/investment-analysis/dimensions'),
             safeJson('/api/investment-analysis/history?limit=30'),
             safeJson('/api/investment-analysis/factor-weights'),
+            safeJson('/api/investment-analysis/notes'),
         ]);
         state.stockResult = stockResult || null;
         state.stocks = stockResult?.stocks || [];
@@ -1238,6 +1333,7 @@ async function loadAll() {
         state.dimensionsByCode = dimensionsResult?.dimensions || {};
         state.dimensionHistoryByCode = dimHistoryResult?.history || {};
         state.factorWeightsByCode = factorWeightsResult?.weights || {};
+        state.notes = Array.isArray(notesResult) ? notesResult : [];
         renderAll();
         setProgress('');
     } catch (e) {

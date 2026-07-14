@@ -166,6 +166,18 @@ def init_db():
             created_at   TEXT,
             updated_at   TEXT
         );
+        CREATE TABLE IF NOT EXISTS stock_decision_notes (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            code          TEXT NOT NULL,
+            name          TEXT,
+            note          TEXT NOT NULL,
+            target_date   TEXT,
+            created_at    TEXT NOT NULL,
+            resolved      INTEGER NOT NULL DEFAULT 0,
+            verdict       TEXT,
+            resolved_note TEXT,
+            resolved_at   TEXT
+        );
         CREATE TABLE IF NOT EXISTS game_save_hero_templates (
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
@@ -2891,6 +2903,64 @@ def get_investment_analysis_history(limit: int = 30):
     for code in by_code:
         by_code[code].reverse()  # 按日期升序，方便前端画趋势线
     return {"history": by_code}
+
+@app.get("/api/investment-analysis/notes")
+def list_decision_notes(code: str = ""):
+    """决策复盘记录：当初为什么关注这只股票，以及后续是否验证。"""
+    conn = get_db()
+    if code:
+        rows = conn.execute(
+            "SELECT * FROM stock_decision_notes WHERE code=? ORDER BY created_at DESC", (code,)
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM stock_decision_notes ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/investment-analysis/notes")
+async def create_decision_note(request: Request):
+    body = await request.json()
+    code = str(body.get("code", "")).strip()
+    name = str(body.get("name", "")).strip()
+    note = str(body.get("note", "")).strip()
+    target_date = str(body.get("target_date") or "").strip() or None
+    if not code or not note:
+        return JSONResponse({"error": "code 和 note 不能为空"}, status_code=400)
+    conn = get_db()
+    now = datetime.now().isoformat()
+    cur = conn.execute(
+        "INSERT INTO stock_decision_notes(code,name,note,target_date,created_at,resolved) VALUES (?,?,?,?,?,0)",
+        (code, name, note, target_date, now),
+    )
+    conn.commit()
+    note_id = cur.lastrowid
+    conn.close()
+    return {"ok": True, "id": note_id}
+
+@app.patch("/api/investment-analysis/notes/{note_id}")
+async def resolve_decision_note(note_id: int, request: Request):
+    body = await request.json()
+    verdict = str(body.get("verdict", "")).strip()
+    resolved_note = str(body.get("resolved_note") or "").strip() or None
+    if verdict not in ("兑现", "部分兑现", "未兑现"):
+        return JSONResponse({"error": "verdict 必须是 兑现/部分兑现/未兑现"}, status_code=400)
+    conn = get_db()
+    now = datetime.now().isoformat()
+    conn.execute(
+        "UPDATE stock_decision_notes SET resolved=1, verdict=?, resolved_note=?, resolved_at=? WHERE id=?",
+        (verdict, resolved_note, now, note_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/investment-analysis/notes/{note_id}")
+def delete_decision_note(note_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM stock_decision_notes WHERE id=?", (note_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
 
 @app.get("/api/stock/report")
 def get_stock_report(date: str):
