@@ -2962,6 +2962,38 @@ def delete_decision_note(note_id: int):
     conn.close()
     return {"ok": True}
 
+@app.get("/api/investment-analysis/factor-backtest")
+def get_investment_analysis_factor_backtest():
+    """
+    读取 quant_trading/backtest_all_stocks.py 的回测结果（launchd 每日16:10自动跑），
+    每只股票在“当前权重配置”和历史真实K线回测出的“最优权重方案”之间的准确率对比。
+    这是权重方案级别的回测，不是单因子独立剥离验证——见 investment_analysis.js 里的说明。
+    """
+    csv_path = QUANT_DIR / "reports" / "all_stocks_weight_optimization.csv"
+    if not csv_path.exists():
+        return {"generated_at": None, "backtest": {}}
+    import csv as csv_module
+    out = {}
+    with open(csv_path, "r", encoding="utf-8-sig") as f:
+        for row in csv_module.DictReader(f):
+            out[row["code"]] = {
+                "days": int(float(row["days"])),
+                "volatility": float(row["volatility"]),
+                "current_accuracy": float(row["current_accuracy"]),
+                "best_scheme": row["best_scheme"],
+                "best_accuracy": float(row["best_accuracy"]),
+                "improvement": float(row["improvement"]),
+                "rec_weights": {
+                    "technical": float(row["rec_tech"]),
+                    "fundamental": float(row["rec_fund"]),
+                    "money_flow": float(row["rec_money"]),
+                    "sentiment": float(row["rec_sentiment"]),
+                    "chip": float(row["rec_chip"]),
+                },
+            }
+    generated_at = int(os.path.getmtime(csv_path))
+    return {"generated_at": generated_at, "backtest": out}
+
 @app.get("/api/stock/report")
 def get_stock_report(date: str):
     path = REPORT_DIR / f"{date}_report.md"

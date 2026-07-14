@@ -10,6 +10,8 @@ const state = {
     dimensionsByCode: {},
     dimensionHistoryByCode: {},
     factorWeightsByCode: {},
+    factorBacktestByCode: {},
+    factorBacktestGeneratedAt: null,
     notes: [],
     selectedCode: '',
     watchSearchSelected: null,
@@ -968,6 +970,32 @@ function factorWeights(code) {
     return codeKeys(code).map(key => state.factorWeightsByCode[key]).find(Boolean) || null;
 }
 
+function factorBacktest(code) {
+    return codeKeys(code).map(key => state.factorBacktestByCode[key]).find(Boolean) || null;
+}
+
+function renderFactorBacktestBlock(code) {
+    const bt = factorBacktest(code);
+    if (!bt) return '';
+    const weights = factorWeights(code) || Object.keys(FACTOR_SCORE_FIELD).map(fk => ({ factor_key: fk, factor_name: fk }));
+    const updated = state.factorBacktestGeneratedAt ? new Date(state.factorBacktestGeneratedAt * 1000).toLocaleDateString('zh-CN') : '';
+    const worthChanging = bt.improvement >= 3;
+    const recLine = weights.map(w => `${w.factor_name}${fmtPct((bt.rec_weights[w.factor_key] || 0) * 100, 0)}`).join(' / ');
+    return `
+        <div class="summary-item">
+            <div class="summary-title">历史权重回测（${escapeHtml(updated)} 更新，近 ${bt.days} 个交易日真实K线）</div>
+            <div class="summary-desc">
+                当前权重配置历史准确率 ${fmtPct(bt.current_accuracy)}，回测最优方案「${escapeHtml(bt.best_scheme)}」准确率 ${fmtPct(bt.best_accuracy)}，
+                差距 ${fmtNum(bt.improvement, 1)} 个百分点。
+                ${worthChanging
+                    ? `建议权重可调整为：${recLine}。`
+                    : '差距小于 3 个百分点，当前权重基本合理，不建议调整。'}
+                这是整套权重方案级别的回测（比较不同权重组合的历史表现），不是单个因子独立剥离验证。
+            </div>
+        </div>
+    `;
+}
+
 function renderFactorAttribution(ctx) {
     const { watch, stock } = ctx;
     const code = stock?.code || watch?.code;
@@ -1012,6 +1040,7 @@ function renderFactorAttribution(ctx) {
                     <div class="summary-title">五因子加权预估 ${fmtNum(totalContribution, 1)} 分</div>
                     <div class="summary-desc">系统最终给出的上涨概率为 ${fmtPct(probability)}，与五因子加权预估相差 ${fmtNum(delta, 1)} 分，差值来自权重表未覆盖的模型细节（如风控修正、极端值处理），仅供参考，不代表归因不完整。</div>
                 </div>
+                ${renderFactorBacktestBlock(code)}
             </div>
         </section>
     `;
@@ -1311,7 +1340,7 @@ function renderAll() {
 async function loadAll() {
     setProgress('正在读取投资分析数据...');
     try {
-        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult] = await Promise.all([
+        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult, factorBacktestResult] = await Promise.all([
             safeJson('/api/stock/results'),
             safeJson('/api/stock/results/history?limit=5'),
             safeJson('/api/watchlist'),
@@ -1322,6 +1351,7 @@ async function loadAll() {
             safeJson('/api/investment-analysis/history?limit=30'),
             safeJson('/api/investment-analysis/factor-weights'),
             safeJson('/api/investment-analysis/notes'),
+            safeJson('/api/investment-analysis/factor-backtest'),
         ]);
         state.stockResult = stockResult || null;
         state.stocks = stockResult?.stocks || [];
@@ -1334,6 +1364,8 @@ async function loadAll() {
         state.dimensionHistoryByCode = dimHistoryResult?.history || {};
         state.factorWeightsByCode = factorWeightsResult?.weights || {};
         state.notes = Array.isArray(notesResult) ? notesResult : [];
+        state.factorBacktestByCode = factorBacktestResult?.backtest || {};
+        state.factorBacktestGeneratedAt = factorBacktestResult?.generated_at || null;
         renderAll();
         setProgress('');
     } catch (e) {
