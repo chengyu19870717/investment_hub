@@ -998,6 +998,12 @@ function factorBacktest(code) {
     return codeKeys(code).map(key => state.factorBacktestByCode[key]).find(Boolean) || null;
 }
 
+function weightsMatchRec(code, bt) {
+    const w = factorWeights(code);
+    if (!w || !bt?.rec_weights) return false;
+    return w.every(item => Math.abs(Number(item.weight) - Number(bt.rec_weights[item.factor_key] || 0)) < 0.005);
+}
+
 function renderFactorBacktestBlock(code) {
     const bt = factorBacktest(code);
     if (!bt) return '';
@@ -1005,6 +1011,24 @@ function renderFactorBacktestBlock(code) {
     const updated = state.factorBacktestGeneratedAt ? new Date(state.factorBacktestGeneratedAt * 1000).toLocaleDateString('zh-CN') : '';
     const worthChanging = bt.improvement >= 3;
     const recLine = weights.map(w => `${w.factor_name}${fmtPct((bt.rec_weights[w.factor_key] || 0) * 100, 0)}`).join(' / ');
+    const applied = weightsMatchRec(code, bt);
+    const hasOverride = (factorWeights(code) || []).some(w => w.is_override);
+    let actions = '';
+    if (applied) {
+        actions = `<div class="modal-actions" style="justify-content:flex-start; padding-top:8px;">
+            <span class="tag good">✓ 已按回测最优权重应用</span>
+            <button class="ia-btn ghost" type="button" onclick="resetFactorWeights(${escapeJsArg(code)})">恢复默认权重</button>
+        </div>`;
+    } else if (worthChanging) {
+        actions = `<div class="modal-actions" style="justify-content:flex-start; padding-top:8px;">
+            <button class="ia-btn primary" type="button" onclick="applyRecommendedWeights(${escapeJsArg(code)})">应用推荐权重</button>
+            ${hasOverride ? `<button class="ia-btn ghost" type="button" onclick="resetFactorWeights(${escapeJsArg(code)})">恢复默认权重</button>` : ''}
+        </div>`;
+    } else if (hasOverride) {
+        actions = `<div class="modal-actions" style="justify-content:flex-start; padding-top:8px;">
+            <button class="ia-btn ghost" type="button" onclick="resetFactorWeights(${escapeJsArg(code)})">恢复默认权重</button>
+        </div>`;
+    }
     return `
         <div class="summary-item">
             <div class="summary-title">历史权重回测（${escapeHtml(updated)} 更新，近 ${bt.days} 个交易日真实K线）</div>
@@ -1016,8 +1040,43 @@ function renderFactorBacktestBlock(code) {
                     : '差距小于 3 个百分点，当前权重基本合理，不建议调整。'}
                 这是整套权重方案级别的回测（比较不同权重组合的历史表现），不是单个因子独立剥离验证。
             </div>
+            ${actions}
         </div>
     `;
+}
+
+async function applyRecommendedWeights(code) {
+    const bt = factorBacktest(code);
+    if (!bt || !bt.rec_weights) return;
+    if (!confirm(`将 ${code} 的因子权重应用为回测最优方案「${bt.best_scheme}」？之后可随时恢复默认。`)) return;
+    setProgress('正在应用推荐权重...');
+    try {
+        const res = await fetch(`/api/stock-factors/${encodeURIComponent(code)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bt.rec_weights),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '应用失败');
+        setProgress('');
+        await loadAll();
+    } catch (e) {
+        setProgress(`应用失败：${e.message}`);
+    }
+}
+
+async function resetFactorWeights(code) {
+    if (!confirm(`恢复 ${code} 的因子权重为全局默认？`)) return;
+    setProgress('正在恢复默认权重...');
+    try {
+        const res = await fetch(`/api/stock-factors/${encodeURIComponent(code)}`, { method: 'DELETE' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '恢复失败');
+        setProgress('');
+        await loadAll();
+    } catch (e) {
+        setProgress(`恢复失败：${e.message}`);
+    }
 }
 
 function renderFactorAttribution(ctx) {
