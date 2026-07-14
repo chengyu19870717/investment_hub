@@ -2994,6 +2994,57 @@ def get_investment_analysis_factor_backtest():
     generated_at = int(os.path.getmtime(csv_path))
     return {"generated_at": generated_at, "backtest": out}
 
+@app.get("/api/investment-analysis/kline")
+def get_investment_analysis_kline(code: str, days: int = 120):
+    """
+    读取 quant_trading/data/hist_daily.db 的日线 OHLCV（下载历史数据模块产出，已存3年），
+    供投资分析详情页画 K 线。days 控制返回最近多少个交易日。
+    """
+    db_path = QUANT_DIR / "data" / "hist_daily.db"
+    if not db_path.exists():
+        return {"code": code, "kline": []}
+    # hist_daily 里代码可能带/不带后缀，用纯数字键匹配
+    digits = re.sub(r"\D", "", code)
+    candidates = [code, digits] if digits else [code]
+    limit = max(5, min(days, 1000))
+    conn = sqlite3.connect(str(db_path))
+    try:
+        rows = []
+        for cand in candidates:
+            rows = conn.execute(
+                "SELECT date, open, high, low, close, volume FROM hist_daily "
+                "WHERE code=? ORDER BY date DESC LIMIT ?",
+                (cand, limit),
+            ).fetchall()
+            if rows:
+                break
+    finally:
+        conn.close()
+    kline = [
+        {"date": r[0], "open": r[1], "high": r[2], "low": r[3], "close": r[4], "volume": r[5]}
+        for r in reversed(rows)
+    ]
+    return {"code": code, "kline": kline}
+
+@app.get("/api/investment-analysis/alerts")
+def get_investment_analysis_alerts(limit: int = 50):
+    """读取 stock_alerts 表（investment_snapshot 每日快照落库），跨股票的近期预警历史。"""
+    conn = get_db()
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS stock_alerts ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, alert_date TEXT NOT NULL, code TEXT NOT NULL, "
+            "name TEXT, alert_type TEXT, message TEXT NOT NULL, created_at TEXT NOT NULL)"
+        )
+        rows = conn.execute(
+            "SELECT alert_date, code, name, alert_type, message, created_at "
+            "FROM stock_alerts ORDER BY alert_date DESC, id DESC LIMIT ?",
+            (max(1, min(limit, 500)),),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
 @app.get("/api/stock/report")
 def get_stock_report(date: str):
     path = REPORT_DIR / f"{date}_report.md"

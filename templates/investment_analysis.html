@@ -159,6 +159,43 @@
         .add-message.good { color: #15803d; }
         .add-message.bad { color: #b91c1c; }
 
+        .overview-wrap { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+        .ov-table-scroll { overflow-x: auto; }
+        .ov-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+        .ov-table th, .ov-table td { padding: 9px 11px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .ov-table th { font-size: 11px; color: var(--text-muted); font-weight: 750; cursor: pointer; user-select: none; }
+        .ov-table th:hover { color: var(--text-primary); }
+        .ov-table th.sorted::after { content: ' ▾'; }
+        .ov-table th.sorted.asc::after { content: ' ▴'; }
+        .ov-table tbody tr { cursor: pointer; }
+        .ov-table tbody tr:hover { background: #f8fafc; }
+        .ov-table tbody tr.active { background: #eff6ff; }
+        .ov-name { font-weight: 850; color: var(--text-primary); }
+        .ov-code { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .ov-num { font-variant-numeric: tabular-nums; text-align: right; }
+        .ov-delta.up { color: #15803d; }
+        .ov-delta.down { color: #b91c1c; }
+        .portfolio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .pf-stat { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 11px; }
+        .pf-label { font-size: 11px; color: var(--text-muted); }
+        .pf-value { font-size: 20px; font-weight: 900; color: var(--text-primary); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .pf-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow-wrap: anywhere; }
+        .alert-list { display: flex; flex-direction: column; gap: 7px; }
+        .alert-item { display: flex; gap: 9px; align-items: baseline; border: 1px solid #eef2f7; background: #f8fafc; border-radius: 8px; padding: 8px 11px; }
+        .alert-item.risk, .alert-item.prob_down { border-left: 3px solid #ef4444; }
+        .alert-item.prob_up { border-left: 3px solid #22c55e; }
+        .alert-item.divergent { border-left: 3px solid #f59e0b; }
+        .alert-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .alert-msg { font-size: 12px; color: var(--text-secondary); line-height: 1.5; overflow-wrap: anywhere; }
+        .kline-chart { width: 100%; height: auto; display: block; background: #fff; }
+        .kline-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+        .kline-legend span::before { content: '—'; margin-right: 3px; font-weight: 900; }
+        .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 12px; }
+        .tech-item { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 9px; }
+        .tech-label { font-size: 11px; color: var(--text-muted); }
+        .tech-value { font-size: 14px; font-weight: 850; color: var(--text-primary); margin-top: 3px; font-variant-numeric: tabular-nums; }
+        .tech-value.good { color: #15803d; } .tech-value.bad { color: #b91c1c; }
+
         @media (max-width: 1180px) {
             .hero-metrics { min-width: 0; }
             .ia-grid.two, .track-grid, .chain-grid, .signal-board { grid-template-columns: 1fr; }
@@ -193,6 +230,7 @@
 
     <main class="main ia-main">
         <div class="ia-progress" id="progressBox"></div>
+        <section id="overviewArea"></section>
         <section class="monitor-tabs" id="monitorTabs"></section>
         <section class="detail-shell" id="stockDetail"></section>
     </main>
@@ -222,6 +260,6 @@
     </div>
 </div>
 
-<script src="/static/js/investment_analysis.js?v=11"></script>
+<script src="/static/js/investment_analysis.js?v=12"></script>
 </body>
 </html>

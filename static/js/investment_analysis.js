@@ -13,6 +13,9 @@ const state = {
     factorBacktestByCode: {},
     factorBacktestGeneratedAt: null,
     notes: [],
+    alerts: [],
+    klineByCode: {},
+    overviewSort: { key: 'probability', asc: false },
     selectedCode: '',
     watchSearchSelected: null,
 };
@@ -1149,8 +1152,11 @@ function renderDetail() {
         box.innerHTML = '<section class="ia-card"><div class="empty">暂无监控股票，点击右上角“新增”添加后开始分析。</div></section>';
         return;
     }
+    const code = ctx.stock?.code || ctx.watch?.code;
+    if (code) ensureKline(code);
     box.innerHTML = [
         renderHero(ctx),
+        renderPriceChart(ctx),
         renderCompanySummary(ctx),
         renderBusinessModel(ctx),
         renderRiskList(ctx),
@@ -1160,6 +1166,115 @@ function renderDetail() {
         renderFactorAttribution(ctx),
         renderDecisionReview(ctx),
     ].join('');
+}
+
+function movingAverage(values, period) {
+    return values.map((_, i) => {
+        if (i < period - 1) return null;
+        let sum = 0;
+        for (let j = i - period + 1; j <= i; j++) sum += values[j];
+        return sum / period;
+    });
+}
+
+function renderPriceChart(ctx) {
+    const code = ctx.stock?.code || ctx.watch?.code;
+    const kline = code ? state.klineByCode[code] : null;
+    const stock = ctx.stock;
+    if (kline === undefined || kline === null) {
+        return `<section class="ia-card"><div class="ia-card-hd"><div class="ia-card-title">价格走势与技术指标</div><div class="ia-card-meta">加载中…</div></div><div class="ia-card-pad"><div class="empty">正在读取历史K线…</div></div></section>`;
+    }
+    if (!kline.length) {
+        return `<section class="ia-card"><div class="ia-card-hd"><div class="ia-card-title">价格走势与技术指标</div><div class="ia-card-meta">无数据</div></div><div class="ia-card-pad"><div class="empty">本地暂无该股历史K线，可在股票分析页「下载历史数据」后再看。</div></div>${renderTechnicals(stock)}</section>`;
+    }
+    const bars = kline.slice(-90);
+    const W = 800, H = 260, padL = 4, padR = 4, padT = 8, padB = 8;
+    const chartW = W - padL - padR, chartH = H - padT - padB;
+    const highs = bars.map(b => b.high), lows = bars.map(b => b.low), closes = bars.map(b => b.close);
+    const maxP = Math.max(...highs), minP = Math.min(...lows);
+    const range = maxP - minP || 1;
+    const step = chartW / bars.length;
+    const bw = Math.max(1, step * 0.62);
+    const yOf = p => padT + (maxP - p) / range * chartH;
+    // 蜡烛：A股约定 红涨绿跌
+    const candles = bars.map((b, i) => {
+        const x = padL + i * step + step / 2;
+        const up = b.close >= b.open;
+        const color = up ? '#ef4444' : '#22c55e';
+        const bodyTop = yOf(Math.max(b.open, b.close));
+        const bodyH = Math.max(1, Math.abs(yOf(b.open) - yOf(b.close)));
+        return `<line x1="${x.toFixed(1)}" y1="${yOf(b.high).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yOf(b.low).toFixed(1)}" stroke="${color}" stroke-width="1"></line>`
+            + `<rect x="${(x - bw / 2).toFixed(1)}" y="${bodyTop.toFixed(1)}" width="${bw.toFixed(1)}" height="${bodyH.toFixed(1)}" fill="${color}"></rect>`;
+    }).join('');
+    const maLine = (period, color) => {
+        const ma = movingAverage(closes, period);
+        const pts = ma.map((v, i) => v === null ? null : `${(padL + i * step + step / 2).toFixed(1)},${yOf(v).toFixed(1)}`).filter(Boolean).join(' ');
+        return pts ? `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.9"></polyline>` : '';
+    };
+    const first = bars[0], last = bars[bars.length - 1];
+    const periodReturn = ((last.close - first.close) / first.close) * 100;
+    return `
+        <section class="ia-card">
+            <div class="ia-card-hd">
+                <div class="ia-card-title">价格走势与技术指标</div>
+                <div class="ia-card-meta">${escapeHtml(first.date)} ~ ${escapeHtml(last.date)} · 区间涨跌 ${fmtPct(periodReturn)}</div>
+            </div>
+            <div class="ia-card-pad">
+                <svg class="kline-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+                    ${candles}
+                    ${maLine(5, '#f59e0b')}
+                    ${maLine(20, '#3b82f6')}
+                </svg>
+                <div class="kline-legend">
+                    <span style="color:#f59e0b;">MA5</span>
+                    <span style="color:#3b82f6;">MA20</span>
+                    <span style="color:#ef4444;">阳线(收≥开)</span>
+                    <span style="color:#22c55e;">阴线</span>
+                    <span>最高 ${fmtNum(maxP, 2)} · 最低 ${fmtNum(minP, 2)}</span>
+                </div>
+                ${renderTechnicals(stock)}
+            </div>
+        </section>
+    `;
+}
+
+function techClass(name, v, stock) {
+    const n = Number(v);
+    if (Number.isNaN(n)) return '';
+    if (name === 'MACD') return n >= 0 ? 'good' : 'bad';
+    if (name === 'KDJ-J') return n >= 80 ? 'bad' : n <= 20 ? 'good' : '';
+    return '';
+}
+
+function renderTechnicals(stock) {
+    if (!stock) return '';
+    const price = Number(stock.price);
+    const bbPos = (_isNum(stock.bb_upper) && _isNum(stock.bb_lower) && stock.bb_upper !== stock.bb_lower)
+        ? (price - stock.bb_lower) / (stock.bb_upper - stock.bb_lower) * 100 : null;
+    const items = [
+        { label: 'MA20 乖离', value: _isNum(stock.distance_from_ma20) ? fmtPct(stock.distance_from_ma20) : '-' },
+        { label: 'MACD 柱', value: _isNum(stock.macd_hist) ? fmtNum(stock.macd_hist, 3) : '-', cls: techClass('MACD', stock.macd_hist, stock) },
+        { label: 'KDJ (K/D/J)', value: [stock.kdj_k, stock.kdj_d, stock.kdj_j].map(v => _isNum(v) ? fmtNum(v, 0) : '-').join('/'), cls: techClass('KDJ-J', stock.kdj_j, stock) },
+        { label: '布林带位置', value: bbPos === null ? '-' : fmtPct(bbPos, 0), cls: bbPos === null ? '' : bbPos >= 90 ? 'bad' : bbPos <= 10 ? 'good' : '' },
+        { label: '量比', value: _isNum(stock.vol_ratio) ? fmtNum(stock.vol_ratio, 2) : '-' },
+        { label: '换手率', value: _isNum(stock.turnover_rate) ? fmtPct(stock.turnover_rate) : '-' },
+        { label: 'OBV 斜率', value: _isNum(stock.obv_slope) ? fmtNum(stock.obv_slope, 3) : '-', cls: _isNum(stock.obv_slope) ? (stock.obv_slope >= 0 ? 'good' : 'bad') : '' },
+        { label: '振幅', value: _isNum(stock.amplitude) ? fmtPct(stock.amplitude) : '-' },
+    ];
+    return `
+        <div class="tech-grid">
+            ${items.map(it => `<div class="tech-item"><div class="tech-label">${escapeHtml(it.label)}</div><div class="tech-value ${it.cls || ''}">${escapeHtml(it.value)}</div></div>`).join('')}
+        </div>
+    `;
+}
+
+async function ensureKline(code) {
+    if (state.klineByCode[code] !== undefined) return;
+    state.klineByCode[code] = null;  // 标记加载中，避免重复请求
+    const res = await safeJson(`/api/investment-analysis/kline?code=${encodeURIComponent(code)}&days=120`);
+    state.klineByCode[code] = Array.isArray(res?.kline) ? res.kline : [];
+    // 仅当当前仍选中该股票时刷新详情，避免快速切换时错位
+    if (sameCode(code, state.selectedCode)) renderDetail();
 }
 
 function selectStock(code) {
@@ -1325,12 +1440,160 @@ async function deleteWatchStock(code, name, event = null) {
     }
 }
 
+function prevProbByCode() {
+    const prev = state.history.length >= 2 ? state.history[1] : null;
+    return prev ? latestByCode(prev) : new Map();
+}
+
+function overviewRows() {
+    const prevMap = prevProbByCode();
+    return normalizedWatchlist().map(item => {
+        const stock = findStockByCode(item.code);
+        const dims = stockDimensions(stock);
+        const decision = decisionForStock(stock);
+        const prev = codeKeys(item.code).map(key => prevMap.get(key)).find(Boolean);
+        const prob = stock ? Number(stock.probability || 0) : null;
+        const probDelta = (stock && prev) ? prob - Number(prev.probability || 0) : null;
+        const primaryExp = primaryExposure(stock, item);
+        return {
+            code: item.code,
+            name: item.name,
+            hasStock: !!stock,
+            probability: prob,
+            probDelta,
+            supply: dims.supply,
+            demand: dims.demand,
+            profit: dims.profit,
+            divergent: dims.divergent,
+            decision,
+            riskLabel: stock?.risk_label || '',
+            maxPosition: stock ? Number(stock.max_position || 0) : 0,
+            eventCount: stockEvents(item.code).filter(ev => ev.status === 'pending').length,
+            industry: stock?.sector || primaryExp?.industry || '',
+        };
+    });
+}
+
+function sortOverview(key) {
+    if (state.overviewSort.key === key) state.overviewSort.asc = !state.overviewSort.asc;
+    else state.overviewSort = { key, asc: false };
+    renderOverview();
+}
+
+const OVERVIEW_COLS = [
+    { key: 'name', label: '股票' },
+    { key: 'probability', label: '上涨概率' },
+    { key: 'probDelta', label: '较上期' },
+    { key: 'supply', label: '供给' },
+    { key: 'demand', label: '需求' },
+    { key: 'profit', label: '盈利' },
+    { key: 'maxPosition', label: '仓位上限' },
+    { key: 'riskLabel', label: '风险' },
+    { key: 'eventCount', label: '事件' },
+];
+
+function renderRankingTable(rows) {
+    const { key, asc } = state.overviewSort;
+    const sorted = [...rows].sort((a, b) => {
+        const av = a[key], bv = b[key];
+        if (typeof av === 'string' || typeof bv === 'string') {
+            return String(av || '').localeCompare(String(bv || '')) * (asc ? 1 : -1);
+        }
+        const an = av === null || av === undefined ? -Infinity : Number(av);
+        const bn = bv === null || bv === undefined ? -Infinity : Number(bv);
+        return (an - bn) * (asc ? 1 : -1);
+    });
+    const head = OVERVIEW_COLS.map(col => {
+        const cls = col.key === key ? `sorted ${asc ? 'asc' : ''}` : '';
+        const align = ['probability', 'probDelta', 'supply', 'demand', 'profit', 'maxPosition', 'eventCount'].includes(col.key) ? 'ov-num' : '';
+        return `<th class="${cls} ${align}" onclick="sortOverview(${escapeJsArg(col.key)})">${escapeHtml(col.label)}</th>`;
+    }).join('');
+    const body = sorted.map(r => {
+        const active = sameCode(r.code, state.selectedCode) ? 'active' : '';
+        const deltaCls = r.probDelta === null ? '' : r.probDelta >= 0 ? 'up' : 'down';
+        const deltaTxt = r.probDelta === null ? '-' : `${r.probDelta > 0 ? '+' : ''}${fmtPct(r.probDelta)}`;
+        return `
+            <tr class="${active}" onclick="selectStock(${escapeJsArg(r.code)})">
+                <td><span class="ov-name">${escapeHtml(r.name)}</span> <span class="ov-code">${escapeHtml(r.code)}</span>
+                    <span class="tag ${r.decision.cls}">${escapeHtml(r.decision.label)}</span>${r.divergent ? ' <span class="tag warn">背离</span>' : ''}</td>
+                <td class="ov-num">${r.probability === null ? '待分析' : fmtPct(r.probability)}</td>
+                <td class="ov-num ov-delta ${deltaCls}">${deltaTxt}</td>
+                <td class="ov-num">${fmtNum(r.supply, 0)}</td>
+                <td class="ov-num">${fmtNum(r.demand, 0)}</td>
+                <td class="ov-num">${fmtNum(r.profit, 0)}</td>
+                <td class="ov-num">${r.hasStock ? fmtPct(r.maxPosition * 100, 0) : '-'}</td>
+                <td>${r.riskLabel ? `<span class="tag ${String(r.riskLabel).includes('危险') || String(r.riskLabel).includes('高') ? 'bad' : 'warn'}">${escapeHtml(r.riskLabel)}</span>` : '-'}</td>
+                <td class="ov-num">${r.eventCount || '-'}</td>
+            </tr>
+        `;
+    }).join('');
+    return `
+        <section class="ia-card">
+            <div class="ia-card-hd"><div class="ia-card-title">监控总览</div><div class="ia-card-meta">${rows.length} 只 · 点击表头排序</div></div>
+            <div class="ia-card-pad ov-table-scroll">
+                <table class="ov-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+            </div>
+        </section>
+    `;
+}
+
+function renderPortfolioCard(rows) {
+    const analyzed = rows.filter(r => r.hasStock);
+    const totalPosition = analyzed.reduce((s, r) => s + r.maxPosition, 0);
+    const attackCount = rows.filter(r => r.decision.label === '偏进攻').length;
+    const defenseCount = rows.filter(r => r.decision.label === '偏防守').length;
+    const riskyCount = rows.filter(r => String(r.riskLabel).includes('危险') || String(r.riskLabel).includes('高')).length;
+    const industryCount = {};
+    analyzed.forEach(r => { if (r.industry) industryCount[r.industry] = (industryCount[r.industry] || 0) + 1; });
+    const topIndustry = Object.entries(industryCount).sort((a, b) => b[1] - a[1])[0];
+    const concentration = analyzed.length ? (topIndustry ? topIndustry[1] / analyzed.length * 100 : 0) : 0;
+    return `
+        <section class="ia-card">
+            <div class="ia-card-hd"><div class="ia-card-title">组合概览</div><div class="ia-card-meta">${analyzed.length}/${rows.length} 只已分析</div></div>
+            <div class="ia-card-pad">
+                <div class="portfolio-grid">
+                    <div class="pf-stat"><div class="pf-label">建议总仓位</div><div class="pf-value">${fmtPct(totalPosition * 100, 0)}</div><div class="pf-note">各股仓位上限加总${totalPosition > 1 ? '，已超100%需取舍' : ''}</div></div>
+                    <div class="pf-stat"><div class="pf-label">进攻 / 防守</div><div class="pf-value">${attackCount} / ${defenseCount}</div><div class="pf-note">其余为观察</div></div>
+                    <div class="pf-stat"><div class="pf-label">高风险标的</div><div class="pf-value">${riskyCount}</div><div class="pf-note">风险标签含高/危险</div></div>
+                    <div class="pf-stat"><div class="pf-label">行业集中度</div><div class="pf-value">${fmtPct(concentration, 0)}</div><div class="pf-note">${topIndustry ? `最集中：${escapeHtml(topIndustry[0])}（${topIndustry[1]}只）` : '暂无行业数据'}</div></div>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
+function renderAlertInbox() {
+    if (!state.alerts.length) return '';
+    return `
+        <section class="ia-card">
+            <div class="ia-card-hd"><div class="ia-card-title">🔔 预警收件箱</div><div class="ia-card-meta">近 ${state.alerts.length} 条</div></div>
+            <div class="ia-card-pad alert-list">
+                ${state.alerts.slice(0, 12).map(a => `
+                    <div class="alert-item ${escapeHtml(a.alert_type || '')}" onclick="selectStock(${escapeJsArg(a.code)})" style="cursor:pointer;">
+                        <span class="alert-date">${escapeHtml(a.alert_date)}</span>
+                        <span class="alert-msg">${escapeHtml(a.message)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </section>
+    `;
+}
+
+function renderOverview() {
+    const box = document.getElementById('overviewArea');
+    if (!box) return;
+    const rows = overviewRows();
+    if (!rows.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="overview-wrap">${renderAlertInbox()}${renderPortfolioCard(rows)}${renderRankingTable(rows)}</div>`;
+}
+
 function renderAll() {
     buildExposures();
     const items = normalizedWatchlist();
     if (!state.selectedCode || !items.some(item => sameCode(item.code, state.selectedCode))) {
         state.selectedCode = items[0]?.code || state.stocks[0]?.code || '';
     }
+    renderOverview();
     renderMonitorTabs();
     renderDetail();
     const updated = state.stockResult?.updated_at ? new Date(state.stockResult.updated_at * 1000).toLocaleString('zh-CN', { hour12: false }) : '';
@@ -1340,7 +1603,7 @@ function renderAll() {
 async function loadAll() {
     setProgress('正在读取投资分析数据...');
     try {
-        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult, factorBacktestResult] = await Promise.all([
+        const [stockResult, historyResult, watchlist, events, factors, industryData, dimensionsResult, dimHistoryResult, factorWeightsResult, notesResult, factorBacktestResult, alertsResult] = await Promise.all([
             safeJson('/api/stock/results'),
             safeJson('/api/stock/results/history?limit=5'),
             safeJson('/api/watchlist'),
@@ -1352,6 +1615,7 @@ async function loadAll() {
             safeJson('/api/investment-analysis/factor-weights'),
             safeJson('/api/investment-analysis/notes'),
             safeJson('/api/investment-analysis/factor-backtest'),
+            safeJson('/api/investment-analysis/alerts?limit=50'),
         ]);
         state.stockResult = stockResult || null;
         state.stocks = stockResult?.stocks || [];
@@ -1366,6 +1630,7 @@ async function loadAll() {
         state.notes = Array.isArray(notesResult) ? notesResult : [];
         state.factorBacktestByCode = factorBacktestResult?.backtest || {};
         state.factorBacktestGeneratedAt = factorBacktestResult?.generated_at || null;
+        state.alerts = Array.isArray(alertsResult) ? alertsResult : [];
         renderAll();
         setProgress('');
     } catch (e) {

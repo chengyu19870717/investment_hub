@@ -54,6 +54,17 @@ def init_snapshot_table():
             UNIQUE(snapshot_date, code)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stock_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            alert_date TEXT NOT NULL,
+            code TEXT NOT NULL,
+            name TEXT,
+            alert_type TEXT,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -231,7 +242,7 @@ def send_mac_notification(title, message):
 
 
 def detect_alerts(prev_row, code, name, dims, stock):
-    """对比上一次快照，找出值得主动提醒的信号变化。不依赖前端页面打开与否。"""
+    """对比上一次快照，找出值得主动提醒的信号变化。返回结构化 [{type, message}]。不依赖前端页面打开与否。"""
     alerts = []
     probability = float(stock.get('probability') or 0)
     risk_label = str(stock.get('risk_label') or '')
@@ -242,13 +253,13 @@ def detect_alerts(prev_row, code, name, dims, stock):
     prev_divergent = bool(prev_row['divergent'])
 
     if risk_label != prev_risk_label and ('危险' in risk_label or '高风险' in risk_label):
-        alerts.append(f'{name}({code})风险标签变为「{risk_label}」（原「{prev_risk_label or "无"}」）')
+        alerts.append({'type': 'risk', 'message': f'{name}({code})风险标签变为「{risk_label}」（原「{prev_risk_label or "无"}」）'})
     if dims['divergent'] and not prev_divergent:
-        alerts.append(f'{name}({code})三维评分出现背离，分差 {dims["spread"]:.0f}')
+        alerts.append({'type': 'divergent', 'message': f'{name}({code})三维评分出现背离，分差 {dims["spread"]:.0f}'})
     if prev_probability < 55 <= probability:
-        alerts.append(f'{name}({code})上涨概率突破55%进入进攻区（{prev_probability:.1f}%→{probability:.1f}%）')
+        alerts.append({'type': 'prob_up', 'message': f'{name}({code})上涨概率突破55%进入进攻区（{prev_probability:.1f}%→{probability:.1f}%）'})
     if prev_probability >= 40 > probability:
-        alerts.append(f'{name}({code})上涨概率跌破40%进入弱势区（{prev_probability:.1f}%→{probability:.1f}%）')
+        alerts.append({'type': 'prob_down', 'message': f'{name}({code})上涨概率跌破40%进入弱势区（{prev_probability:.1f}%→{probability:.1f}%）'})
     return alerts
 
 
@@ -293,7 +304,11 @@ def run_snapshot(snapshot_date=None):
             "ORDER BY snapshot_date DESC LIMIT 1",
             (item['code'], snapshot_date),
         ).fetchone()
-        all_alerts.extend(detect_alerts(prev_row, item['code'], name, dims, stock))
+        stock_alerts = detect_alerts(prev_row, item['code'], name, dims, stock)
+        for a in stock_alerts:
+            a['code'] = item['code']
+            a['name'] = name
+        all_alerts.extend(stock_alerts)
         conn.execute("""
             INSERT INTO stock_dimension_snapshots
                 (snapshot_date, code, name, probability, score, price, risk_label,
@@ -312,12 +327,21 @@ def run_snapshot(snapshot_date=None):
             1 if dims['divergent'] else 0, dims['exposures_count'], now,
         ))
         written += 1
+
+    # 预警落库：同一天重跑先清当天再写，保持幂等（detect_alerts 对比昨日快照，同天结果确定）
+    conn.execute("DELETE FROM stock_alerts WHERE alert_date=?", (snapshot_date,))
+    for a in all_alerts:
+        conn.execute(
+            "INSERT INTO stock_alerts(alert_date, code, name, alert_type, message, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (snapshot_date, a['code'], a['name'], a['type'], a['message'], now),
+        )
     conn.commit()
     conn.close()
 
     if all_alerts:
         title = f'投资分析信号提醒（{len(all_alerts)}条）'
-        body = '；'.join(all_alerts)
+        body = '；'.join(a['message'] for a in all_alerts)
         send_mac_notification(title, body[:250])
 
     return {
