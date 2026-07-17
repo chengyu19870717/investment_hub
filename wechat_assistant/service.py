@@ -81,6 +81,111 @@ def _mode_cfg(mode: str) -> dict:
     return _ARTICLE_MODES.get(mode) or _ARTICLE_MODES[_DEFAULT_MODE]
 
 
+# ── 选题方向风格档案 ──────────────────────────────────────────────────────────
+# 按选题方向整体调整文风：正文行文 + 标题措辞。style="auto" 时按关键词自动推断。
+_STYLE_PROFILES: dict[str, dict] = {
+    "hot_news": {
+        "label": "时事热评",
+        "keywords": ["热搜", "事件", "回应", "曝光", "争议", "官方", "通报", "网友", "舆论", "发声", "被曝", "冲上"],
+        "article": (
+            "文风（时事热评）：\n"
+            "- 开篇直接点出事件核心，一两句话交代背景，不做冗长铺垫。\n"
+            "- 观点鲜明有态度，敢下判断，但论证克制，区分事实与评论。\n"
+            "- 节奏快，短句多，适当设问推进；结尾落在事件之外的普遍启示。"
+        ),
+        "titles": "标题风格：紧扣事件关键词，观点前置，有态度但不煽动情绪。",
+    },
+    "finance": {
+        "label": "财经投资",
+        "keywords": ["股", "基金", "投资", "楼市", "房价", "利率", "央行", "理财", "经济", "GDP", "美元", "黄金", "财报", "通胀", "降息", "加息", "市场"],
+        "article": (
+            "文风（财经投资）：\n"
+            "- 严谨专业，逻辑链条清晰：现象→原因→影响→应对。\n"
+            "- 用数据和机制说话，避免情绪化判断；术语首次出现给一句白话解释。\n"
+            "- 语气理性克制，给结论的同时提示不确定性与风险，不做收益承诺。"
+        ),
+        "titles": "标题风格：专业稳重，可含关键数据或趋势判断，严禁收益承诺和煽动性用词。",
+    },
+    "tech": {
+        "label": "科技解读",
+        "keywords": ["AI", "人工智能", "芯片", "大模型", "互联网", "App", "算法", "机器人", "新能源", "自动驾驶", "手机", "软件", "科技", "发布"],
+        "article": (
+            "文风（科技解读）：\n"
+            "- 把专业概念翻译成普通人能懂的类比和场景，先讲“这跟我有什么关系”。\n"
+            "- 结构上先给结论再展开原理，避免堆参数、堆术语。\n"
+            "- 带前瞻视角：这项技术/事件接下来会改变什么，边界和局限是什么。"
+        ),
+        "titles": "标题风格：突出“与读者的关系”和新奇感，少用参数术语，多用白话类比。",
+    },
+    "emotion": {
+        "label": "情感生活",
+        "keywords": ["婚姻", "恋爱", "家庭", "父母", "孩子", "情感", "焦虑", "孤独", "陪伴", "幸福", "中年", "养老", "相亲"],
+        "article": (
+            "文风（情感生活）：\n"
+            "- 叙事带入：用具体的人和场景开篇，细节真实可感，多用第一/第二人称。\n"
+            "- 语言细腻温暖，节奏舒缓，允许留白；情绪推进要自然，不贩卖焦虑。\n"
+            "- 观点藏在故事里，结尾轻收，给读者共鸣和安慰而非说教。"
+        ),
+        "titles": "标题风格：口语化、有画面感，像对朋友说话，引发共鸣而不贩卖焦虑。",
+    },
+    "career": {
+        "label": "职场成长",
+        "keywords": ["职场", "工作", "裁员", "面试", "工资", "薪", "升职", "跳槽", "老板", "同事", "副业", "创业", "简历", "35岁"],
+        "article": (
+            "文风（职场成长）：\n"
+            "- 干货结构化：分论点边界清晰，每个论点配一个真实可感的职场案例。\n"
+            "- 给可执行的具体建议（怎么做、什么场景用），不停留在道理层面。\n"
+            "- 语气像有经验的同行分享，平视读者，不居高临下。"
+        ),
+        "titles": "标题风格：直指职场痛点或利益点，让目标读者一眼觉得“这说的是我”。",
+    },
+    "culture": {
+        "label": "文化娱乐",
+        "keywords": ["电影", "电视剧", "综艺", "明星", "演唱会", "游戏", "小说", "文化", "历史", "艺术", "票房", "非遗"],
+        "article": (
+            "文风（文化娱乐）：\n"
+            "- 轻松有趣，口语化表达，可以适度玩梗，但观点要立得住。\n"
+            "- 多用画面感描写和金句式点评，段落轻快。\n"
+            "- 从娱乐话题里带出一层文化或人性的观察，让文章不止于八卦。"
+        ),
+        "titles": "标题风格：轻松抓眼球，可用悬念或反差，不剧透关键情节。",
+    },
+    "health": {
+        "label": "健康科普",
+        "keywords": ["健康", "养生", "睡眠", "运动", "饮食", "减肥", "体检", "疾病", "医生", "血压", "血糖"],
+        "article": (
+            "文风（健康科普）：\n"
+            "- 科普口吻，先破除一个常见误区，再给出有依据的正确做法。\n"
+            "- 表述留有余地（“研究提示”“因人而异”），不做医疗效果断言。\n"
+            "- 建议具体到日常可操作的行为，语气亲和不吓唬人。"
+        ),
+        "titles": "标题风格：从误区或日常习惯切入，可信亲和，严禁夸大疗效或制造恐慌。",
+    },
+}
+
+
+def _infer_style(topic: str, core_viewpoint: str = "") -> str:
+    """按关键词命中数推断选题方向，无命中返回空串（通用文风）。"""
+    text = f"{topic} {core_viewpoint}"
+    best_key, best_hits = "", 0
+    for key, profile in _STYLE_PROFILES.items():
+        hits = sum(1 for kw in profile["keywords"] if kw.lower() in text.lower())
+        if hits > best_hits:
+            best_key, best_hits = key, hits
+    return best_key
+
+
+def _style_cfg(style: str, topic: str = "", core_viewpoint: str = "") -> Optional[dict]:
+    """解析风格参数：显式 key 直取；auto/空则自动推断；推断不出返回 None。"""
+    style = (style or "").strip()
+    if style in _STYLE_PROFILES:
+        return _STYLE_PROFILES[style]
+    if style in ("", "auto"):
+        inferred = _infer_style(topic, core_viewpoint)
+        return _STYLE_PROFILES.get(inferred)
+    return None
+
+
 SYSTEM_PROMPT = """你是一个资深微信公众号内容助手，擅长把作者的核心观点转化为适合公众号发布的内容。
 你的写作风格要求：
 1. 观点清晰，有判断，不空泛堆砌。
@@ -152,6 +257,7 @@ class WechatContentAssistant:
         audience: str = "",
         tone: str = "",
         mode: str = "",
+        style: str = "",
     ) -> AssistantResult:
         topic = topic.strip()
         core_viewpoint = core_viewpoint.strip()
@@ -160,11 +266,13 @@ class WechatContentAssistant:
         if not topic and not core_viewpoint:
             raise ValueError("请输入选题或核心观点")
         cfg = _mode_cfg(mode)
+        style_cfg = _style_cfg(style, topic, core_viewpoint)
         prompt = _build_article_prompt(
             topic=topic, core_viewpoint=core_viewpoint, content_notes=content_notes,
             title=title, audience=audience or self.config.generation.get("default_audience"),
             tone=tone or self.config.generation.get("default_tone"),
             word_count=cfg["word_count"], requirements=cfg["requirements"],
+            style_block=style_cfg["article"] if style_cfg else "",
         )
         resp = self.client.generate(
             system=SYSTEM_PROMPT,
@@ -174,7 +282,7 @@ class WechatContentAssistant:
         )
         markdown = resp.text.strip()
         path = self._save_text(topic or core_viewpoint, "article", markdown, ".md")
-        return self._result({"markdown": markdown}, [path], resp)
+        return self._result({"markdown": markdown, "style": style_cfg["label"] if style_cfg else ""}, [path], resp)
 
     def optimize_titles(self, markdown: str) -> AssistantResult:
         markdown = markdown.strip()
@@ -208,13 +316,23 @@ class WechatContentAssistant:
         content_notes: str = "",
         audience: str = "",
         tone: str = "",
+        style: str = "",
+        kept_titles: Optional[list[str]] = None,
     ) -> AssistantResult:
         topic = topic.strip()
         core_viewpoint = core_viewpoint.strip()
         content_notes = content_notes.strip()
+        kept = [t.strip() for t in (kept_titles or []) if t.strip()][:8]
         if not topic and not core_viewpoint:
             raise ValueError("请先选择选题或输入核心观点")
-        prompt = f"""请基于以下微信公众号选题生成 10 个备选标题，并对每个标题评分。
+        style_cfg = _style_cfg(style, topic, core_viewpoint)
+        count = max(10 - len(kept), 3)
+        kept_section = (
+            "用户已保留以下标题（不要重复或高度相似，新标题角度要与它们错开）：\n"
+            + "\n".join(f"- {t}" for t in kept) + "\n\n"
+        ) if kept else ""
+        style_line = f"\n6. {style_cfg['titles']}" if style_cfg else ""
+        prompt = f"""请基于以下微信公众号选题生成 {count} 个备选标题，并对每个标题评分。
 
 选题：
 {topic or core_viewpoint}
@@ -231,7 +349,7 @@ class WechatContentAssistant:
 内容气质：
 {tone or self.config.generation.get("default_tone")}
 
-请严格输出 JSON，不要输出 Markdown 代码块。JSON 结构如下：
+{kept_section}请严格输出 JSON，不要输出 Markdown 代码块。JSON 结构如下：
 [
   {{
     "title": "标题文字",
@@ -242,11 +360,11 @@ class WechatContentAssistant:
 ]
 
 要求：
-1. 10 个标题角度要有区分，覆盖观点型、问题型、场景型、反常识型、数字型。
+1. {count} 个标题角度要有区分，覆盖观点型、问题型、场景型、反常识型、数字型。
 2. 标题要适合公众号传播，但不要夸张、恐吓或虚假承诺。
 3. 每个标题不超过 28 个中文字符。
 4. 标题必须贴合选题，不要偏离作者核心观点。
-5. score 为 1-10 的整数，综合评估传播力（是否让人想点）、准确性（是否贴合内容）、新颖性（是否与众不同）。"""
+5. score 为 1-10 的整数，综合评估传播力（是否让人想点）、准确性（是否贴合内容）、新颖性（是否与众不同）。{style_line}"""
         resp = self.client.generate(
             system=SYSTEM_PROMPT,
             prompt=prompt,
@@ -287,6 +405,8 @@ class WechatContentAssistant:
                 clean = re.sub(r'^\s*(?:\d+[.)]\s*|[-*]\s*)', '', line).strip().strip('"').strip()
                 if 4 <= len(clean) <= 40 and not clean.startswith('{') and not clean.startswith('['):
                     titles_with_scores.append({"title": clean, "score": 0, "type": "", "reason": ""})
+        kept_set = set(kept)
+        titles_with_scores = [t for t in titles_with_scores if t["title"] not in kept_set]
         titles = [t["title"] for t in titles_with_scores]
         payload = {"topic": topic or core_viewpoint, "titles": titles, "titles_scored": titles_with_scores}
         path = self._save_json(topic or core_viewpoint or "titles", "topic_titles", payload)
@@ -486,6 +606,7 @@ class WechatContentAssistant:
         audience: str = "",
         tone: str = "",
         mode: str = "",
+        style: str = "",
     ) -> Iterator[str]:
         """Stream article text chunks, then yield a final JSON sentinel with file path."""
         topic = topic.strip()
@@ -495,11 +616,13 @@ class WechatContentAssistant:
         if not topic and not core_viewpoint:
             raise ValueError("请输入选题或核心观点")
         cfg = _mode_cfg(mode)
+        style_cfg = _style_cfg(style, topic, core_viewpoint)
         prompt = _build_article_prompt(
             topic=topic, core_viewpoint=core_viewpoint, content_notes=content_notes,
             title=title, audience=audience or self.config.generation.get("default_audience"),
             tone=tone or self.config.generation.get("default_tone"),
             word_count=cfg["word_count"], requirements=cfg["requirements"],
+            style_block=style_cfg["article"] if style_cfg else "",
         )
         chunks: list[str] = []
         for chunk in self.client.generate_stream(
@@ -688,9 +811,11 @@ class WechatContentAssistant:
 
 要求：每种 hook 直接切入，第一句话就要有吸引力，严禁"近年来…""随着…""在当今…"等无效铺垫。"""
         resp = self.client.generate(
-            system=SYSTEM_PROMPT, prompt=prompt, max_tokens=800, temperature=0.82,
+            system=SYSTEM_PROMPT, prompt=prompt, max_tokens=1400, temperature=0.82,
         )
-        hooks = parse_json_list(resp.text)
+        hooks = [h for h in parse_dict_list(resp.text, ("hooks",)) if str(h.get("hook") or "").strip()]
+        if not hooks:
+            raise ValueError("Hook 解析失败：模型未返回有效内容，请重试")
         payload = {"topic": topic or core_viewpoint, "hooks": hooks}
         return self._result(payload, [], resp)
 
@@ -725,9 +850,15 @@ class WechatContentAssistant:
 4. 优先选择有对比、有反转、有画面感的句子
 5. 避免"我们应该…""要…才能…"这类空泛说教"""
         resp = self.client.generate(
-            system=SYSTEM_PROMPT, prompt=prompt, max_tokens=600, temperature=0.7,
+            system=SYSTEM_PROMPT, prompt=prompt, max_tokens=1000, temperature=0.7,
         )
-        quotes = parse_json_list(resp.text)
+        quotes = [q for q in parse_dict_list(resp.text, ("quotes",)) if str(q.get("quote") or "").strip()]
+        if not quotes:
+            # JSON 被截断/格式跑偏时，从原始文本里正则捞 quote 字段兜底
+            for m in re.finditer(r'"quote"\s*:\s*"([^"]{4,80})"', resp.text):
+                quotes.append({"quote": m.group(1).strip(), "why": ""})
+        if not quotes:
+            raise ValueError("金句解析失败：模型未返回有效内容，请重试")
         payload = {"topic": topic, "quotes": quotes}
         path = self._save_json(topic or "quotes", "quotes", payload)
         return self._result(payload, [path], resp)
@@ -769,9 +900,11 @@ class WechatContentAssistant:
 
 要求：互动引导要自然，不要命令式语气；结尾必须与文章内容有关联，不能是通用模板。"""
         resp = self.client.generate(
-            system=SYSTEM_PROMPT, prompt=prompt, max_tokens=700, temperature=0.78,
+            system=SYSTEM_PROMPT, prompt=prompt, max_tokens=1200, temperature=0.78,
         )
-        endings = parse_json_list(resp.text)
+        endings = [e for e in parse_dict_list(resp.text, ("endings",)) if str(e.get("ending") or "").strip()]
+        if not endings:
+            raise ValueError("结尾方案解析失败：模型未返回有效内容，请重试")
         payload = {"topic": topic or core_viewpoint, "endings": endings}
         return self._result(payload, [], resp)
 
@@ -1186,7 +1319,9 @@ def _build_article_prompt(
     tone: str,
     word_count: str,
     requirements: str,
+    style_block: str = "",
 ) -> str:
+    style_section = f"\n{style_block}\n" if style_block else ""
     return f"""请写一篇微信公众号正文，使用 Markdown 输出。
 
 选题：
@@ -1206,7 +1341,7 @@ def _build_article_prompt(
 
 内容气质：
 {tone or "客观理性，有温度"}
-
+{style_section}
 字数目标：{word_count}
 
 要求：
@@ -1235,6 +1370,66 @@ def parse_json_list(text: str) -> list[dict]:
             "titles": [str(x).strip() for x in titles[:3] if str(x).strip()],
         })
     return normalized
+
+
+def _salvage_json_objects(text: str) -> list[dict]:
+    """从（可能被 max_tokens 截断的）文本中打捞所有完整的顶层 {...} 对象。"""
+    # 有数组则从数组内开始扫，避免 {"quotes": [ 这类未闭合的外层包装吞掉扫描深度
+    bracket = text.find("[")
+    if bracket >= 0:
+        text = text[bracket + 1:]
+    objects: list[dict] = []
+    depth, start, in_string, escaped = 0, -1, False, False
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start >= 0:
+                candidate = text[start:i + 1]
+                for c in (candidate, _sanitize_json_str(candidate)):
+                    try:
+                        obj = json.loads(c)
+                        if isinstance(obj, dict):
+                            objects.append(obj)
+                        break
+                    except json.JSONDecodeError:
+                        continue
+                start = -1
+    return objects
+
+
+def parse_dict_list(text: str, wrapper_keys: tuple[str, ...] = ()) -> list[dict]:
+    """解析模型返回的 dict 列表，保留原始字段（不做选题式归一化）。
+
+    兼容裸数组和 {"quotes": [...]} / {"data": [...]} 等包装形式；
+    JSON 因 max_tokens 截断时，打捞其中已完整的对象。
+    解析失败返回空列表，由调用方决定兜底或报错。
+    """
+    try:
+        parsed = parse_json_value(text)
+    except (json.JSONDecodeError, ValueError):
+        return _salvage_json_objects(text)
+    if isinstance(parsed, dict):
+        for key in (*wrapper_keys, "data", "items", "results"):
+            if isinstance(parsed.get(key), list):
+                parsed = parsed[key]
+                break
+    if not isinstance(parsed, list):
+        return _salvage_json_objects(text)
+    return [item for item in parsed if isinstance(item, dict)]
 
 
 def parse_title_list(text: str) -> list[str]:

@@ -615,6 +615,7 @@ class WechatArticleRequest(BaseModel):
     provider: str = ""
     model: str = ""
     mode: str = "rich"
+    style: str = "auto"
 
 class WechatTitlesRequest(BaseModel):
     markdown: str = ""
@@ -625,6 +626,8 @@ class WechatTitlesRequest(BaseModel):
     tone: str = ""
     provider: str = ""
     model: str = ""
+    style: str = "auto"
+    kept_titles: list[str] = Field(default_factory=list)
 
 class WechatConvertRequest(BaseModel):
     markdown: str
@@ -830,6 +833,7 @@ def wechat_assistant_article(body: WechatArticleRequest):
             audience=body.audience,
             tone=body.tone,
             mode=body.mode,
+            style=body.style,
         )
         return _wechat_json(result)
     except Exception as exc:
@@ -848,6 +852,7 @@ def wechat_assistant_article_stream(body: WechatArticleRequest):
                 audience=body.audience,
                 tone=body.tone,
                 mode=body.mode,
+                style=body.style,
             ):
                 if chunk.startswith("\x00"):
                     meta = chunk[1:]
@@ -875,6 +880,8 @@ def wechat_assistant_titles(body: WechatTitlesRequest):
                 content_notes=body.content_notes,
                 audience=body.audience,
                 tone=body.tone,
+                style=body.style,
+                kept_titles=body.kept_titles,
             )
         return _wechat_json(result)
     except Exception as exc:

@@ -389,6 +389,19 @@
                     <label class="wx-label">自定义话题</label>
                     <input class="wx-input" id="customTopicInput" placeholder="不追热点时可直接输入" oninput="saveForm()">
                 </div>
+                <div class="wx-field" style="margin-bottom:8px;">
+                    <label class="wx-label">文章风格 <span style="color:#94a3b8;font-size:10px;">按选题方向调整文风与标题</span></label>
+                    <select class="wx-select" id="styleSelect" onchange="saveForm()">
+                        <option value="auto">自动（按选题判断）</option>
+                        <option value="hot_news">时事热评 · 观点犀利</option>
+                        <option value="finance">财经投资 · 严谨专业</option>
+                        <option value="tech">科技解读 · 通俗前瞻</option>
+                        <option value="emotion">情感生活 · 叙事温暖</option>
+                        <option value="career">职场成长 · 干货实用</option>
+                        <option value="culture">文化娱乐 · 轻松有趣</option>
+                        <option value="health">健康科普 · 亲和可信</option>
+                    </select>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
                     <button class="wx-btn primary" id="btnHotTopics" type="button" onclick="fetchHotTopics()">获取热点 50</button>
                     <button class="wx-btn" type="button" onclick="useCustomTopic()">使用自定义</button>
@@ -924,7 +937,7 @@ const GENERATION_BTN_IDS = [
 ];
 
 // ── localStorage ──────────────────────────────────────────────────────────────
-const PERSIST_FIELDS = ['customTopicInput','coreViewpoint','contentNotesInput','audienceInput','toneInput','imagePositionSelect','accountPositioning'];
+const PERSIST_FIELDS = ['customTopicInput','coreViewpoint','contentNotesInput','audienceInput','toneInput','imagePositionSelect','accountPositioning','styleSelect'];
 const LS_KEY = 'wx_ops_v2';
 
 function saveForm() {
@@ -1423,13 +1436,27 @@ async function refreshTitles() {
         if (!topic) throw new Error('请先选择热点话题或填写自定义话题');
         setStatus('正在生成标题（含传播力评分）...');
         const prevTitle = selectedTitleInput.value;
+        // 收集勾选「保留」的标题及其评分信息，重新生成时原样保留并告知后端避开
+        const keptIdx = Array.from(document.querySelectorAll('#titleList input[data-keep]:checked'))
+            .map(cb => Number(cb.dataset.index)).filter(i => titlesState[i] != null);
+        const keptTitles = keptIdx.map(i => titlesState[i]);
+        const keptScored = keptIdx.map(i => {
+            const s = titlesScored[i];
+            return (s && s.title === titlesState[i]) ? s : { title: titlesState[i], score: 0, type: '', reason: '' };
+        });
         const data = await apiPost('/api/wechat-assistant/titles', {
             topic, core_viewpoint: iv('coreViewpoint'), content_notes: iv('contentNotesInput'),
             audience: iv('audienceInput'), tone: iv('toneInput'),
             provider: selectedProvider(), model: selectedModel(),
+            style: iv('styleSelect') || 'auto', kept_titles: keptTitles,
         });
-        titlesState = mergeKept(titlesState, data.titles || [], 'titleList', t => t);
-        titlesScored = data.titles_scored || [];
+        // 保留项在前、新标题在后；titlesScored 与 titlesState 按下标严格对齐
+        const freshScored = ((data.titles_scored && data.titles_scored.length)
+            ? data.titles_scored
+            : (data.titles || []).map(t => ({ title: t, score: 0, type: '', reason: '' }))
+        ).filter(t => !keptTitles.includes(t.title));
+        titlesState = keptTitles.concat(freshScored.map(t => t.title));
+        titlesScored = keptScored.concat(freshScored);
         selectedTitleIndex = titlesState.indexOf(prevTitle);
         if (selectedTitleIndex < 0) selectedTitleInput.value = '';
         renderTitles();
@@ -1611,7 +1638,7 @@ async function writeArticle() {
                 core_viewpoint: iv('coreViewpoint'), content_notes: iv('contentNotesInput'),
                 audience: iv('audienceInput'), tone: iv('toneInput'),
                 provider: selectedProvider(), model: selectedModel(),
-                mode: currentMode,
+                mode: currentMode, style: iv('styleSelect') || 'auto',
             }),
         });
         if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||'请求失败'); }
