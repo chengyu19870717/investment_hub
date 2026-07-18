@@ -26,6 +26,7 @@ class ComfyImageResult:
     prompt: str
     comfy_filename: str
     comfy_subfolder: str
+    speed_lora: str = ""
 
 
 DEFAULT_CHECKPOINT_ORDER = (
@@ -35,6 +36,32 @@ DEFAULT_CHECKPOINT_ORDER = (
     "realisticvision-v6-sd15.safetensors",
     "pastelmix.safetensors",
 )
+
+# 少步数加速 LoRA（按优先级）：命中即启用 Lightning 模式
+# （8步 euler/sgm_uniform/cfg1.0，cfg=1 时跳过负向分支，UNet 前向次数 16×2 → 8×1）
+SPEED_LORA_CANDIDATES = (
+    "sdxl_lightning_8step_lora.safetensors",
+    "sdxl_lightning_4step_lora.safetensors",
+    "Hyper-SDXL-8steps-lora.safetensors",
+)
+
+_SPEED_PRESETS = {
+    "sdxl_lightning_8step_lora.safetensors": {"steps": 8, "cfg": 1.0},
+    "sdxl_lightning_4step_lora.safetensors": {"steps": 4, "cfg": 1.0},
+    "Hyper-SDXL-8steps-lora.safetensors": {"steps": 8, "cfg": 1.0},
+}
+
+
+def find_speed_lora(comfy_dir: Path) -> str:
+    lora_dir = comfy_dir / "models" / "loras"
+    for name in SPEED_LORA_CANDIDATES:
+        if (lora_dir / name).is_file():
+            return name
+    return ""
+
+
+def _is_sdxl_checkpoint(checkpoint: str) -> bool:
+    return "xl" in checkpoint.lower()
 
 DEFAULT_NEGATIVE_PROMPT = (
     "low quality, blurry, jpeg artifacts, watermark, signature, logo, text, "
@@ -79,6 +106,7 @@ def generate_comfy_image(
     sampler_name: str = "dpmpp_2m",
     scheduler: str = "karras",
     timeout_seconds: int = 360,
+    speed: str = "auto",
 ) -> ComfyImageResult:
     prompt = (prompt or "").strip()
     if not prompt:
@@ -89,6 +117,16 @@ def generate_comfy_image(
     height = _snap_dimension(height, default=576)
     steps = max(1, min(int(steps or 16), 60))
     cfg = max(1.0, min(float(cfg or 6.5), 15.0))
+
+    # Lightning 加速：SDXL 底模 + 加速 LoRA 在场时覆盖采样参数（speed=off 可关闭）
+    speed_lora = ""
+    if speed != "off" and _is_sdxl_checkpoint(checkpoint):
+        speed_lora = find_speed_lora(comfy_dir)
+        if speed_lora:
+            preset = _SPEED_PRESETS[speed_lora]
+            steps, cfg = preset["steps"], preset["cfg"]
+            sampler_name, scheduler = "euler", "sgm_uniform"
+
     seed = random.randint(1, 2**63 - 1)
     positive = _enhance_prompt(prompt)
     negative = (negative_prompt or DEFAULT_NEGATIVE_PROMPT).strip()
@@ -106,6 +144,7 @@ def generate_comfy_image(
         scheduler=scheduler,
         seed=seed,
         filename_prefix=filename_prefix,
+        speed_lora=speed_lora,
     )
     prompt_id = _queue_prompt(base_url, workflow)
     image_meta = _wait_for_image(base_url, prompt_id, timeout_seconds)
@@ -126,6 +165,7 @@ def generate_comfy_image(
         prompt=positive,
         comfy_filename=str(image_meta.get("filename") or ""),
         comfy_subfolder=str(image_meta.get("subfolder") or ""),
+        speed_lora=speed_lora,
     )
 
 
@@ -141,19 +181,23 @@ def _txt2img_workflow(
     scheduler: str,
     seed: int,
     filename_prefix: str,
+    speed_lora: str = "",
 ) -> dict:
-    return {
+    # 有加速 LoRA 时插入 LoraLoader 节点，model/clip 均改走 LoRA 输出
+    model_src = ["8", 0] if speed_lora else ["1", 0]
+    clip_src = ["8", 1] if speed_lora else ["1", 1]
+    workflow = {
         "1": {
             "class_type": "CheckpointLoaderSimple",
             "inputs": {"ckpt_name": checkpoint},
         },
         "2": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"clip": ["1", 1], "text": positive},
+            "inputs": {"clip": clip_src, "text": positive},
         },
         "3": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"clip": ["1", 1], "text": negative},
+            "inputs": {"clip": clip_src, "text": negative},
         },
         "4": {
             "class_type": "EmptyLatentImage",
@@ -162,7 +206,7 @@ def _txt2img_workflow(
         "5": {
             "class_type": "KSampler",
             "inputs": {
-                "model": ["1", 0],
+                "model": model_src,
                 "seed": seed,
                 "steps": steps,
                 "cfg": cfg,
@@ -183,6 +227,18 @@ def _txt2img_workflow(
             "inputs": {"images": ["6", 0], "filename_prefix": filename_prefix},
         },
     }
+    if speed_lora:
+        workflow["8"] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "model": ["1", 0],
+                "clip": ["1", 1],
+                "lora_name": speed_lora,
+                "strength_model": 1.0,
+                "strength_clip": 1.0,
+            },
+        }
+    return workflow
 
 
 def _queue_prompt(base_url: str, workflow: dict) -> str:

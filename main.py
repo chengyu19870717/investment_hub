@@ -23,7 +23,7 @@ from requirement_docs import (
     parse_requirement_description,
     resolve_save_dir,
 )
-from wechat_assistant.comfyui_client import ComfyUIError, choose_checkpoint, generate_comfy_image, list_checkpoints
+from wechat_assistant.comfyui_client import ComfyUIError, choose_checkpoint, find_speed_lora, generate_comfy_image, list_checkpoints
 from wechat_assistant.config import load_config
 from wechat_assistant.hot_topics import fetch_hot_topics
 from wechat_assistant.llm import LLMError
@@ -670,6 +670,7 @@ class WechatRenderImagesRequest(BaseModel):
     steps: int = 16
     cfg: float = 6.5
     force: bool = False
+    speed: str = "auto"  # auto=有加速LoRA就用 / off=强制原始采样参数
 
 def _wechat_model_for_provider(provider_key: str, provider_item: dict, override: str = "") -> str:
     manual_model = (override or "").strip()
@@ -914,6 +915,7 @@ async def wechat_assistant_comfy_status():
             "url": _COMFY_FALLBACK_URLS[0],
             "default_checkpoint": default_checkpoint,
             "models": models,
+            "speed_lora": find_speed_lora(_COMFY_DIR),
         }
     except Exception as exc:
         return _wechat_error(exc)
@@ -945,49 +947,61 @@ async def wechat_assistant_render_images(body: WechatRenderImagesRequest):
         files = []
         checkpoint = body.checkpoint.strip() or choose_checkpoint(_COMFY_DIR)
 
-        for index, item in enumerate(body.images[:4]):
-            image = dict(item or {})
-            if image.get("image_url") and image.get("image_path") and not body.force:
-                rendered.append(image)
-                continue
+        # 生图期间阻止系统空闲睡眠（实测睡眠会把一次生图拖到 17+ 分钟并触发超时）
+        caffeinate_proc = None
+        try:
+            caffeinate_proc = subprocess.Popen(["/usr/bin/caffeinate", "-i"])
+        except Exception:
+            pass
+        try:
+            for index, item in enumerate(body.images[:4]):
+                image = dict(item or {})
+                if image.get("image_url") and image.get("image_path") and not body.force:
+                    rendered.append(image)
+                    continue
 
-            prompt = str(
-                image.get("prompt")
-                or image.get("scene")
-                or image.get("caption")
-                or image.get("name")
-                or ""
-            ).strip()
-            try:
-                result = await asyncio.to_thread(
-                    generate_comfy_image,
-                    prompt=prompt,
-                    output_dir=config.output_dir,
-                    comfy_dir=_COMFY_DIR,
-                    base_url=_COMFY_FALLBACK_URLS[0],
-                    checkpoint=checkpoint,
-                    width=body.width,
-                    height=body.height,
-                    steps=body.steps,
-                    cfg=body.cfg,
-                )
-                image.update({
-                    "image_path": result.image_path,
-                    "image_url": _output_public_url(result.image_path),
-                    "checkpoint": result.checkpoint,
-                    "seed": result.seed,
-                    "width": result.width,
-                    "height": result.height,
-                    "comfy_prompt": result.prompt,
-                    "comfy_filename": result.comfy_filename,
-                    "comfy_subfolder": result.comfy_subfolder,
-                    "generated_at": datetime.now().isoformat(timespec="seconds"),
-                })
-                files.append(result.image_path)
-            except Exception as exc:
-                image["render_error"] = str(exc)
-                errors.append({"index": index, "error": str(exc)})
-            rendered.append(image)
+                prompt = str(
+                    image.get("prompt")
+                    or image.get("scene")
+                    or image.get("caption")
+                    or image.get("name")
+                    or ""
+                ).strip()
+                try:
+                    result = await asyncio.to_thread(
+                        generate_comfy_image,
+                        prompt=prompt,
+                        output_dir=config.output_dir,
+                        comfy_dir=_COMFY_DIR,
+                        base_url=_COMFY_FALLBACK_URLS[0],
+                        checkpoint=checkpoint,
+                        width=body.width,
+                        height=body.height,
+                        steps=body.steps,
+                        cfg=body.cfg,
+                        speed=body.speed,
+                    )
+                    image.update({
+                        "image_path": result.image_path,
+                        "image_url": _output_public_url(result.image_path),
+                        "speed_lora": result.speed_lora,
+                        "checkpoint": result.checkpoint,
+                        "seed": result.seed,
+                        "width": result.width,
+                        "height": result.height,
+                        "comfy_prompt": result.prompt,
+                        "comfy_filename": result.comfy_filename,
+                        "comfy_subfolder": result.comfy_subfolder,
+                        "generated_at": datetime.now().isoformat(timespec="seconds"),
+                    })
+                    files.append(result.image_path)
+                except Exception as exc:
+                    image["render_error"] = str(exc)
+                    errors.append({"index": index, "error": str(exc)})
+                rendered.append(image)
+        finally:
+            if caffeinate_proc:
+                caffeinate_proc.terminate()
 
         return {
             "ok": True,
