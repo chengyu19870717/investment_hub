@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文件整理 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <link rel="stylesheet" href="/static/css/style.css?v=8">
 </head>
 <body>
     <div class="page">
@@ -50,9 +50,9 @@
             <div class="fo-panel">
                 <table class="fo-table">
                     <thead><tr>
-                        <th style="width:60px;">顺序</th><th style="width:150px;">分类目录</th>
-                        <th style="width:90px;">匹配方式</th><th>匹配内容（多个用 | 分隔）</th>
-                        <th style="width:60px;">启用</th><th style="width:70px;"></th>
+                        <th style="width:82px;">顺序</th><th style="width:160px;">分类目录</th>
+                        <th style="width:110px;">匹配方式</th><th>匹配内容（多个用 | 分隔）</th>
+                        <th style="width:52px;text-align:center;">启用</th><th style="width:74px;"></th>
                     </tr></thead>
                     <tbody id="rulesBody"></tbody>
                 </table>
@@ -238,7 +238,7 @@ async function loadRules() {
             <option value="ext" ${r.match_type === 'ext' ? 'selected' : ''}>扩展名</option>
         </select></td>
         <td><input class="fo-input" data-f="pattern" value="${esc(r.pattern)}"></td>
-        <td><input type="checkbox" data-f="enabled" ${r.enabled ? 'checked' : ''}></td>
+        <td style="text-align:center;"><input type="checkbox" data-f="enabled" ${r.enabled ? 'checked' : ''}></td>
         <td><button class="fo-btn fo-btn--danger" data-delrule="${r.id}">删除</button></td>
     </tr>`).join('');
 }

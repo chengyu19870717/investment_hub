@@ -815,6 +815,7 @@ body {
 
 .fo-btn {
     padding: 6px 12px;
+    white-space: nowrap;
     font-size: 13px;
     font-family: inherit;
     color: var(--text-secondary);
@@ -830,10 +831,17 @@ body {
 .fo-btn--primary:hover:not(:disabled) { color: #fff; filter: brightness(1.08); }
 .fo-btn--danger:hover:not(:disabled) { border-color: #ff3b30; color: #ff3b30; }
 
-.fo-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fo-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 .fo-table th, .fo-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
-.fo-table th { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+/* 表头和按钮一律不换行：列窄时中文会被挤成一字一行的竖排 */
+.fo-table th { font-size: 12px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
 .fo-table td.fo-file { word-break: break-all; }
+.fo-table td { overflow: hidden; }
+/* 规则表：输入框撑满所在单元格，匹配内容列因此能吃掉全部剩余宽度 */
+.fo-table .fo-input { width: 100%; min-width: 0; flex: none; }
+/* 只让规则表的操作列右对齐；写成 .fo-table td:last-child 会把
+   「暂无记录」这种单格行也推到右边（那一格既是 first 也是 last） */
+#rulesBody td:last-child { text-align: right; }
 
 .fo-chip {
     display: inline-block;
