@@ -28,6 +28,16 @@ from wechat_assistant.config import load_config
 from wechat_assistant.hot_topics import fetch_hot_topics
 from wechat_assistant.llm import LLMError
 from wechat_assistant.service import WechatContentAssistant
+from file_organizer import (
+    DEFAULT_RULES as ORGANIZER_DEFAULT_RULES,
+    SUGGESTED_DIRS as ORGANIZER_SUGGESTED_DIRS,
+    OrganizerError,
+    dir_summary as organizer_dir_summary,
+    organize as organizer_organize,
+    plan as organizer_plan,
+    safe_dir as organizer_safe_dir,
+    undo as organizer_undo,
+)
 from investment_snapshot import (
     load_industry_data as _snap_load_industry_data,
     build_exposures as _snap_build_exposures,
@@ -83,21 +93,45 @@ def to_pinyin(text: str = ""):
     result = "_".join(p for p in parts if p.isalpha())
     return {"result": result}
 
-FEATURES = [
-    {"title": "投资分析",       "url": "/investment-analysis", "icon": "📈", "description": "集中管理投资研究与产业链分析", "status": "active"},
-    {"title": "录音转会议纪要", "url": "/audio",         "icon": "🎙️", "description": "上传录音自动生成纪要", "status": "active"},
-    {"title": "一图一表",       "url": "/chart",         "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active"},
-    {"title": "待办管理",       "url": "/tasks",         "icon": "📝", "description": "快速登记和管理待办",   "status": "active"},
-    {"title": "微信公众号运营", "url": "/wechat-ops",    "icon": "📰", "description": "选题、正文、标题与排版生成", "status": "active"},
-    {"title": "需求文档工作流", "url": "/requirement-docs", "icon": "📄", "description": "描述解析、Word文档生成与版本管理", "status": "active"},
-    {"title": "项目清单",       "url": "/project-list",   "icon": "🧭", "description": "汇总本地项目与项目简介",     "status": "active"},
-    {"title": "数据标准",       "url": "/data-standard",  "icon": "📐", "description": "数据标准化配置与管理",   "status": "active"},
-    {"title": "代理网关",       "url": "/proxy",          "icon": "🌐", "description": "一键开关系统代理服务",   "status": "active"},
-    {"title": "富甲天下5修改器", "url": "/game-save",     "icon": "🎮", "description": "存档修改：金钱/士兵/资源",  "status": "active"},
-    {"title": "三国志14修改器",  "url": "/san14-save",    "icon": "🏯", "description": "离线存档修改：城市/武将/势力", "status": "active"},
-    {"title": "三国立志传3修改器","url": "/sango3-save",   "icon": "⚔️", "description": "存档修改：点数/天数/地图",  "status": "active"},
-    {"title": "ComfyUI",         "url": "/comfyui",       "icon": "🎨", "description": "AI绘图：启停管理 + 一键跳转", "status": "active"},
+# 首页二级菜单的分类。顺序即页面上标签页的顺序，id 与 FEATURES 的 category 对应
+FEATURE_CATEGORIES = [
+    {"id": "invest",  "label": "投资理财", "icon": "📈"},
+    {"id": "office",  "label": "办公效率", "icon": "🗂️"},
+    {"id": "data",    "label": "数据与项目", "icon": "🧭"},
+    {"id": "system",  "label": "系统工具", "icon": "⚙️"},
+    {"id": "game",    "label": "游戏工具", "icon": "🎮"},
 ]
+
+FEATURES = [
+    {"title": "投资分析",       "url": "/investment-analysis", "icon": "📈", "description": "集中管理投资研究与产业链分析", "status": "active", "category": "invest"},
+    {"title": "录音转会议纪要", "url": "/audio",         "icon": "🎙️", "description": "上传录音自动生成纪要", "status": "active", "category": "office"},
+    {"title": "一图一表",       "url": "/chart",         "icon": "🗂️", "description": "可编辑业务流程图",     "status": "active", "category": "office"},
+    {"title": "待办管理",       "url": "/tasks",         "icon": "📝", "description": "快速登记和管理待办",   "status": "active", "category": "office"},
+    {"title": "微信公众号运营", "url": "/wechat-ops",    "icon": "📰", "description": "选题、正文、标题与排版生成", "status": "active", "category": "office"},
+    {"title": "需求文档工作流", "url": "/requirement-docs", "icon": "📄", "description": "描述解析、Word文档生成与版本管理", "status": "active", "category": "office"},
+    {"title": "项目清单",       "url": "/project-list",   "icon": "🧭", "description": "汇总本地项目与项目简介",     "status": "active", "category": "data"},
+    {"title": "数据标准",       "url": "/data-standard",  "icon": "📐", "description": "数据标准化配置与管理",   "status": "active", "category": "data"},
+    {"title": "文件整理",       "url": "/file-organizer", "icon": "🗃️", "description": "按规则把下载/文稿的散落文件归类", "status": "active", "category": "system"},
+    {"title": "代理网关",       "url": "/proxy",          "icon": "🌐", "description": "一键开关系统代理服务",   "status": "active", "category": "system"},
+    {"title": "ComfyUI",         "url": "/comfyui",       "icon": "🎨", "description": "AI绘图：启停管理 + 一键跳转", "status": "active", "category": "system"},
+    {"title": "富甲天下5修改器", "url": "/game-save",     "icon": "🎮", "description": "存档修改：金钱/士兵/资源",  "status": "active", "category": "game"},
+    {"title": "三国志14修改器",  "url": "/san14-save",    "icon": "🏯", "description": "离线存档修改：城市/武将/势力", "status": "active", "category": "game"},
+    {"title": "三国立志传3修改器","url": "/sango3-save",   "icon": "⚔️", "description": "存档修改：点数/天数/地图",  "status": "active", "category": "game"},
+]
+
+
+def grouped_features():
+    """按 FEATURE_CATEGORIES 的顺序分组，空分类不出现在页面上。
+    category 缺失或写错的功能兜底进「系统工具」，避免新增功能忘了标分类就从首页消失。"""
+    valid = {c["id"] for c in FEATURE_CATEGORIES}
+    buckets = {c["id"]: [] for c in FEATURE_CATEGORIES}
+    for feature in FEATURES:
+        cid = feature.get("category")
+        buckets[cid if cid in valid else "system"].append(feature)
+    return [
+        {**cat, "features": buckets[cat["id"]]}
+        for cat in FEATURE_CATEGORIES if buckets[cat["id"]]
+    ]
 
 # ── 代理配置 ──────────────────────────────────────────────
 PROXY_IFACE  = "Wi-Fi"          # 网络接口名称
@@ -386,6 +420,54 @@ def init_db():
         )
     """)
 
+    # ── 文件整理 ──
+    # 用户纳入整理范围的目录（路径唯一）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS organizer_dirs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            path       TEXT UNIQUE NOT NULL,
+            created_at TEXT
+        )
+    """)
+    # 分类规则：priority 小的先匹配，命中即停（先具体后宽泛）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS organizer_rules (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            category   TEXT NOT NULL,
+            match_type TEXT NOT NULL DEFAULT 'keyword',  -- keyword | ext
+            pattern    TEXT NOT NULL,                    -- 多个用 | 分隔
+            priority   INTEGER NOT NULL DEFAULT 500,
+            enabled    INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT
+        )
+    """)
+    # 每次整理的移动流水，供「撤销上次整理」使用
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS organizer_runs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            directory  TEXT NOT NULL,
+            moves      TEXT NOT NULL,   -- JSON: [{filename,category,src,dest,reason}]
+            moved_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            undone_at  TEXT
+        )
+    """)
+    # 首次运行播种预置规则和候选目录
+    if conn.execute("SELECT COUNT(*) FROM organizer_rules").fetchone()[0] == 0:
+        now = datetime.now().isoformat(timespec="seconds")
+        for rule in ORGANIZER_DEFAULT_RULES:
+            conn.execute(
+                "INSERT INTO organizer_rules(category,match_type,pattern,priority,enabled,updated_at)"
+                " VALUES(?,?,?,?,1,?)",
+                (rule["category"], rule["match_type"], rule["pattern"], rule["priority"], now),
+            )
+    if conn.execute("SELECT COUNT(*) FROM organizer_dirs").fetchone()[0] == 0:
+        now = datetime.now().isoformat(timespec="seconds")
+        for d in ORGANIZER_SUGGESTED_DIRS:
+            if d.is_dir():
+                conn.execute("INSERT OR IGNORE INTO organizer_dirs(path,created_at) VALUES(?,?)",
+                             (str(d), now))
+
     conn.commit()
     conn.close()
 
@@ -411,7 +493,15 @@ def set_setting(key: str, value: str):
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "features": FEATURES})
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "features": FEATURES,
+        "groups": grouped_features(),
+    })
+
+@app.get("/file-organizer", response_class=HTMLResponse)
+def file_organizer_page(request: Request):
+    return templates.TemplateResponse("file_organizer.html", {"request": request})
 
 @app.get("/investment-analysis", response_class=HTMLResponse)
 def investment_analysis_page(request: Request):
@@ -6197,6 +6287,199 @@ async def restart_server(request: Request):
     """
     info = _spawn_restart_helper(request)
     return JSONResponse({"ok": True, "mode": "detached", **info})
+
+
+# ── 文件整理 ──────────────────────────────────────────────
+
+def _organizer_rules() -> list[dict]:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id,category,match_type,pattern,priority,enabled FROM organizer_rules ORDER BY priority, id"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+class OrganizerDirIn(BaseModel):
+    path: str
+
+
+class OrganizerRuleIn(BaseModel):
+    category: str
+    match_type: str = "keyword"
+    pattern: str
+    priority: int = 500
+    enabled: int = 1
+
+
+class OrganizerRunIn(BaseModel):
+    path: str
+    include_hidden: bool = False
+
+
+@app.get("/api/file-organizer/dirs")
+def organizer_list_dirs():
+    """列出纳管目录及各自的散落文件数。目录被用户手工删掉时不报错，标 missing 让前端提示。"""
+    conn = get_db()
+    rows = conn.execute("SELECT id,path FROM organizer_dirs ORDER BY id").fetchall()
+    conn.close()
+    items = []
+    for row in rows:
+        try:
+            directory = organizer_safe_dir(row["path"])
+            items.append({"id": row["id"], **organizer_dir_summary(directory), "missing": False})
+        except OrganizerError as exc:
+            items.append({"id": row["id"], "path": row["path"], "name": Path(row["path"]).name,
+                          "loose_count": 0, "subdir_count": 0, "missing": True, "error": str(exc)})
+    return JSONResponse({"dirs": items})
+
+
+@app.post("/api/file-organizer/dirs")
+def organizer_add_dir(body: OrganizerDirIn):
+    try:
+        directory = organizer_safe_dir(body.path)
+    except OrganizerError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    conn = get_db()
+    conn.execute("INSERT OR IGNORE INTO organizer_dirs(path,created_at) VALUES(?,?)",
+                 (str(directory), datetime.now().isoformat(timespec="seconds")))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True, "path": str(directory)})
+
+
+@app.delete("/api/file-organizer/dirs/{dir_id}")
+def organizer_delete_dir(dir_id: int):
+    """只从纳管列表移除，不碰磁盘上的目录。"""
+    conn = get_db()
+    conn.execute("DELETE FROM organizer_dirs WHERE id=?", (dir_id,))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/file-organizer/rules")
+def organizer_get_rules():
+    return JSONResponse({"rules": _organizer_rules()})
+
+
+@app.post("/api/file-organizer/rules")
+def organizer_create_rule(body: OrganizerRuleIn):
+    if not body.category.strip() or not body.pattern.strip():
+        return JSONResponse({"ok": False, "error": "分类名和匹配内容不能为空"}, status_code=400)
+    if "/" in body.category:
+        return JSONResponse({"ok": False, "error": "分类名不能包含斜杠"}, status_code=400)
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO organizer_rules(category,match_type,pattern,priority,enabled,updated_at)"
+        " VALUES(?,?,?,?,?,?)",
+        (body.category.strip(), body.match_type, body.pattern.strip(), body.priority,
+         body.enabled, datetime.now().isoformat(timespec="seconds")),
+    )
+    conn.commit()
+    rule_id = cur.lastrowid
+    conn.close()
+    return JSONResponse({"ok": True, "id": rule_id})
+
+
+@app.patch("/api/file-organizer/rules/{rule_id}")
+def organizer_update_rule(rule_id: int, body: OrganizerRuleIn):
+    conn = get_db()
+    conn.execute(
+        "UPDATE organizer_rules SET category=?,match_type=?,pattern=?,priority=?,enabled=?,updated_at=?"
+        " WHERE id=?",
+        (body.category.strip(), body.match_type, body.pattern.strip(), body.priority,
+         body.enabled, datetime.now().isoformat(timespec="seconds"), rule_id),
+    )
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True})
+
+
+@app.delete("/api/file-organizer/rules/{rule_id}")
+def organizer_delete_rule(rule_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM organizer_rules WHERE id=?", (rule_id,))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/file-organizer/preview")
+def organizer_preview(body: OrganizerRunIn):
+    """不动磁盘，只回一份「哪个文件去哪」的清单，供页面点整理前心里有数。"""
+    try:
+        directory = organizer_safe_dir(body.path)
+    except OrganizerError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    planned = organizer_plan(directory, _organizer_rules(), body.include_hidden)
+    summary: dict[str, int] = {}
+    for item in planned:
+        summary[item.category] = summary.get(item.category, 0) + 1
+    return JSONResponse({
+        "ok": True,
+        "total": len(planned),
+        "summary": summary,
+        "items": [{"filename": p.filename, "category": p.category, "reason": p.reason} for p in planned],
+    })
+
+
+@app.post("/api/file-organizer/organize")
+def organizer_run(body: OrganizerRunIn):
+    """一键整理。移动流水落 organizer_runs，供撤销使用。"""
+    try:
+        directory = organizer_safe_dir(body.path)
+    except OrganizerError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    result = organizer_organize(directory, _organizer_rules(), body.include_hidden)
+    run_id = None
+    if result.moved:
+        conn = get_db()
+        cur = conn.execute(
+            "INSERT INTO organizer_runs(directory,moves,moved_count,created_at) VALUES(?,?,?,?)",
+            (str(directory), json.dumps(result.moved, ensure_ascii=False), len(result.moved),
+             datetime.now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+        run_id = cur.lastrowid
+        conn.close()
+    return JSONResponse({
+        "ok": True,
+        "run_id": run_id,
+        "moved": len(result.moved),
+        "skipped": result.skipped,
+        "categories": result.categories,
+        "details": result.moved,
+    })
+
+
+@app.get("/api/file-organizer/runs")
+def organizer_list_runs():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id,directory,moved_count,created_at,undone_at FROM organizer_runs"
+        " ORDER BY id DESC LIMIT 20"
+    ).fetchall()
+    conn.close()
+    return JSONResponse({"runs": [dict(r) for r in rows]})
+
+
+@app.post("/api/file-organizer/runs/{run_id}/undo")
+def organizer_undo_run(run_id: int):
+    conn = get_db()
+    row = conn.execute("SELECT moves,undone_at FROM organizer_runs WHERE id=?", (run_id,)).fetchone()
+    if not row:
+        conn.close()
+        return JSONResponse({"ok": False, "error": "找不到这次整理记录"}, status_code=404)
+    if row["undone_at"]:
+        conn.close()
+        return JSONResponse({"ok": False, "error": "这次整理已经撤销过了"}, status_code=400)
+    outcome = organizer_undo(json.loads(row["moves"]))
+    conn.execute("UPDATE organizer_runs SET undone_at=? WHERE id=?",
+                 (datetime.now().isoformat(timespec="seconds"), run_id))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True, **outcome})
 
 
 if __name__ == "__main__":

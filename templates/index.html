@@ -36,28 +36,45 @@
         </header>
 
         <main class="main">
-            <div class="section-label">功能入口</div>
-            <div class="card-grid-4">
-                {% for feature in features %}
-                <a href="{{ feature.url }}"
-                   class="card {% if feature.status == 'coming_soon' %}card--disabled{% endif %}">
-                    <div class="card-icon-wrap">
-                        <span class="card-icon">{{ feature.icon }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="card-title">{{ feature.title }}</div>
-                        <div class="card-desc">{{ feature.description }}</div>
-                    </div>
-                    {% if feature.status == 'coming_soon' %}
-                    <div class="card-badge">即将上线</div>
-                    {% else %}
-                    <svg class="card-arrow" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    {% endif %}
-                </a>
+            <nav class="nav-tabs" id="navTabs">
+                <button class="nav-tab is-active" data-cat="all">
+                    <span class="nav-tab-icon">🧰</span>全部
+                    <span class="nav-tab-count">{{ features | length }}</span>
+                </button>
+                {% for group in groups %}
+                <button class="nav-tab" data-cat="{{ group.id }}">
+                    <span class="nav-tab-icon">{{ group.icon }}</span>{{ group.label }}
+                    <span class="nav-tab-count">{{ group.features | length }}</span>
+                </button>
                 {% endfor %}
-            </div>
+            </nav>
+
+            {% for group in groups %}
+            <section class="cat-section" data-cat="{{ group.id }}">
+                <div class="section-label">{{ group.icon }} {{ group.label }}</div>
+                <div class="card-grid-4">
+                    {% for feature in group.features %}
+                    <a href="{{ feature.url }}"
+                       class="card {% if feature.status == 'coming_soon' %}card--disabled{% endif %}">
+                        <div class="card-icon-wrap">
+                            <span class="card-icon">{{ feature.icon }}</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-title">{{ feature.title }}</div>
+                            <div class="card-desc">{{ feature.description }}</div>
+                        </div>
+                        {% if feature.status == 'coming_soon' %}
+                        <div class="card-badge">即将上线</div>
+                        {% else %}
+                        <svg class="card-arrow" viewBox="0 0 16 16" fill="none">
+                            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
         </main>
 
         <footer class="footer">
@@ -65,6 +82,35 @@
         </footer>
     </div>
 <script>
+// 二级菜单：全部分类都渲染在页面上，切换只是显示/隐藏，不重新请求。
+// 选中的分类记进 localStorage，刷新或从子页面返回时停在原处。
+(function () {
+    const tabs = document.querySelectorAll('#navTabs .nav-tab');
+    const sections = document.querySelectorAll('.cat-section');
+    const STORE_KEY = 'baibao_home_cat';
+
+    function apply(cat) {
+        tabs.forEach(t => t.classList.toggle('is-active', t.dataset.cat === cat));
+        sections.forEach(s => {
+            const show = (cat === 'all' || s.dataset.cat === cat);
+            s.style.display = show ? '' : 'none';
+            // 只看单个分类时，标题就冗余了（标签页已经说明是哪类）
+            const label = s.querySelector('.section-label');
+            if (label) label.style.display = (cat === 'all') ? '' : 'none';
+        });
+    }
+
+    tabs.forEach(tab => tab.addEventListener('click', () => {
+        localStorage.setItem(STORE_KEY, tab.dataset.cat);
+        apply(tab.dataset.cat);
+    }));
+
+    // 存的分类可能已被删除（改了 FEATURE_CATEGORIES），落不到实处就回到全部
+    const saved = localStorage.getItem(STORE_KEY);
+    const known = Array.from(tabs).some(t => t.dataset.cat === saved);
+    apply(known ? saved : 'all');
+})();
+
 function restartFetchWithTimeout(url, timeoutMs) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
