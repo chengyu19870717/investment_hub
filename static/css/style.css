@@ -933,8 +933,11 @@ body {
 
 .au-bar { height: 7px; background: var(--badge-bg); border-radius: 999px; overflow: hidden; }
 .au-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .35s ease; }
-.au-bar-fill.au-bar--warn { background: #ff9f0a; }
-.au-bar-fill.au-bar--danger { background: #ff3b30; }
+/* 有配额时：轨道绿=还能用的量，红条=已用掉的量 */
+.au-bar--split { background: #34c759; }
+.au-bar--split .au-bar-fill { background: #ff3b30; }
+.au-bar--split .au-bar-fill.au-bar--danger { background: #d70015; }
+.au-rest { color: #2a9d4a; font-weight: 600; }
 
 .au-tag {
     padding: 1px 6px; font-size: 10px; border-radius: 999px;

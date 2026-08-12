@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI用量查看 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=13">
 </head>
 <body>
     <div class="page">
@@ -100,8 +100,12 @@ async function api(url, opts) {
 // ── 限额条 ────────────────────────────────────────────
 function limitBar(label, percent, resetIso, opts = {}) {
     const pct = (percent === null || percent === undefined) ? null : Math.min(100, Math.max(0, percent));
-    const level = pct === null ? '' : (pct >= 90 ? ' au-bar--danger' : pct >= 70 ? ' au-bar--warn' : '');
+    // 已用=红、剩余=绿：红条盖在绿轨道上，轨道露出的部分就是还能用的量
+    const level = pct !== null && pct >= 90 ? ' au-bar--danger' : '';
     const stale = opts.stale;
+    // 剩余量单独写出来，光看百分比换算不出还能烧多少 token
+    const rest = (opts.quota && opts.used !== undefined)
+        ? `<span class="au-rest">剩余 ${fmt(Math.max(0, opts.quota - opts.used))}</span>` : '';
     // 没有官方配额的渠道（Claude），百分比只能相对用户自填的上限；
     // 点「设配额」就地填写，不必跳去设置页
     const pctHtml = pct === null
@@ -116,9 +120,9 @@ function limitBar(label, percent, resetIso, opts = {}) {
           <span>${esc(label)}${stale ? ' <span class="au-tag">旧数据</span>' : ''}</span>
           <span class="au-limit-pct">${pctHtml}</span>
         </div>
-        <div class="au-bar"><div class="au-bar-fill${level}" style="width:${pct === null ? 0 : pct}%"></div></div>
+        <div class="au-bar${pct === null ? '' : ' au-bar--split'}"><div class="au-bar-fill${level}" style="width:${pct === null ? 0 : pct}%"></div></div>
         <div class="au-limit-foot">
-          <span>${opts.usage || ''} ${quotaFoot}</span>
+          <span>${opts.usage || ''} ${rest} ${quotaFoot}</span>
           <span>${resetIso ? `重置 ${fmtTime(resetIso)} · ${until(resetIso)}` : ''}</span>
         </div>
         ${stale ? `<div class="au-hint">${esc(opts.staleHint || '')}</div>` : ''}
@@ -137,10 +141,12 @@ function channelCard(c) {
         limitsHtml =
             limitBar('5小时用量', c.window_5h.used_percent ?? null, c.window_5h.resets_at,
                      { usage: `${fmt(c.window_5h.total_tokens)} tokens · ${c.window_5h.calls} 次调用`,
-                       quotaKey: 'claude_quota_5h', quota: c.window_5h.quota }) +
+                       quotaKey: 'claude_quota_5h', quota: c.window_5h.quota,
+                       used: c.window_5h.total_tokens }) +
             limitBar('7天用量', c.window_7d.used_percent ?? null, c.window_7d.resets_at,
                      { usage: `${fmt(c.window_7d.total_tokens)} tokens · ${c.window_7d.calls} 次调用`,
-                       quotaKey: 'claude_quota_7d', quota: c.window_7d.quota });
+                       quotaKey: 'claude_quota_7d', quota: c.window_7d.quota,
+                       used: c.window_7d.total_tokens });
     }
 
     // DeepSeek 走余额口径，没有 token 概念
