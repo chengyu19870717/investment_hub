@@ -1,5 +1,14 @@
 # 变更记录
 
+## [2026-08-12] (2) - AI用量看板刷新反馈修复
+- fix: 「刷新数据」看起来没反应 —— 功能本就正常，是反馈不可见
+  - 提示条改 position:fixed 固定在视口右上角（z-index 高于 sticky header）。
+    页面有三屏高、刷新按钮在常驻 header 里，原提示留在文档流顶部，
+    滚动看分析时点刷新完全看不到反馈
+  - 无新增时文案从「claude +0、codex +0」改为「已是最新，没有新增记录」
+  - header 增加常驻「刚刷新于 HH:MM:SS」，toast 消失后仍有据可查
+  - 提示里附带 DeepSeek 最新余额
+
 ## [2026-08-12] - AI用量查看看板
 - feat: 新增「AI用量查看」功能入口 `/ai-usage`，支持 Claude Code / Codex / DeepSeek
   - 渠道总览卡片：累计 tokens、近5小时/近7天用量、最近使用时间

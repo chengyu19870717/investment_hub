@@ -886,6 +886,22 @@ body {
 .fo-toast--error { background: #ffecea; color: #ff3b30; }
 
 /* ── AI 用量看板 ──────────────────────────────────────── */
+/* 提示条固定在视口右上角。页面有三屏高而刷新按钮在 sticky header 里始终可见，
+   若提示留在文档流顶部，滚动状态下点刷新就完全看不到反馈（表现为「没反应」）。
+   z-index 需高于 .header 的 100。 */
+#toast:not(:empty) {
+    position: fixed;
+    top: 62px;
+    right: 20px;
+    z-index: 200;
+    max-width: min(460px, calc(100vw - 40px));
+    box-shadow: var(--shadow-hover);
+    animation: au-toast-in .22s ease;
+}
+@keyframes au-toast-in { from { opacity: 0; transform: translateY(-6px); } }
+
+.au-last { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
 .au-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
 .au-loading { color: var(--text-muted); font-size: 14px; padding: 12px; }
 

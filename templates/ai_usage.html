@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI用量查看 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     <div class="page">
@@ -17,7 +17,10 @@
                             <span class="logo-text">程钰的百宝箱</span>
                         </a>
                     </div>
-                    <button class="fo-btn" id="refreshBtn">🔄 刷新数据</button>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span id="lastRefresh" class="au-last"></span>
+                        <button class="fo-btn" id="refreshBtn">🔄 刷新数据</button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -271,15 +274,28 @@ function bindSeg(id, cb) {
 bindSeg('chanSeg', loadAnalysis);
 bindSeg('periodSeg', loadAnalysis);
 
+function markRefreshed() {
+    // 常驻时间戳：toast 只闪 4.5 秒，滚动看分析时很容易完全错过，
+    // 需要一个刷完仍留在屏幕上的证据
+    $('lastRefresh').textContent = '刚刷新于 ' +
+        new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
 $('refreshBtn').addEventListener('click', async () => {
     const btn = $('refreshBtn');
     btn.disabled = true; btn.textContent = '⏳ 刷新中…';
     try {
         const r = await api('/api/ai-usage/refresh', { method: 'POST' });
-        const add = Object.entries(r.inserted).map(([k, v]) => `${k} +${v}`).join('、');
-        let msg = `已刷新（${add}）`;
-        if (r.deepseek && r.deepseek.error) msg += `；DeepSeek 余额查询失败：${r.deepseek.error}`;
-        toast(msg, !!(r.deepseek && r.deepseek.error));
+        const total = Object.values(r.inserted).reduce((a, b) => a + b, 0);
+        const detail = Object.entries(r.inserted).filter(([, v]) => v > 0)
+            .map(([k, v]) => `${k} +${v}`).join('、');
+        // 「+0、+0」读起来像没反应，无新增时要明说「已是最新」
+        let msg = total > 0 ? `已刷新：新增 ${total} 条记录（${detail}）` : '已是最新，没有新增记录';
+        const ds = r.deepseek;
+        if (ds && ds.error) msg += `；DeepSeek 余额查询失败：${ds.error}`;
+        else if (ds && ds.balance !== undefined) msg += `；DeepSeek 余额 ¥${ds.balance.toFixed(2)}`;
+        toast(msg, !!(ds && ds.error));
+        markRefreshed();
         await Promise.all([loadOverview(), loadAnalysis()]);
     } catch (err) {
         toast(err.message, true);
