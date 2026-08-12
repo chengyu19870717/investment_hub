@@ -959,3 +959,20 @@ body {
 .au-breakdown { margin-top: 18px; }
 .au-sub { font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 18px 0 8px; }
 .au-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 20px; }
+
+/* 配额就地填写：没配额时是按钮，有配额时是脚注上的可点文字 */
+.au-quota-btn {
+    font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    border: 1.5px dashed var(--border); background: transparent; color: var(--text-muted);
+    cursor: pointer; transition: color .15s ease, border-color .15s ease;
+}
+.au-quota-btn:hover { color: var(--accent); border-color: var(--accent); }
+.au-quota-edit { cursor: pointer; color: var(--text-muted); border-bottom: 1px dashed var(--border); }
+.au-quota-edit:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* 明细表占比：数字 + 迷你条，数量级差异一眼可见 */
+.au-pct { display: flex; align-items: center; gap: 6px; }
+.au-pct-num { font-size: 12px; min-width: 42px; }
+.au-pct-bar { flex: 1; height: 5px; background: var(--badge-bg); border-radius: 999px; overflow: hidden; }
+.au-pct-bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.au-sub-pct { display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }

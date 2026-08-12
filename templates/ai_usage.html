@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI用量查看 - 程钰的百宝箱</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=11">
+    <link rel="stylesheet" href="/static/css/style.css?v=12">
 </head>
 <body>
     <div class="page">
@@ -102,15 +102,23 @@ function limitBar(label, percent, resetIso, opts = {}) {
     const pct = (percent === null || percent === undefined) ? null : Math.min(100, Math.max(0, percent));
     const level = pct === null ? '' : (pct >= 90 ? ' au-bar--danger' : pct >= 70 ? ' au-bar--warn' : '');
     const stale = opts.stale;
+    // 没有官方配额的渠道（Claude），百分比只能相对用户自填的上限；
+    // 点「设配额」就地填写，不必跳去设置页
+    const pctHtml = pct === null
+        ? `<button class="au-quota-btn" data-quota-key="${opts.quotaKey || ''}">设配额</button>`
+        : `${pct}%`;
+    const quotaFoot = (pct !== null && opts.quota)
+        ? `<span class="au-quota-edit" data-quota-key="${opts.quotaKey || ''}"
+                 title="点击修改配额">配额 ${fmt(opts.quota)} ✎</span>` : '';
     return `
       <div class="au-limit${stale ? ' au-limit--stale' : ''}">
         <div class="au-limit-head">
           <span>${esc(label)}${stale ? ' <span class="au-tag">旧数据</span>' : ''}</span>
-          <span class="au-limit-pct">${pct === null ? '未设配额' : pct + '%'}</span>
+          <span class="au-limit-pct">${pctHtml}</span>
         </div>
         <div class="au-bar"><div class="au-bar-fill${level}" style="width:${pct === null ? 0 : pct}%"></div></div>
         <div class="au-limit-foot">
-          <span>${opts.usage || ''}</span>
+          <span>${opts.usage || ''} ${quotaFoot}</span>
           <span>${resetIso ? `重置 ${fmtTime(resetIso)} · ${until(resetIso)}` : ''}</span>
         </div>
         ${stale ? `<div class="au-hint">${esc(opts.staleHint || '')}</div>` : ''}
@@ -128,9 +136,11 @@ function channelCard(c) {
     } else if (c.id !== 'deepseek') {
         limitsHtml =
             limitBar('5小时用量', c.window_5h.used_percent ?? null, c.window_5h.resets_at,
-                     { usage: `${fmt(c.window_5h.total_tokens)} tokens · ${c.window_5h.calls} 次调用` }) +
+                     { usage: `${fmt(c.window_5h.total_tokens)} tokens · ${c.window_5h.calls} 次调用`,
+                       quotaKey: 'claude_quota_5h', quota: c.window_5h.quota }) +
             limitBar('7天用量', c.window_7d.used_percent ?? null, c.window_7d.resets_at,
-                     { usage: `${fmt(c.window_7d.total_tokens)} tokens · ${c.window_7d.calls} 次调用` });
+                     { usage: `${fmt(c.window_7d.total_tokens)} tokens · ${c.window_7d.calls} 次调用`,
+                       quotaKey: 'claude_quota_7d', quota: c.window_7d.quota });
     }
 
     // DeepSeek 走余额口径，没有 token 概念
@@ -177,6 +187,42 @@ function channelCard(c) {
       </div>`;
 }
 
+// 配额填写：接受 3000000 / 300万 / 3M 三种写法，省得数零
+function parseQuota(text) {
+    const s = String(text || '').trim().replace(/[,，\s]/g, '');
+    if (!s) return 0;
+    const m = s.match(/^([\d.]+)\s*(万|亿|k|K|m|M)?$/);
+    if (!m) return NaN;
+    const n = parseFloat(m[1]);
+    if (isNaN(n)) return NaN;
+    const mult = { '万': 1e4, '亿': 1e8, k: 1e3, K: 1e3, m: 1e6, M: 1e6 }[m[2]] || 1;
+    return Math.round(n * mult);
+}
+
+$('cards').addEventListener('click', async (e) => {
+    const el = e.target.closest('[data-quota-key]');
+    if (!el) return;
+    const key = el.dataset.quotaKey;
+    if (!key) return;
+    const label = key.endsWith('5h') ? '5小时' : '7天';
+    const cur = CHANNELS.find(c => c.id === 'claude');
+    const now = cur ? (key.endsWith('5h') ? cur.window_5h.quota : cur.window_7d.quota) : '';
+    const input = prompt(
+        `填入你的 Claude 套餐 ${label} token 配额上限，填后按用量显示百分比。\n` +
+        `支持写法：3000000 / 300万 / 3M（留空则清除配额）`, now || '');
+    if (input === null) return;
+    const val = parseQuota(input);
+    if (isNaN(val)) { toast('配额格式不对，请填数字，如 300万', true); return; }
+    try {
+        await api('/api/ai-usage/quota', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [key]: val || '' }),
+        });
+        toast(val ? `${label}配额已设为 ${fmt(val)} tokens` : `${label}配额已清除`);
+        await loadOverview();
+    } catch (err) { toast(err.message, true); }
+});
+
 let CHANNELS = [];
 async function loadOverview() {
     const { channels } = await api('/api/ai-usage/overview');
@@ -221,16 +267,37 @@ function renderChart(buckets) {
       <svg viewBox="0 0 ${W} ${H}" class="au-chart" preserveAspectRatio="none">${bars}${labels}</svg>`;
 }
 
+// 占比：分母是本次查询的总量，写成 pct(部分, 全体)
+const pctOf = (part, whole) => whole > 0 ? (part / whole * 100) : 0;
+const pctText = (part, whole) => {
+    const p = pctOf(part, whole);
+    if (p === 0) return '0%';
+    return p < 0.1 ? '<0.1%' : p.toFixed(1) + '%';
+};
+// 单元格里的迷你占比条，让数量级差异一眼可见
+const pctCell = (part, whole) => `
+  <div class="au-pct">
+    <span class="au-pct-num">${pctText(part, whole)}</span>
+    <span class="au-pct-bar"><i style="width:${Math.min(100, pctOf(part, whole)).toFixed(1)}%"></i></span>
+  </div>`;
+
 function renderBreakdown(data) {
     const rows = data.buckets.slice().reverse().slice(0, 12);
+    const grand = data.total_tokens || 0;
     const table = `
       <table class="fo-table">
-        <thead><tr><th style="width:110px;">区间</th><th>合计</th><th>输入</th><th>输出</th>
-                   <th>缓存读</th><th>缓存写</th><th style="width:70px;">调用</th></tr></thead>
+        <thead><tr><th style="width:100px;">区间</th><th style="width:90px;">合计</th>
+                   <th style="width:120px;">占比</th>
+                   <th>输入</th><th>输出</th><th>缓存读</th><th>缓存写</th>
+                   <th style="width:60px;">调用</th></tr></thead>
         <tbody>${rows.map(b => `<tr>
           <td>${esc(b.bucket)}</td><td><b>${fmt(b.total_tokens)}</b></td>
-          <td>${fmt(b.input_tokens)}</td><td>${fmt(b.output_tokens)}</td>
-          <td>${fmt(b.cache_read)}</td><td>${fmt(b.cache_write)}</td><td>${b.calls}</td>
+          <td>${pctCell(b.total_tokens, grand)}</td>
+          <td>${fmt(b.input_tokens)}<span class="au-sub-pct">${pctText(b.input_tokens, b.total_tokens)}</span></td>
+          <td>${fmt(b.output_tokens)}<span class="au-sub-pct">${pctText(b.output_tokens, b.total_tokens)}</span></td>
+          <td>${fmt(b.cache_read)}<span class="au-sub-pct">${pctText(b.cache_read, b.total_tokens)}</span></td>
+          <td>${fmt(b.cache_write)}<span class="au-sub-pct">${pctText(b.cache_write, b.total_tokens)}</span></td>
+          <td>${b.calls}</td>
         </tr>`).join('')}</tbody>
       </table>`;
     // 每组「标题+表格」必须包在同一个 div 里：.au-two 是两列 grid，
