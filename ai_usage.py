@@ -128,11 +128,14 @@ def parse_codex_line(line: str, path: str) -> tuple[UsageRecord | None, dict | N
         cw = int(last.get("cache_write_input_tokens") or 0)
         if inp or out:
             key = hashlib.md5(f"{path}{ts}{inp}{out}{cr}{cw}".encode()).hexdigest()
+            # Codex 的 input_tokens 含缓存部分，Claude 的不含。存库前统一成
+            # 「四类互斥」口径：input 只留非缓存部分，否则同表混算时
+            # 各类占比会加起来超过 100%。总量仍是 inp+out，与官方一致。
             rec = UsageRecord(
                 channel="codex", ts=ts, dedupe_key=f"codex:{key}",
-                model="codex", input_tokens=inp, output_tokens=out,
+                model="codex", input_tokens=max(0, inp - cr - cw), output_tokens=out,
                 cache_read=cr, cache_write=cw,
-                total_tokens=inp + out,   # cached 已包含在 input 里，再加会重复
+                total_tokens=inp + out,
                 session_id=Path(path).stem[-36:], project="codex",
             )
     snapshot = None
