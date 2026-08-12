@@ -25,3 +25,10 @@ uploads/
 ~/.baibao/baibao.db
 .env
 *.log
+
+# 浏览器自动化产物与临时截图（验证用，不入库）
+.playwright-cli/
+.playwright-mcp/
+*.png
+output/
+stock_analysis.db
