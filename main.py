@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 import sqlite3, json, re, os, subprocess, struct, asyncio, sys, threading, hashlib
@@ -28,6 +28,7 @@ from wechat_assistant.config import load_config
 from wechat_assistant.hot_topics import fetch_hot_topics
 from wechat_assistant.llm import LLMError
 from wechat_assistant.service import WechatContentAssistant
+import ai_usage
 from file_organizer import (
     DEFAULT_RULES as ORGANIZER_DEFAULT_RULES,
     SUGGESTED_DIRS as ORGANIZER_SUGGESTED_DIRS,
@@ -111,6 +112,7 @@ FEATURES = [
     {"title": "需求文档工作流", "url": "/requirement-docs", "icon": "📄", "description": "描述解析、Word文档生成与版本管理", "status": "active", "category": "office"},
     {"title": "项目清单",       "url": "/project-list",   "icon": "🧭", "description": "汇总本地项目与项目简介",     "status": "active", "category": "data"},
     {"title": "数据标准",       "url": "/data-standard",  "icon": "📐", "description": "数据标准化配置与管理",   "status": "active", "category": "data"},
+    {"title": "AI用量查看",     "url": "/ai-usage",       "icon": "📊", "description": "Claude/Codex/DeepSeek token 用量与限额看板", "status": "active", "category": "system"},
     {"title": "文件整理",       "url": "/file-organizer", "icon": "🗃️", "description": "按规则把下载/文稿的散落文件归类", "status": "active", "category": "system"},
     {"title": "代理网关",       "url": "/proxy",          "icon": "🌐", "description": "一键开关系统代理服务",   "status": "active", "category": "system"},
     {"title": "ComfyUI",         "url": "/comfyui",       "icon": "🎨", "description": "AI绘图：启停管理 + 一键跳转", "status": "active", "category": "system"},
@@ -420,6 +422,54 @@ def init_db():
         )
     """)
 
+    # ── AI 用量 ──
+    # 逐条用量记录。dedupe_key 唯一，兼防「同文件重复读」和「续接会话跨文件重放」
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_usage_records (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel       TEXT NOT NULL,
+            ts            TEXT NOT NULL,       -- ISO8601 UTC
+            dedupe_key    TEXT UNIQUE NOT NULL,
+            model         TEXT,
+            input_tokens  INTEGER DEFAULT 0,
+            output_tokens INTEGER DEFAULT 0,
+            cache_read    INTEGER DEFAULT 0,
+            cache_write   INTEGER DEFAULT 0,
+            total_tokens  INTEGER DEFAULT 0,
+            session_id    TEXT,
+            project       TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_usage_ch_ts ON ai_usage_records(channel, ts)")
+    # 每个日志文件已读到的字节偏移，实现增量摄取
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_usage_files (
+            path       TEXT PRIMARY KEY,
+            offset     INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+    # 官方限额快照（目前只有 Codex 提供）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_usage_limits (
+            channel    TEXT PRIMARY KEY,
+            payload    TEXT NOT NULL,   -- JSON: rate_limits 原文
+            captured_at TEXT
+        )
+    """)
+    # DeepSeek 余额快照：官方无 usage 接口，消费额只能靠余额差值反推
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_usage_balance (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel  TEXT NOT NULL,
+            day      TEXT NOT NULL,
+            balance  REAL NOT NULL,
+            currency TEXT DEFAULT 'CNY',
+            captured_at TEXT,
+            UNIQUE(channel, day)
+        )
+    """)
+
     # ── 文件整理 ──
     # 用户纳入整理范围的目录（路径唯一）
     conn.execute("""
@@ -502,6 +552,10 @@ def index(request: Request):
 @app.get("/file-organizer", response_class=HTMLResponse)
 def file_organizer_page(request: Request):
     return templates.TemplateResponse("file_organizer.html", {"request": request})
+
+@app.get("/ai-usage", response_class=HTMLResponse)
+def ai_usage_page(request: Request):
+    return templates.TemplateResponse("ai_usage.html", {"request": request})
 
 @app.get("/investment-analysis", response_class=HTMLResponse)
 def investment_analysis_page(request: Request):
@@ -6287,6 +6341,194 @@ async def restart_server(request: Request):
     """
     info = _spawn_restart_helper(request)
     return JSONResponse({"ok": True, "mode": "detached", **info})
+
+
+# ── AI 用量 ───────────────────────────────────────────────
+
+def _ai_usage_ingest() -> dict:
+    """增量摄取 Claude / Codex 日志。只读各文件未读过的字节，因此可以随时调用。"""
+    conn = get_db()
+    offsets = {r["path"]: r["offset"] for r in
+               conn.execute("SELECT path, offset FROM ai_usage_files").fetchall()}
+    now = datetime.now().isoformat(timespec="seconds")
+    inserted = {}
+    for channel in ("claude", "codex"):
+        records, new_offsets, limits = ai_usage.scan_channel(channel, offsets)
+        count = 0
+        for rec in records:
+            # INSERT OR IGNORE + UNIQUE(dedupe_key)：续接会话跨文件重放的消息会被挡掉
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO ai_usage_records"
+                "(channel,ts,dedupe_key,model,input_tokens,output_tokens,"
+                " cache_read,cache_write,total_tokens,session_id,project)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (rec.channel, rec.ts, rec.dedupe_key, rec.model, rec.input_tokens,
+                 rec.output_tokens, rec.cache_read, rec.cache_write, rec.total_tokens,
+                 rec.session_id, rec.project),
+            )
+            count += cur.rowcount
+        for path, offset in new_offsets.items():
+            conn.execute(
+                "INSERT INTO ai_usage_files(path,offset,updated_at) VALUES(?,?,?)"
+                " ON CONFLICT(path) DO UPDATE SET offset=excluded.offset, updated_at=excluded.updated_at",
+                (path, offset, now))
+        if limits:
+            conn.execute(
+                "INSERT INTO ai_usage_limits(channel,payload,captured_at) VALUES(?,?,?)"
+                " ON CONFLICT(channel) DO UPDATE SET payload=excluded.payload,"
+                " captured_at=excluded.captured_at",
+                (channel, json.dumps(limits, ensure_ascii=False), now))
+        inserted[channel] = count
+    conn.commit()
+    conn.close()
+    return inserted
+
+
+def _ai_usage_rows(channel: str | None = None, since_days: int | None = None) -> list[dict]:
+    conn = get_db()
+    sql = "SELECT channel,ts,model,input_tokens,output_tokens,cache_read,cache_write," \
+          "total_tokens,session_id,project FROM ai_usage_records"
+    params: list = []
+    where = []
+    if channel and channel != "all":
+        where.append("channel=?")
+        params.append(channel)
+    if since_days:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat()
+        where.append("ts>=?")
+        params.append(cutoff)
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+
+def _ai_usage_snapshot_balance() -> dict | None:
+    """查一次 DeepSeek 余额并按天落快照。同一天重复查只更新当天那条。"""
+    key = get_setting("deepseek_api_key")
+    if not key:
+        return None
+    try:
+        payload = ai_usage.fetch_deepseek_balance(key)
+    except Exception as exc:
+        return {"error": str(exc)}
+    balance = ai_usage.cny_balance(payload)
+    if balance is None:
+        return {"error": "响应中没有 CNY 余额"}
+    today = datetime.now().strftime("%Y-%m-%d")
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO ai_usage_balance(channel,day,balance,currency,captured_at) VALUES('deepseek',?,?,'CNY',?)"
+        " ON CONFLICT(channel,day) DO UPDATE SET balance=excluded.balance, captured_at=excluded.captured_at",
+        (today, balance, datetime.now().isoformat(timespec="seconds")))
+    conn.commit()
+    conn.close()
+    return {"balance": balance, "currency": "CNY", "day": today}
+
+
+def _deepseek_daily_spend() -> list[dict]:
+    """余额快照差值 → 每日消费额。余额上升说明充值了，这天不计消费。"""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT day, balance FROM ai_usage_balance WHERE channel='deepseek' ORDER BY day"
+    ).fetchall()
+    conn.close()
+    out = []
+    prev = None
+    for row in rows:
+        spend = None
+        if prev is not None:
+            diff = prev - row["balance"]
+            spend = round(diff, 2) if diff > 0 else 0.0
+        out.append({"day": row["day"], "balance": row["balance"], "spend": spend})
+        prev = row["balance"]
+    return out
+
+
+@app.post("/api/ai-usage/refresh")
+def ai_usage_refresh():
+    inserted = _ai_usage_ingest()
+    balance = _ai_usage_snapshot_balance()
+    return JSONResponse({"ok": True, "inserted": inserted, "deepseek": balance})
+
+
+@app.get("/api/ai-usage/overview")
+def ai_usage_overview(refresh: int = 1):
+    """看板主接口：各渠道用量 + 5小时/7天窗口 + 官方限额 + DeepSeek 余额。"""
+    if refresh:
+        _ai_usage_ingest()
+    conn = get_db()
+    limit_rows = {r["channel"]: json.loads(r["payload"])
+                  for r in conn.execute("SELECT channel,payload FROM ai_usage_limits").fetchall()}
+    bal_row = conn.execute(
+        "SELECT day,balance,currency FROM ai_usage_balance WHERE channel='deepseek'"
+        " ORDER BY day DESC LIMIT 1").fetchone()
+    conn.close()
+
+    channels = []
+    for cid, meta in ai_usage.CHANNELS.items():
+        rows = _ai_usage_rows(cid)
+        total = sum(r["total_tokens"] for r in rows)
+        item = {
+            "id": cid, "label": meta["label"], "icon": meta["icon"],
+            "total_tokens": total, "calls": len(rows),
+            "first_ts": min((r["ts"] for r in rows), default=None),
+            "last_ts": max((r["ts"] for r in rows), default=None),
+            "window_5h": ai_usage.window_usage(rows, ai_usage.WINDOW_5H),
+            "window_7d": ai_usage.window_usage(rows, ai_usage.WINDOW_7D),
+            "official_limits": [],
+            "limit_source": "self",   # self=自算滚动窗口, official=官方口径
+            "note": "",
+        }
+        snap = limit_rows.get(cid)
+        if snap and snap.get("windows"):
+            item["official_limits"] = ai_usage.parse_codex_limits(snap)
+            item["limit_source"] = "official"
+            item["captured_at"] = snap.get("ts")
+            item["credits"] = snap.get("credits") or {}
+            item["plan_type"] = snap.get("plan_type")
+        if cid == "claude":
+            item["note"] = "Claude Code 本地日志不含官方限额，以下为按滚动窗口自算的用量"
+            # 用户可在设置里填自己套餐的配额上限，填了才显示百分比
+            for win, key in (("window_5h", "claude_quota_5h"), ("window_7d", "claude_quota_7d")):
+                quota = get_setting(key, "")
+                if quota.isdigit() and int(quota) > 0:
+                    item[win]["quota"] = int(quota)
+                    item[win]["used_percent"] = round(
+                        item[win]["total_tokens"] / int(quota) * 100, 1)
+        if cid == "deepseek":
+            item["note"] = "DeepSeek 官方无 token 用量接口，按余额快照差值统计消费额"
+            item["balance"] = dict(bal_row) if bal_row else None
+            item["daily_spend"] = _deepseek_daily_spend()[-30:]
+        channels.append(item)
+    return JSONResponse({"channels": channels})
+
+
+@app.get("/api/ai-usage/analysis")
+def ai_usage_analysis(channel: str = "all", period: str = "day", limit: int = 30):
+    if period not in ("day", "week", "month", "year"):
+        return JSONResponse({"ok": False, "error": "period 只能是 day/week/month/year"},
+                            status_code=400)
+    rows = _ai_usage_rows(channel)
+    buckets = ai_usage.aggregate(rows, period)[-limit:]
+    return JSONResponse({
+        "ok": True, "channel": channel, "period": period,
+        "buckets": buckets,
+        "by_model": ai_usage.by_model(rows),
+        "by_project": ai_usage.by_project(rows),
+        "total_tokens": sum(r["total_tokens"] for r in rows),
+        "calls": len(rows),
+    })
+
+
+@app.post("/api/ai-usage/quota")
+def ai_usage_set_quota(body: dict):
+    """保存 Claude 套餐配额上限（本地日志拿不到，只能人工填）。"""
+    for key in ("claude_quota_5h", "claude_quota_7d"):
+        if key in body:
+            set_setting(key, str(body[key] or ""))
+    return JSONResponse({"ok": True})
 
 
 # ── 文件整理 ──────────────────────────────────────────────

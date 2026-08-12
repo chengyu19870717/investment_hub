@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI用量查看 - 程钰的百宝箱</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=10">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-inner">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div class="logo">
+                        <a href="/" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;">
+                            <span class="logo-icon">🧰</span>
+                            <span class="logo-text">程钰的百宝箱</span>
+                        </a>
+                    </div>
+                    <button class="fo-btn" id="refreshBtn">🔄 刷新数据</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <div id="toast"></div>
+
+            <div class="section-label">📊 渠道总览</div>
+            <div id="cards" class="au-cards">
+                <div class="au-loading">正在读取本地日志…</div>
+            </div>
+
+            <div class="section-label">📈 用量分析</div>
+            <div class="fo-panel">
+                <div class="fo-row" style="margin-bottom:14px;">
+                    <div class="au-seg" id="chanSeg"></div>
+                    <div class="au-seg" id="periodSeg">
+                        <button class="au-seg-btn is-active" data-period="day">日度</button>
+                        <button class="au-seg-btn" data-period="week">周度</button>
+                        <button class="au-seg-btn" data-period="month">月度</button>
+                        <button class="au-seg-btn" data-period="year">年度</button>
+                    </div>
+                </div>
+                <div id="chart"></div>
+                <div id="breakdown" class="au-breakdown"></div>
+            </div>
+        </main>
+
+        <footer class="footer"><span>程钰的百宝箱 · 本地版</span></footer>
+    </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// 大数字压缩：token 动辄上亿，完整数字在卡片里读不出量级
+function fmt(n) {
+    n = Number(n || 0);
+    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
+    if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+    return n.toLocaleString();
+}
+const fmtFull = n => Number(n || 0).toLocaleString();
+
+function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return '—';
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit',
+                                       hour: '2-digit', minute: '2-digit' });
+}
+
+// 距现在还有多久 —— 重置时间光看时刻不够直观
+function until(iso) {
+    if (!iso) return '';
+    const ms = new Date(iso) - Date.now();
+    if (isNaN(ms)) return '';
+    if (ms <= 0) return '已重置';
+    const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
+    return h >= 24 ? `还剩 ${Math.floor(h / 24)} 天 ${h % 24} 小时`
+                   : (h > 0 ? `还剩 ${h} 小时 ${m} 分` : `还剩 ${m} 分`);
+}
+
+function toast(msg, isError) {
+    $('toast').innerHTML = `<div class="fo-toast ${isError ? 'fo-toast--error' : ''}">${esc(msg)}</div>`;
+    setTimeout(() => { $('toast').innerHTML = ''; }, 4500);
+}
+
+async function api(url, opts) {
+    const res = await fetch(url, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || `请求失败 (${res.status})`);
+    return data;
+}
+
+// ── 限额条 ────────────────────────────────────────────
+function limitBar(label, percent, resetIso, opts = {}) {
+    const pct = (percent === null || percent === undefined) ? null : Math.min(100, Math.max(0, percent));
+    const level = pct === null ? '' : (pct >= 90 ? ' au-bar--danger' : pct >= 70 ? ' au-bar--warn' : '');
+    const stale = opts.stale;
+    return `
+      <div class="au-limit${stale ? ' au-limit--stale' : ''}">
+        <div class="au-limit-head">
+          <span>${esc(label)}${stale ? ' <span class="au-tag">旧数据</span>' : ''}</span>
+          <span class="au-limit-pct">${pct === null ? '未设配额' : pct + '%'}</span>
+        </div>
+        <div class="au-bar"><div class="au-bar-fill${level}" style="width:${pct === null ? 0 : pct}%"></div></div>
+        <div class="au-limit-foot">
+          <span>${opts.usage || ''}</span>
+          <span>${resetIso ? `重置 ${fmtTime(resetIso)} · ${until(resetIso)}` : ''}</span>
+        </div>
+        ${stale ? `<div class="au-hint">${esc(opts.staleHint || '')}</div>` : ''}
+      </div>`;
+}
+
+function channelCard(c) {
+    // 官方限额（Codex）优先；没有就用自算滚动窗口
+    let limitsHtml = '';
+    if (c.official_limits && c.official_limits.length) {
+        limitsHtml = c.official_limits.map(l =>
+            limitBar(l.label, l.used_percent, l.resets_at,
+                     { stale: l.stale, staleHint: l.stale_hint,
+                       usage: `官方口径 · 采集于 ${fmtTime(l.captured_at)}` })).join('');
+    } else if (c.id !== 'deepseek') {
+        limitsHtml =
+            limitBar('5小时用量', c.window_5h.used_percent ?? null, c.window_5h.resets_at,
+                     { usage: `${fmt(c.window_5h.total_tokens)} tokens · ${c.window_5h.calls} 次调用` }) +
+            limitBar('7天用量', c.window_7d.used_percent ?? null, c.window_7d.resets_at,
+                     { usage: `${fmt(c.window_7d.total_tokens)} tokens · ${c.window_7d.calls} 次调用` });
+    }
+
+    // DeepSeek 走余额口径，没有 token 概念
+    let bodyHtml;
+    if (c.id === 'deepseek') {
+        const bal = c.balance;
+        const spends = (c.daily_spend || []).filter(d => d.spend !== null);
+        const recent = spends.slice(-7);
+        bodyHtml = `
+          <div class="au-metric">
+            <div class="au-metric-val">${bal ? '¥' + bal.balance.toFixed(2) : '—'}</div>
+            <div class="au-metric-key">账户余额${bal ? ' · ' + esc(bal.day) : ''}</div>
+          </div>
+          <div class="au-spend">
+            ${recent.length
+              ? recent.map(d => `<div class="au-spend-row"><span>${esc(d.day)}</span><b>¥${d.spend.toFixed(2)}</b></div>`).join('')
+              : '<div class="au-hint">余额快照不足两天，明天起可显示每日消费额</div>'}
+          </div>`;
+    } else {
+        const w = c.window_7d;
+        bodyHtml = `
+          <div class="au-metric">
+            <div class="au-metric-val">${fmt(c.total_tokens)}</div>
+            <div class="au-metric-key">累计 tokens · ${fmtFull(c.calls)} 次调用</div>
+          </div>
+          <div class="au-mini">
+            <div><span>近7天</span><b>${fmt(w.total_tokens)}</b></div>
+            <div><span>近5小时</span><b>${fmt(c.window_5h.total_tokens)}</b></div>
+            <div><span>最近使用</span><b>${fmtTime(c.last_ts)}</b></div>
+          </div>`;
+    }
+
+    return `
+      <div class="au-card">
+        <div class="au-card-head">
+          <span class="au-card-icon">${c.icon}</span>
+          <span class="au-card-title">${esc(c.label)}</span>
+          ${c.plan_type ? `<span class="fo-chip fo-chip--muted">${esc(c.plan_type)}</span>` : ''}
+          ${c.limit_source === 'official' ? '<span class="fo-chip">官方限额</span>' : ''}
+        </div>
+        ${bodyHtml}
+        ${limitsHtml}
+        ${c.note ? `<div class="au-hint">${esc(c.note)}</div>` : ''}
+      </div>`;
+}
+
+let CHANNELS = [];
+async function loadOverview() {
+    const { channels } = await api('/api/ai-usage/overview');
+    CHANNELS = channels;
+    $('cards').innerHTML = channels.map(channelCard).join('');
+    if (!$('chanSeg').dataset.built) {
+        $('chanSeg').innerHTML =
+            `<button class="au-seg-btn is-active" data-chan="all">全部</button>` +
+            channels.map(c => `<button class="au-seg-btn" data-chan="${c.id}">${c.icon} ${esc(c.label)}</button>`).join('');
+        $('chanSeg').dataset.built = '1';
+    }
+}
+
+// ── 柱状图（内联 SVG，与项目其他图表一致，不引外部库）────
+function renderChart(buckets) {
+    if (!buckets.length) {
+        $('chart').innerHTML = '<div class="au-hint">该渠道暂无数据</div>';
+        return;
+    }
+    const W = 100, H = 30, pad = 2;               // viewBox 单位，靠 CSS 拉伸自适应
+    const max = Math.max(...buckets.map(b => b.total_tokens)) || 1;
+    const bw = (W - pad * 2) / buckets.length;
+    const bars = buckets.map((b, i) => {
+        const h = (b.total_tokens / max) * (H - 6);
+        const x = pad + i * bw, y = H - 3 - h;
+        return `<rect x="${(x + bw * 0.15).toFixed(2)}" y="${y.toFixed(2)}"
+                      width="${(bw * 0.7).toFixed(2)}" height="${Math.max(h, 0.3).toFixed(2)}"
+                      rx="0.3" fill="var(--accent)" opacity="0.85">
+                  <title>${esc(b.bucket)}：${fmtFull(b.total_tokens)} tokens · ${b.calls} 次</title>
+                </rect>`;
+    }).join('');
+    // 首尾+中间各标一个刻度，标签太密会糊成一片
+    const idxs = [...new Set([0, Math.floor(buckets.length / 2), buckets.length - 1])];
+    const labels = idxs.map(i => {
+        const x = pad + i * bw + bw / 2;
+        const anchor = i === 0 ? 'start' : (i === buckets.length - 1 ? 'end' : 'middle');
+        return `<text x="${x.toFixed(2)}" y="${H - 0.4}" font-size="1.5" fill="var(--text-muted)"
+                      text-anchor="${anchor}">${esc(buckets[i].bucket)}</text>`;
+    }).join('');
+    $('chart').innerHTML = `
+      <div class="au-chart-max">峰值 ${fmt(max)} tokens</div>
+      <svg viewBox="0 0 ${W} ${H}" class="au-chart" preserveAspectRatio="none">${bars}${labels}</svg>`;
+}
+
+function renderBreakdown(data) {
+    const rows = data.buckets.slice().reverse().slice(0, 12);
+    const table = `
+      <table class="fo-table">
+        <thead><tr><th style="width:110px;">区间</th><th>合计</th><th>输入</th><th>输出</th>
+                   <th>缓存读</th><th>缓存写</th><th style="width:70px;">调用</th></tr></thead>
+        <tbody>${rows.map(b => `<tr>
+          <td>${esc(b.bucket)}</td><td><b>${fmt(b.total_tokens)}</b></td>
+          <td>${fmt(b.input_tokens)}</td><td>${fmt(b.output_tokens)}</td>
+          <td>${fmt(b.cache_read)}</td><td>${fmt(b.cache_write)}</td><td>${b.calls}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    // 每组「标题+表格」必须包在同一个 div 里：.au-two 是两列 grid，
+    // 散着放会让标题占一格、表格占另一格，标题和内容对不上
+    const models = data.by_model.length ? `
+      <div>
+        <div class="au-sub">按模型</div>
+        <table class="fo-table"><tbody>${data.by_model.map(m => `<tr>
+          <td>${esc(m.model)}</td><td style="width:110px;"><b>${fmt(m.total_tokens)}</b></td>
+          <td style="width:80px;">${m.calls} 次</td></tr>`).join('')}</tbody></table>
+      </div>` : '';
+    const projects = data.by_project.length ? `
+      <div>
+        <div class="au-sub">按项目</div>
+        <table class="fo-table"><tbody>${data.by_project.map(p => `<tr>
+          <td class="fo-file">${esc(p.project)}</td><td style="width:110px;"><b>${fmt(p.total_tokens)}</b></td>
+          <td style="width:80px;">${p.calls} 次</td></tr>`).join('')}</tbody></table>
+      </div>` : '';
+    $('breakdown').innerHTML = `
+      <div class="au-sub">分区间明细（缓存读通常占大头，单独列出以免总量失真）</div>
+      ${table}
+      <div class="au-two" style="align-items:start;">${models}${projects}</div>`;
+}
+
+async function loadAnalysis() {
+    const chan = $('chanSeg').querySelector('.is-active')?.dataset.chan || 'all';
+    const period = $('periodSeg').querySelector('.is-active').dataset.period;
+    const data = await api(`/api/ai-usage/analysis?channel=${chan}&period=${period}&limit=40`);
+    renderChart(data.buckets);
+    renderBreakdown(data);
+}
+
+function bindSeg(id, cb) {
+    $(id).addEventListener('click', e => {
+        const btn = e.target.closest('.au-seg-btn');
+        if (!btn) return;
+        $(id).querySelectorAll('.au-seg-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+        cb();
+    });
+}
+bindSeg('chanSeg', loadAnalysis);
+bindSeg('periodSeg', loadAnalysis);
+
+$('refreshBtn').addEventListener('click', async () => {
+    const btn = $('refreshBtn');
+    btn.disabled = true; btn.textContent = '⏳ 刷新中…';
+    try {
+        const r = await api('/api/ai-usage/refresh', { method: 'POST' });
+        const add = Object.entries(r.inserted).map(([k, v]) => `${k} +${v}`).join('、');
+        let msg = `已刷新（${add}）`;
+        if (r.deepseek && r.deepseek.error) msg += `；DeepSeek 余额查询失败：${r.deepseek.error}`;
+        toast(msg, !!(r.deepseek && r.deepseek.error));
+        await Promise.all([loadOverview(), loadAnalysis()]);
+    } catch (err) {
+        toast(err.message, true);
+    } finally {
+        btn.disabled = false; btn.textContent = '🔄 刷新数据';
+    }
+});
+
+(async () => {
+    try {
+        await loadOverview();
+        await loadAnalysis();
+    } catch (err) { toast(err.message, true); }
+})();
+</script>
+</body>
+</html>
